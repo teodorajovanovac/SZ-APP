@@ -44,12 +44,19 @@ predloga.
 FK: `PredstavnikSS_ID` → Kupac (pretpostavka), `NaseljeLNK` → Naselje, `Upravnik` → Staff (pretp.).
 Ovo je koren organizacione hijerarhije — skoro sve ostale tabele se svode na nju kroz `lnkSkupstinaID`/`ID_SK`/`SK_ID`/`IDSZ` (**nekonzistentno imenovanje kroz staru bazu — u novoj šemi predlažem da svuda bude `SkustinaId`**).
 
-> **Komentar:**tabelu Kupac bih preimenovao u Partner, jer se tu nalaze i Vlasnici (kupci) i dobavljači a takođe podatke iz tabele Skupstina bih čuvao u istoj tabeli. 
+> **Komentar:**
+Kako bi se idetifikovali partneri za koje se radi kreirao bih posebnu tabelu MyCompany sa strukutorom
+CompanyId - isto što i SkupstinaID / SZID što predstavlja trenutno tabelu Skupstina.
+
+Tabelu Kupac bih preimenovao u Partner, jer se tu nalaze i Vlasnici (kupci) i dobavljači a takođe podatke iz tabele Skupstina bih čuvao u istoj tabeli. 
+
 Potrebno imati CategoryId za tipologiju partnera Fizičko lice - Domaće, Fizičko lice - Stranac, Kompanija, Sz, Upravnik
-Konto određuje tip Dobavljač/Kupac s tim što dobavljačima treba i PodKonto kao primarni PodKonto za automatizaciju knjiženja.
-Kako bi se idetifikovali partneri za koje se radi kreirao bih posebnu tabelu MyCompany  sa strukutorom
-CompanyId - isto što i SkupstinaID / SZID
-Category / ili / CategoryId - ovde bi trebao da imam kategorizaciju koja je pre bila naselje, ali sa vezom child, parent, kao npr Belvile pa child Plot 24, Plot 23, Plot 25 - svaki od ovih plotova ima nekoliko CompanyId... Sa mogućnosti da nema pripadnost tj da ima vrednost null.
+Konto određuje tip Dobavljač/Kupac 435/204 s tim što dobavljačima treba i PodKonto kao primarni PodKonto za automatizaciju knjiženja.
+Ovde bih izvukao napolje i kreirao novu tabelu sa infomacijama PartnerAccounting - Id, PartnerId, CompanyId, Account, defaultSubAccount
+Id koji se ovde dobija je veza koja je ranije bila KupacId tj lnk_kupac_Id, Idk itd.....
+Ovaj Id je ručno unošen i radi lakšeg prepoznavanja korišteni su od 1001-6999 za vlasnike, zakupce... 7000-7999 za posebne refundacije, gde su dobavljaći uneseni kao kupci da bi se izdali računi za refundacije, penale itd. 8000-8999 za sopstevene stambene zajednice npr. ako je SZID bio 101 - to je sad u MyCopmpany kreirao se automatski i 8101 u kupcima sa kontom 4350. U 9001- su unošeni dobavljači.
+
+CategoryLocation / ili / CategoryLocationId - ovde bi trebao da imam kategorizaciju koja je pre bila naselje, ali sa vezom child, parent, kao npr Belvile pa child Plot 24, Plot 23, Plot 25 - svaki od ovih plotova ima nekoliko CompanyId... Sa mogućnosti da nema pripadnost tj da ima vrednost CategoryLocationId = null.
 
 ---
 
@@ -61,27 +68,29 @@ FK: `lnkSkupstinaID` → Skustina (potvrđeno ERROR_020), `lnk_ID_K` → Kupac N
 Vlasnik, Platilac.....
 Iskustveno: OwnerId, TenantId, InvoicingId
 Osnovna veza je InvoicingId jer to je Id za kontiranje, izdavanje računa i naplatu.
-Međutim pitanje je kome se izdaje račun, vlasniku ili zakupcu. U sušti nije bitno dok nedođe do spora, utuženja gde je u tom trenutku vrlo bitno.
-Po defaultu kad InvoicingId 
+Po defaultu kad su unese InvoicingId dedeljuje se isti na OwnerId a TenantId je null.
+Unos TenantId se radi menja autoamtski InvoicingId
+PLATILAC_lnk_ID_K2` se za sad izbacu i svi uneti podaci ignorisu
 
 **`Kupac`** (vlasnik/zakupac/**i dobavljač** — vidi pitanje 3.1) — PK `ID_K`.
 FK: `lnk_ID_SK` → Skustina, `lnkNaselje` → Naselje, `IDMaster` → Kupac (self, **pitanje 3.2**), `IDGrupniRacunMaster` → Kupac (self, grupno fakturisanje, pitanje 3.2).
 `Tip` — diskriminator (kupac vs. dobavljač vs. drugo — potvrditi vrednosti).
 
+> **Komentar:**tabelu Kupac kao što sam naveo menjamo u Partner, IDMaster se koristio da bi se identifikovao isti kupac u vise unosa, ali sad to ćemo raditi tako što je jedan unos u partneru a ponavljanje unosa se vrši u tabeli PartnerAccounting
+
 **`Naselje`** — PK `NaseljeID`. Prosta šifra opštine/naselja.
 
 > **Komentar:**Naselje bih ukinuo kao tabelu za sebe i preimenovao u CategoryLocation, kao što sam naveo ranije.
-CategoryLocationId
+CategoryLocationId...
 
 
 **`SzUlaz`**, **`SzObjekat`** — pomoćne tabele za ulaze u zgradu / grupisanje objekata. FK `SZ`/`SzId` → Skustina.
 
-> **Komentar:**Sve ovo je vezano za podelu zgrade što nije uvek slučaj kod svakog korisnika. 
-Recimo firma koja upravlja sa 10 zgrada ne mora da ima tu podelu, dok firma 
-koja upravlja sa 100 zgrada verovatno hoće da ima tu podelu. 
-Ako ne bude bilo potrebe za ovakvom podelom onda ove tabele ne trebaju.
+> **Komentar:** Svakako preimenovani npr BuildingEntrances - svaki Unit mora da bude povezan sa  BuildingEntrancesId jer se tu definiše adresa Unita jer jedna SZ može biti lamela sa nekoliko različitih adresa.
 
 **Šifarnici bez promene strukture:** `TipObjekta`, `TipPartnera`, `TipStavke`, `TipObracuna`, `TipADDTXT`, `TipUplatnice`, `TipTODO`, `tipStatus`, `Godina`, `Kurs`, `Konta`, `KontniOkvir`.
+
+
 
 ### 2.2 Fakturisanje
 
@@ -95,7 +104,13 @@ FK: `lnkGR` → GrupaRacuna NOT NULL, `ID_K` → Kupac NOT NULL, `ID_SK` → Sku
 FK: `ID_R` → Racun NOT NULL (potvrđeno ERROR_071, **stara baza ima gotov cleanup-upit za siročad — znak da FK nikad nije bio hard constraint**), `ID_RDOB` → Dobavljac_Racuni.IDTRRAC, `ID_O` → Objekti.
 **Napomena:** `lnkGR`, `ID_K`, `ID_SK` se ovde dupliraju sa `Racun` i **moraju** biti identični (ERROR_062/063/064 su čisto to i proveravaju) → u novoj šemi predlažem da se **ne dupliraju**, nego izvode JOIN-om na `Racun`, čime cela ta klasa grešaka postaje strukturno nemoguća. Ako postoji dobar razlog za denormalizaciju (npr. istorijski snapshot posle promene skupštine), **pitanje 3.5**.
 
+>**Komentar** OVO MI NIJE JASNO  u novoj šemi predlažem da se **ne dupliraju**, nego izvode JOIN-om na `Racun`
+---
+
 **`RacunObjekti`** — M:N most Racun↔Objekti (bez sopstvenog PK u exportu — dodati surogat PK ili composite PK).
+
+>**Komentar** Da li je potreban PK, prilikom generisanja računa kreiraju se RacunSub tj. stavke računa ali ujedno je potreban informacija na osnovu koji Objekata / Units je kreiran račun da ni se informacija prikazala za printu
+---
 
 **`RacunStavkeBenefitArhiva`** — arhiva stavki sa primenjenim beneficijama (isti oblik kao RacunStavke + PK `IDRacunStavke` NOT NULL).
 
@@ -120,6 +135,9 @@ FK: `BR_NALOG`→Nalog.Br_Nalog NOT NULL, `lnkSkupstinaID`→Skustina NOT NULL, 
 **`DATUM` NOT NULL** (ERROR_902 lovi baš NULL datume kao grešku).
 **Najvažnije pravilo za dizajn:** svaki `Nalog` mora biti u ravnoteži — `SUM(DIZNOS) = SUM(PIZNOS)` za sve GK stavke tog naloga (ERROR_104). Ovo je kandidat za **trigger ili application-level transakcionu proveru pri knjiženju**, ne samo izveštaj-provera kao u staroj app.
 
+>**Komantar** SIFRAKONTA moŽe da se ukloni, RDOB je veza koja je sigurno korišćena za RacunIN_ID nisam siguran čemu služi. KontoTroska imenovati kao SubAccounting 
+
+
 **`Nalog`** (knjigovodstveni nalog/batch) — PK `Br_Nalog` (Double u exportu — **verovatno treba postati `INT IDENTITY`**, pitanje 3.7 jer je čudno da PK bude Double). FK `SZID`→Skustina.
 **Pravilo: sve GK stavke jednog naloga moraju pripadati istoj skupštini** (ERROR_027).
 
@@ -132,6 +150,8 @@ FK: `BR_NALOG`→Nalog.Br_Nalog NOT NULL, `lnkSkupstinaID`→Skustina NOT NULL, 
 **`TemplateIzvodaKnjizenje`** — slično, template za knjiženje izvoda.
 
 **`ZK`** — **nejasna namena, izgleda kao paralelna/starija verzija GK strukture (identične kolone kao GK). Pitanje 3.8: da li se ZK i dalje aktivno koristi, ili je to istorijski/napušten mehanizam?**
+
+>**Komantar** ZK je privremena tabla ZateznaKamata, nakon obračuna kamate u tabeli ObračunKamate, kreira se ZK tabela iz koje prilikom izdavanja računa se uzima iznos kamate. Po knjiženju računa inicijalno se knjiži iz ove tabele ZK a može i iz računa. 
 
 **`RacunStavke_Troskovi`** — agregat stavki po troškovima (FK `ID_R`→Racun, `lnkGR`→GrupaRacuna, `ID_K`→Kupac, `ID_SK`→Skustina).
 
@@ -149,6 +169,9 @@ FK: `SK_ID`→Skustina, `DobavljacKonto`→**Kupac** (potvrđeno ERROR_032/042 �
 
 **`RacunIN`** — drugačiji/stariji oblik ulaznog računa (kolone se preklapaju sa `Dobavljac_Racuni` ali nisu identične). **Pitanje 3.9: da li je `RacunIN` prethodnik `Dobavljac_Racuni` (napušten) ili se oba i dalje koriste paralelno?**
 
+
+>**Komantar** RacunIN je napustena tabla
+
 ### 2.6 Opomene
 
 **`GrupaOpomena`** — PK `IDGrupaOpomena`. FK `lnkSablonOpomene`→OpomenaSabloni, `IDSZ`→Skustina, `lnkGrupaRacuna`→GrupaRacuna.
@@ -156,9 +179,15 @@ FK: `SK_ID`→Skustina, `DobavljacKonto`→**Kupac** (potvrđeno ERROR_032/042 �
 **`OpomenaStavke`** — PK `IDOpomenaStavka`. FK `lnkOpomena`→Opomena, `lnkIDGO`→GrupaOpomena, `lnkKupacID`→Kupac, `IDRacun`→Racun.
 **`OpomenaSabloni`** — PK `IDOpomenaSablon`. Template tekstova za štampu opomena — sadržaj (Text/Memo polja), ne treba menjati strukturu.
 
+
+
+
 ### 2.7 Virman / plaćanja
 
 **`Virman`** (nalog za prenos) — PK `IDVirman`. `refSourceID`+`refSourceTag` je **polimorfna referenca** (tag određuje na koju tabelu ID pokazuje — verovatno Racun ili Dobavljac_Racuni) — u SQL Serveru nema prirodan FK za ovo; predlažem da ostane kao par kolona sa aplikativnom validacijom, ili da se razdvoji u tipizirane FK kolone ako se utvrdi da `refSourceTag` ima mali, poznat skup vrednosti.
+
+>**Komantar** Ovo je preuzeta tabela iz druge applikacije, tabla koja se generiše da bi se odštampala uplatnica za plaćanje ulaznog računa, ili generisao QR code ili napravila list za plaćanje za verifikaciju u banci.
+
 
 ### 2.8 Mail
 
@@ -166,9 +195,15 @@ FK: `SK_ID`→Skustina, `DobavljacKonto`→**Kupac** (potvrđeno ERROR_032/042 �
 **`Mail_Send`** — PK `IDMail`. Queue slanja; `DateSend IS NULL AND ErrorStatus IS NULL` = zaglavljen u redu (ERROR_022 — korisno kao status-view u novom sistemu, ne kao "greška" koju treba sprečiti šemom).
 **`Mail_Send_Attachment`** — FK `IDMail`→Mail_Send.
 
+
+
+
 ### 2.9 Fajlovi
 
 **`Files`** — PK `IDDokument`. `IDRefItem`+`TabSource` je opet polimorfna referenca (kao Virman) — ista napomena važi.
+
+>**Komantar** Tabla jeste pravljena kao polimirfna referenca, definise se TabSource i odgovarajući Id..... npr Partner i njegov Id čime se dinamički definise na koju tabelu se odnose podaci kao digitalna arhiva Partnera....
+
 
 ### 2.10 Sistem / auth / audit
 
@@ -180,6 +215,9 @@ FK: `SK_ID`→Skustina, `DobavljacKonto`→**Kupac** (potvrđeno ERROR_032/042 �
 **`Notes`** — slobodne beleške.
 **`Settings`**, **`Settings_eMail`**, **`Settings_FormGrid`** — konfiguracija; `Settings_FormGrid` je Access-specifično (memorisan raspored kolona u gridovima) — **ne prenosi se**, React ima svoj mehanizam za to ako uopšte treba.
 
+
+>**Komantar** Tablea Promene se menja u Events i nije systemska tabela već se vrši unos zahteva korisnika, promena poput zahtev za promenu emaila, ko je i kad podeno i kad je odobreno i kad je proknjizeno ....takođe i promene statusa objekata ili slično ili podaci koje korisnik želi da promeni a zahteva određeni tok processa odobravanja.....
+
 ## 3. Otvorena pitanja za korisnicu
 
 Ovo su tačke gde sam morala da pretpostavim nešto na osnovu JOIN-ova/imenovanja, a ne iz
@@ -189,33 +227,60 @@ eksplicitnog izvora — pre generisanja migracije treba potvrditi:
 
 >**Komentar:** Usvojiti eng. fraze za imenovanje tabela i polja.
 InvoiceSupplier
-Dobavljac_Racuni.DobavljacKonto je sad partnerId i upućuje na Partner tabelu gde je partnerAccount polje Account sa vrednoštu 435 .
+Dobavljac_Racuni.DobavljacKonto je sad partnerId i upućuje na PartnerAccounting tabelu gde je partnerAccount polje Account sa vrednoštu 4350 za dobavljače
 
 
 
 2. **`Kupac.IDMaster`** i **`IDGrupniRacunMaster`** (oba self-reference) — koja je razlika između ova dva mehanizma grupisanja kupaca/računa? (npr. "master" vlasnik firme sa više stanova vs. grupno fakturisanje jednom platiocu)
 
-
+>**Komentar:** Kupac.IDMaster je master vlasnik firme sa više stanova ali ovo ukidamo
+IDGrupniRacunMaster je mehanizam za kreiranje grupnog računa i koristi se tako što recimo 9 Kupaca imaju Units vezu i  IDGrupniRacunMaster upisan 1731 gde taj Id nema nikakvu vezu sa Units. Racuni se normalno kreiraju za 9 kupaca ali onda radi se funkcija za GrupniRacun gde se kreira novi račun i vezuje za tih 9, i podeban izveštaj računa kreiraju se stavke zbirno i ukupno svih 9. Izvorni računi se storniraju. Na tih 9 kupaca nema dugovanja, svaki mesec su iznosi i stornirano a potraživanja se nalazae na IDGrupniRacunMaster
 
 
 3. **`Objekti.PLATILAC_lnk_ID_K`** vs **`PLATILAC_lnk_ID_K2`** — zašto dva platioca po objektu? Da li je jedan primarni a drugi rezervni, ili se koriste istovremeno (npr. podela troška)?
 
 >**Komentar** Da, postoji opcija podele korišćenja. Npr. Kompanija koristi garažno mesto u periodu od 9-17h a stan koristi privatno lice. Račun se deli u odnosu na korišćenje tj, 1/3 companija a 2/3 fizičko lice. Ovo je za sad samo pokušano idejno rešenje planiram da odustanem već da se jedinica unese 2 puta sa koficijento računanja k2 .3333 i .6666
+Zako da PLATILAC_lnk_ID_K2 je BRISE.
 
 4. **`GK.SIFRAKONTA`** — potvrđeno je da mora biti identično `lnkKUPACID` (ERROR_043). Da li postoji slučaj gde se razlikuju u praksi (npr. istorijski podaci pre neke izmene), ili je sigurno da se kolona može izbaciti iz nove šeme?
+
+>**Komentar** Nikad se ne razlikuje, postoji mogućnost da konta koja nemaju lnkKUPACID nose SIFRAKONTA npr 4900 konto ali definitivno je nebitno BRISI.
+
 5. **Denormalizacija `RacunStavke.lnkGR/ID_K/ID_SK`** — ERROR_062/063/064 postoje baš zato što se ove kolone znaju razminuti sa `Racun`. Da li postoji poslovni razlog da stavka "zamrzne" svoju skupštinu/kupca nezavisno od zaglavlja (npr. promena vlasništva posle izdavanja računa), ili je ovo čisto istorijska Access navika (denormalizacija radi brzine upita bez indeksa) koju nova šema treba da ukloni?
+
+>**Komentar** Postoji mogucnost da nakando se menja kome se izdaje račun, kasno stigo kupoprodajni ugovor itd, ovo se ručno menjalo u bazi i iz tog razloga je ova kontrola.
+
 6. **Preciznost zaokruživanja novca** — stara baza meša 2 i 4 decimale zaokruživanja u različitim proverama (ERROR_014 koristi `Round(...,4)` pa `Round(...,2)`, ERROR_104 samo `Round(...,2)`). Koji je ispravan poslovni standard: interni obračun na 4 decimale i zaokруживanje na 2 samo za prikaz/uplatnicu, ili se svuda radi na 2 decimale?
 
 >**Komentar** Zakruživanje se radi na 4 i 2 decimale zavisi šta. 
 Računi - ukupni iznosi su na 2 decimale, međutim Kurs je na 4 decimale kao i stavke računa pre konačne sume su na 4 decimale a konačne sume na 2 decimale.
-
-
+U GK sve transakcije bi trebalo na 2 decimale.
+Radi sigurnosti, radimo sve u GK na 4 decimale, u računima konačne sume na 2 decimale.
 
 7. **`Nalog.Br_Nalog` je tipa Double** u exportu, iako se ponaša kao PK/broj naloga. Da li su to zaista celi brojevi (pa prelazi bez rizika u `INT IDENTITY`), ili postoji format sa decimalnim delom (npr. `123.1` za storno/anex istog naloga)?
+>**Komentar** ne celi brojevi samo i to redni brojevi po companyId (bivši SZID)
+
+
 8. **Tabela `ZK`** — ima skoro identičnu strukturu kao `GK` ali drugo ime. Da li se i dalje aktivno koristi (paralelna knjiga za nešto specifično — možda "zajednička kasa" ili "založena kotizacija"?), ili je napuštena/istorijska?
+
+>**Komentar** Već objašnjeno da je to privremena tabela Zatezne kamate pre knjiženja u raćuna u GK. 
+
+
 9. **`RacunIN` vs. `Dobavljac_Racuni`** — obe liče na "ulazni račun". Da li je `RacunIN` stariji, napušten oblik, ili se i dalje koristi za nešto specifično (možda računi bez punog dobavljačkog workflow-a)?
+
+>**Komentar**  RacunIN - napušteno
+
 10. **Dinamički izveštaji/statistike** (`tblIzvestaj`, `tblIzvestajSub`, `tblSifrarnik`, `tblSifrarnikSub`, `tblAnaliza`, `tblSTATS`, `tblWhrEx`, `tblShortList`) — ovo je Access-ov interni "generic report/filter builder" (SQL teksta se čuva u koloni i izvršava dinamički). Da li se ovo u praksi svakodnevno koristi za ad-hoc analize (pa novi sistem treba sličan generički mehanizam), ili je uglavnom zamenjeno sa fiksnim skupom izveštaja iz Faze 5 projektnog brief-a?
+
+>**Komentar**  tblIzvestaj - koristi se svi izveštaji vrčo često i često se unose ovi SQL-ovi za dobije izveštaja. Treba napraviti i u novom sistemu mogućnost dinamičkih izveštaja ali svakako treba iskoristiti priliku i napraviti čistoću i red u svemu. 
+tblAnaliza  - koristi sve SQL koji počinju sa ERROR i prikazuju podatke koje imaju greške. Vrlo često se koristi. I bez obzira što će nivi sistem imati pravila ako se tokom rada naiđe na grepku ovde se pravi SQL upit koji se automatski pokreće i prikazuje ako se grepka ponovoila.
+tblSTATS - korisiti se za statističke preglede - pregrojavanje, uglavnom napušteno jer je sve prebačeno u tblIzvestaj
+tblWhrEx - koristi se u formama kao dinamički upiti za generisanje podataka, akcije itd.
+tblShortList - Koristi se kao univerzalana tabela kako ne bi pravio 50 sitnih slicnih tabela poput ID, Naziv, Vrednost-....
+
 11. **`ugovori`** tabela — kolone (`Field16`, `Field37`, `Field51`, datumi vezani za 2018/2019...) izgledaju kao jednokratni uvoz iz Excel-a za specifičnu kampanju prelaska ugovora, ne kao tekuća operativna tabela. Potvrditi da se ignoriše u novoj šemi (u skladu sa CLAUDE.md pravilom o privremenim tabelama), ili je i dalje referentna?
+
+>**Komentar**  ugovori - Ovo ćeno koristiti, sad će se zvati Contract i biće veza izmedju Units, PartnerAccounting i pored ovih Id imaće Datum preuzimanja - StartInvoicingDate , Datum Prekida - EndInvoicingDate, Datum početka i isteka ugovora, Napomena kao i status ugovora. 
 
 ## 4. Tabele isključene iz predloga (privremene/backup/probne)
 
@@ -234,18 +299,38 @@ zamenjuje se standardnim tooling-om/git istorijom).
 `Switchboard Items` (sve tri verzije) — Access meni sistem, zamenjuje se React navigacijom, ne
 prenosi se.
 
+>**Komentar**  React nabigacija bi bilo dobro da dolazi iz baze podataka. PrinterBinLOCAL se koristilo kao lokalna tabela u koju bi se pakovali podaci Id od odredjenih tabla da bi se generisali podaci npr, svi Id računa koji je posle vrši određene radnje, grupni PDF, pojedinačni PDF, slanje emaila itd. To je bio kao npr Kanta za skupljanje podataka i nakon što se završi sa unosom vrše se razne radnje.
+Mislim da je ovo dobra praksa koju treba zadržati i u novom sistemu. 
+
 ## 5. Poslovna pravila izvučena iz `ERROR_*` upita (~70 upita)
 
 Grupisano po domenu. Za svako: šta upit otkriva kao "grešku" i predlog kako to postane
 validacija/constraint/test u novom sistemu.
 
+>**Komentar**  Tako je, Sa tim što je poželjno da SQL bude upisa u tabeli i da može da se vrši unos novih SQL-ova i da se na osnovu njega dinamički generiše izveštaj. Nema poteba da budu kreirani kao view. Inače svi ERROR koji su trenutno u upotreni su u tabeli tblAnaliza
+
 ### 5.1 Bankovni izvod ↔ GK usklađenost
 
-- **ERROR_001** — Suma `(Odobrenje − Zaduzenje)` na stavci izvoda mora biti jednaka sumi `(PIZNOS − DIZNOS)` svih GK stavki povezanih preko `lnkIzvodStavkaID`. → Provera pri knjiženju izvoda (transakciona), ne samo naknadni izveštaj.
+- **ERROR_001** — Suma `(Odobrenje − Zaduzenje)` na stavci izvoda mora biti jednaka sumi `(PIZNOS − DIZNOS)` svih GK stavki povezanih preko `lnkIzvodStavkaID`. → Provera pri knjiženju izvoda (transakciona), ne samo naknadni izveštaj. 
+
+
+
 - **ERROR_003** — Stavke izvoda bez ijedne povezane GK stavke = "na čekanju za knjiženje" (normalno prelazno stanje, ne kvar) → status polje / filter u UI, ne error.
+
+>**Komentar**  Ovo su karakteristike Bankovnih izvoda koji čekaju na knjiženje. Znači da su u unosu i da još nisu knjiženi.
+
 - **ERROR_006** — `IzvodStavke` bez roditeljskog `Izvod` (osirotele) → `IzvodLNKID` mora biti `NOT NULL FK`.
+
+>**Komentar**  Izvod mora imati roditeljski Izvod. Neće biti omogućen unos i knjiženje bez povezivanja sa Izvodom.
+
 - **ERROR_007** — Izvod markiran `Rasknjizen=True` (proknjižen) ali ima stavke bez GK zapisa → nekonzistentno stanje, znači da se `Rasknjizen` ne sme postaviti dok knjiženje nije kompletno (aplikativna invarijanta, po mogućstvu transakciona).
+
+>**Komentar**  Da, tako je.
+
 - **ERROR_008** — Kontrolna suma: `SUM(Zaduzenje)=Izvod.Duguje`, `SUM(Odobrenje)=Izvod.Potrazuje`, i broj stavki mora odgovarati `NalogaZaduzenja+NalogaOdobranja`. → Provera pri unosu/importu izvoda.
+
+>**Komentar**  Da, tako je.
+
 - **ERROR_009 (IZVOD-NEPOSTOJECA-SZ)** — `Izvod.ID_SK` mora postojati u `Skustina` → standardni FK constraint.
 - **ERROR_014 (IZVOD-NALOG-SUMA-NIJE-NULA)** — Za proknjižene izvode, `SUM(DIZNOS − PIZNOS)` svih GK stavki vezanih za taj `Nalog` mora biti `0` → nalog mora biti u ravnoteži (specijalan slučaj opštijeg pravila iz 5.3/ERROR_104).
 - **ERROR_019** — Suma `Odobrenje/Zaduzenje` po stavkama izvoda mora odgovarati sumi `DIZNOS/PIZNOS` na kontu **2410** u GK za isti nalog.
