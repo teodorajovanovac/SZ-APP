@@ -36,14 +36,33 @@ označeno da li je potvrđeno upotrebom ili je pretpostavka), i napomene. Tabele
 `docs/data-model.md` označene kao privremene/backup/probne (vidi sekciju 4) su **isključene** iz
 predloga.
 
+
+
 ### 2.1 Matični podaci
 
 **`Skustina`** (skupština/zgrada) — PK `IDSkupstina`.
 FK: `PredstavnikSS_ID` → Kupac (pretpostavka), `NaseljeLNK` → Naselje, `Upravnik` → Staff (pretp.).
 Ovo je koren organizacione hijerarhije — skoro sve ostale tabele se svode na nju kroz `lnkSkupstinaID`/`ID_SK`/`SK_ID`/`IDSZ` (**nekonzistentno imenovanje kroz staru bazu — u novoj šemi predlažem da svuda bude `SkustinaId`**).
 
+> **Komentar:**tabelu Kupac bih preimenovao u Partner, jer se tu nalaze i Vlasnici (kupci) i dobavljači a takođe podatke iz tabele Skupstina bih čuvao u istoj tabeli. 
+Potrebno imati CategoryId za tipologiju partnera Fizičko lice - Domaće, Fizičko lice - Stranac, Kompanija, Sz, Upravnik
+Konto određuje tip Dobavljač/Kupac s tim što dobavljačima treba i PodKonto kao primarni PodKonto za automatizaciju knjiženja.
+Kako bi se idetifikovali partneri za koje se radi kreirao bih posebnu tabelu MyCompany  sa strukutorom
+CompanyId - isto što i SkupstinaID / SZID
+Category / ili / CategoryId - ovde bi trebao da imam kategorizaciju koja je pre bila naselje, ali sa vezom child, parent, kao npr Belvile pa child Plot 24, Plot 23, Plot 25 - svaki od ovih plotova ima nekoliko CompanyId... Sa mogućnosti da nema pripadnost tj da ima vrednost null.
+
+---
+
+
 **`Objekti`** (stanovi/poslovni prostori) — PK `ID_O`.
 FK: `lnkSkupstinaID` → Skustina (potvrđeno ERROR_020), `lnk_ID_K` → Kupac NOT NULL (vlasnik, potvrđeno ERROR_005/ERROR_020), `lnk_tip` → TipObjekta, `IDVlasnik`/`IDZakupac` → Kupac, `PLATILAC_lnk_ID_K`/`PLATILAC_lnk_ID_K2` → Kupac (**dva "platioca" — nejasna semantika, pitanje 3.3**).
+
+> **Komentar:**tabelu objekti bih preimenovao u Units. lnkSkupstinaID je menja u CompanyID
+Vlasnik, Platilac.....
+Iskustveno: OwnerId, TenantId, InvoicingId
+Osnovna veza je InvoicingId jer to je Id za kontiranje, izdavanje računa i naplatu.
+Međutim pitanje je kome se izdaje račun, vlasniku ili zakupcu. U sušti nije bitno dok nedođe do spora, utuženja gde je u tom trenutku vrlo bitno.
+Po defaultu kad InvoicingId 
 
 **`Kupac`** (vlasnik/zakupac/**i dobavljač** — vidi pitanje 3.1) — PK `ID_K`.
 FK: `lnk_ID_SK` → Skustina, `lnkNaselje` → Naselje, `IDMaster` → Kupac (self, **pitanje 3.2**), `IDGrupniRacunMaster` → Kupac (self, grupno fakturisanje, pitanje 3.2).
@@ -51,7 +70,16 @@ FK: `lnk_ID_SK` → Skustina, `lnkNaselje` → Naselje, `IDMaster` → Kupac (se
 
 **`Naselje`** — PK `NaseljeID`. Prosta šifra opštine/naselja.
 
+> **Komentar:**Naselje bih ukinuo kao tabelu za sebe i preimenovao u CategoryLocation, kao što sam naveo ranije.
+CategoryLocationId
+
+
 **`SzUlaz`**, **`SzObjekat`** — pomoćne tabele za ulaze u zgradu / grupisanje objekata. FK `SZ`/`SzId` → Skustina.
+
+> **Komentar:**Sve ovo je vezano za podelu zgrade što nije uvek slučaj kod svakog korisnika. 
+Recimo firma koja upravlja sa 10 zgrada ne mora da ima tu podelu, dok firma 
+koja upravlja sa 100 zgrada verovatno hoće da ima tu podelu. 
+Ako ne bude bilo potrebe za ovakvom podelom onda ove tabele ne trebaju.
 
 **Šifarnici bez promene strukture:** `TipObjekta`, `TipPartnera`, `TipStavke`, `TipObracuna`, `TipADDTXT`, `TipUplatnice`, `TipTODO`, `tipStatus`, `Godina`, `Kurs`, `Konta`, `KontniOkvir`.
 
@@ -158,11 +186,31 @@ Ovo su tačke gde sam morala da pretpostavim nešto na osnovu JOIN-ova/imenovanj
 eksplicitnog izvora — pre generisanja migracije treba potvrditi:
 
 1. **Kupac vs. Dobavljač** — `Dobavljac_Racuni.DobavljacKonto` pokazuje na `Kupac.ID_K`, što znači da se dobavljači vode kao zapisi u `Kupac` sa `Tip`-om. Da li u novoj šemi zadržati jedinstvenu tabelu `Partner`/`Kupac` sa diskriminatorom (verniji prenos, manji rizik), ili razdvojiti u dve tabele (čistije modelovanje, ali zahteva migracionu odluku o tome gde je granica)?
+
+>**Komentar:** Usvojiti eng. fraze za imenovanje tabela i polja.
+InvoiceSupplier
+Dobavljac_Racuni.DobavljacKonto je sad partnerId i upućuje na Partner tabelu gde je partnerAccount polje Account sa vrednoštu 435 .
+
+
+
 2. **`Kupac.IDMaster`** i **`IDGrupniRacunMaster`** (oba self-reference) — koja je razlika između ova dva mehanizma grupisanja kupaca/računa? (npr. "master" vlasnik firme sa više stanova vs. grupno fakturisanje jednom platiocu)
+
+
+
+
 3. **`Objekti.PLATILAC_lnk_ID_K`** vs **`PLATILAC_lnk_ID_K2`** — zašto dva platioca po objektu? Da li je jedan primarni a drugi rezervni, ili se koriste istovremeno (npr. podela troška)?
+
+>**Komentar** Da, postoji opcija podele korišćenja. Npr. Kompanija koristi garažno mesto u periodu od 9-17h a stan koristi privatno lice. Račun se deli u odnosu na korišćenje tj, 1/3 companija a 2/3 fizičko lice. Ovo je za sad samo pokušano idejno rešenje planiram da odustanem već da se jedinica unese 2 puta sa koficijento računanja k2 .3333 i .6666
+
 4. **`GK.SIFRAKONTA`** — potvrđeno je da mora biti identično `lnkKUPACID` (ERROR_043). Da li postoji slučaj gde se razlikuju u praksi (npr. istorijski podaci pre neke izmene), ili je sigurno da se kolona može izbaciti iz nove šeme?
 5. **Denormalizacija `RacunStavke.lnkGR/ID_K/ID_SK`** — ERROR_062/063/064 postoje baš zato što se ove kolone znaju razminuti sa `Racun`. Da li postoji poslovni razlog da stavka "zamrzne" svoju skupštinu/kupca nezavisno od zaglavlja (npr. promena vlasništva posle izdavanja računa), ili je ovo čisto istorijska Access navika (denormalizacija radi brzine upita bez indeksa) koju nova šema treba da ukloni?
 6. **Preciznost zaokruživanja novca** — stara baza meša 2 i 4 decimale zaokruživanja u različitim proverama (ERROR_014 koristi `Round(...,4)` pa `Round(...,2)`, ERROR_104 samo `Round(...,2)`). Koji je ispravan poslovni standard: interni obračun na 4 decimale i zaokруживanje na 2 samo za prikaz/uplatnicu, ili se svuda radi na 2 decimale?
+
+>**Komentar** Zakruživanje se radi na 4 i 2 decimale zavisi šta. 
+Računi - ukupni iznosi su na 2 decimale, međutim Kurs je na 4 decimale kao i stavke računa pre konačne sume su na 4 decimale a konačne sume na 2 decimale.
+
+
+
 7. **`Nalog.Br_Nalog` je tipa Double** u exportu, iako se ponaša kao PK/broj naloga. Da li su to zaista celi brojevi (pa prelazi bez rizika u `INT IDENTITY`), ili postoji format sa decimalnim delom (npr. `123.1` za storno/anex istog naloga)?
 8. **Tabela `ZK`** — ima skoro identičnu strukturu kao `GK` ali drugo ime. Da li se i dalje aktivno koristi (paralelna knjiga za nešto specifično — možda "zajednička kasa" ili "založena kotizacija"?), ili je napuštena/istorijska?
 9. **`RacunIN` vs. `Dobavljac_Racuni`** — obe liče na "ulazni račun". Da li je `RacunIN` stariji, napušten oblik, ili se i dalje koristi za nešto specifično (možda računi bez punog dobavljačkog workflow-a)?
