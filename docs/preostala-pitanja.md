@@ -19,6 +19,10 @@ poslednjoj/jednoj stavci ili se knjiži na poseban "konto zaokruživanja".
 pisati konačni testovi/tolerancije za obračun.
 **Reference:** `tehnicki-plan-faza1.md` sekcija 1 ("Zaokruživanje") i sekcija 4 (O-1).
 
+>**Komentar** Nema šta tu da se bira. Standardno zaokruživanje se podrazumeva, 
+sve ostalo je izmišljanje tople vode. Drugo, ne postoji nikakva razlika u iznosima koju bi treba
+lo posebno knjižiti. Ista pravila važe i za obračun kamata.
+
 ### A-2. `Partner.GrupniRacunGrupaId` — šta tačno predstavlja (bivše O-2)
 Bivši `Kupac.IDGrupniRacunMaster`. Šef je objasnio da je to proizvoljna grupna oznaka koju deli
 više partnera (npr. vrednost `1731` deli 9 partnera) i da **nema veze sa `Unit`** — ali nije
@@ -29,6 +33,10 @@ self-FK na `Partner`, može biti pogrešno.
 **Reference:** `schema-ddl-draft.sql` linije 210, 226; `tehnicki-plan-faza1.md` sekcija 2.1 i
 sekcija 4 (O-2).
 
+>**Komentar** Partner.GrupniRacunGrupaId je oznaka za grupni račun 
+po novoj strukturi nema smisla da se nalazi u tabeli Partner vec u tabeli PartnerAccounting.
+
+
 ### A-3. `Contract.PartnerAccountingId` vs `PartnerId` (bivše O-4)
 Nova tabela `Contract` (vlasnik/zakupac/primalac računa po jedinici, vremenski) trenutno pokazuje
 na `PartnerAccounting` (partner + firma + konto), ne direktno na `Partner` (identitet). Ovo je
@@ -38,6 +46,8 @@ vlasništvo/zakup nije nužno "knjigovodstvena uloga" u istom smislu kao kupac/d
 trenutno implementabilno, ali rizik da FK cilj treba promeniti.
 **Reference:** `schema-ddl-draft.sql` linija 310; `tehnicki-plan-faza1.md` sekcija 2.1 i sekcija 4
 (O-4).
+
+>**Komentar** PartnerAccountingId je Konto koje se dodeljuju Partneru po Ugovoru. Contract treba da pokazuje na PartnerAccounting.
 
 ### A-4. Šifarnici za `Company.UplatnicaTip` / `SkStatus` / `TipSubjekta` (bivše O-5)
 Flagovano u pregledu problema kao nedostajući FK/šifarnik — tri INT kolone na `Company` bez
@@ -83,6 +93,9 @@ izvršavanje korisnički unetog SQL-a — whitelisting/read-only konekcija zbog 
 injekcije), ne prostu migraciju tabele.
 **Reference:** `tehnicki-plan-faza1.md` sekcija 5 i sekcija 9 (napomena na kraju).
 
+
+
+
 ## C. Manje nejasnoće (ASSUMPTION oznake u DDL-u) — verovatno beznačajne, ali nepotvrđene
 
 Svaka od ovih je pojedinačna kolona gde tačno poslovno značenje nije poznato. Nijedna ne blokira
@@ -92,15 +105,40 @@ izgubi/pogrešno protumači podatak):
 | Kolona | Nejasnoća | Linija u `schema-ddl-draft.sql` |
 |---|---|---|
 | `Kurs.Skolska` | Nejasna namena ("školska godina"?) | 125 |
+>**Komentar** preuzeto iz druge aplikacije. 
+Struktura treba da bude Id, Rate (4 digits), Date, IdEntryType (iz tblShortList - tip unosa, ručni unos, automatski, importDb), UpdateDateTime
+
+
 | `Company.Field1` | Nejasna namena | 183 |
+>**Komentar** nepotrebno polje, nema podataka
+
 | `Unit.IO` | Nejasna namena kolone "IO" | 271 |
+>**Komentar** nepotrebno polje, nema podataka
+
 | `Racun.Co` | Nejasna namena | 536 |
+>**Komentar** Ovo polje se koristilo za komplikovane račune koji se štampaju na specifičaan način u štampariji dvostrano, perfororan papir. Prekoove vrednosti se radilo sortiranje, grupisanje računa prema broju stranica. Ostaviti polje ako imamo sličnu situaciju INT tipa, promeniti ime u PageCount, def vrednost 0
+
 | `TekuciRacun.PartnerId` (bivši `IDPARTNER`) | Pretpostavljeno da je identitetski nivo (Partner), ne PartnerAccounting — nije potvrđeno | 653 |
+>**Komentar** Partner
+
 | `Dobavljac_Racuni.TmpPrevId` | "tmp" u nazivu sugeriše privremeno polje — proveriti da li se zaista koristi | 689 |
+>**Komentar**privremeno polje, nebitni podaci.
+
 | `KnjiznaDokumenta.KnjiznoDokumentIdRef` (bivši `IDKR`) | Nejasno na šta tačno pokazuje | 716 |
+>**Komentar** tabela knjižna dokumenta je preuzeta iz druge aplikacije, sa idejom unosa dokumata kako npr preuzeta stanja, početna stanja itd. Obzirom da mogu se Dobavljac_Racuni prilagodi tome ovu tabelu treba izbaciti.
+
 | `GK.Dpo` | Tačno poslovno značenje nije potvrđeno (ERROR_016 ga tretira kao obavezno uz konto 204x) | 752 |
+>**Komentar** DPO ime je preuzeto iz druge aplikacije (mislim da je skraćeno od datum potraživanja obaveze), inace je Datum dospeća tj datum valute. Izdat račun je knjiži sa datum prometa polje Datum a datum do kad mora da se plati račun je Datum dospeća. DueDate je možda dolji naziv
+
 | `RacunStavke_Troskovi` (cela tabela) | Da li je uopšte potrebna kao agregatni "cache", ili se svodi na SUM upit u realnom vremenu | 1008-1009 |
+>**Komentar** Ova tablea je iz prethodne verzije SZ, još uvek se koristi ali plan je da se napusti taj koncept. Treba je obrisati
+
 | `Godina.GodinaId` vs `IDSZ` | Da li je PK ove tabele zapravo `CompanyId` (1 red po firmi po godini), ne nezavisan surogat | 354 |
+>**Komentar** Ova tablea je iz druge aplikacije koja ima veliki broj racuna i transakcija u GK pa je bilo potrebno deliti podatke po godinama. Zbog neupotrebe treba je izbrisati.
+
 | `Konta` vs `KontniOkvir` | Da li su ovo dve odvojene stvari (interni šifarnik firme vs. pun standardni kontni plan) ili se preklapaju — nije eksplicitno potvrđeno | — (obe tabele, sekcija 1 DDL-a) |
+>**Komentar** Tabela KontniOkvir je dovoljna. Tabela Konta se ne koristi i treba je izbrisati.
+
 | Format broja računa `CompanyId-PartnerAccountingId-GGMM` | Primer `101-1234-1121` — nije 100% jasno da li je "1121" GGMM ili MMGG (mesec-godina obrnuto) | `pitanjaZaContext.md`, pitanje o numeraciji |
+>**Komentar** GGMM tj YYMM je godina i mesec. . Septembar 2026 je 2609
 
