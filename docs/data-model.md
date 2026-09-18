@@ -1,8 +1,17 @@
-# Šema baze — direktno izvučena iz .mdb fajlova (mdbtools, JET4)
+# Database schema — extracted directly from the .mdb files (mdbtools, JET4)
 
-Nema definisanih Access Relationships niti indeksa ni u jednom od tri fajla — provereno direktno na binarnom nivou (mdb-schema --relations --indexes), ne samo u eksportu. Ovo je stvarno stanje baze, ne propust u eksportu.
+Table and column names below have been translated from the original Serbian/legacy Access names to
+English, using the same naming convention as `schema-ddl-draft.sql` (see that file's header for the
+full old-name -> new-name rationale). The structure, column order and column types are otherwise an
+exact, unmodified copy of the legacy database — this file still documents the real, physical shape of
+the old Access files, including framework/temp/backup tables that will not carry over to the new
+schema; it is not itself the new schema design.
 
-## data.mdb — 73 tabele (stvarni podaci)
+No Access Relationships or indexes are defined in any of the three files — verified directly at the
+binary level (mdb-schema --relations --indexes), not just in the export. This is the actual state of
+the database, not a gap in the export.
+
+## data.mdb — 73 tables (real data)
 ```sql
 -- ----------------------------------------------------------
 -- MDB Tools - A library for reading MS Access database files
@@ -14,1166 +23,1166 @@ Nema definisanih Access Relationships niti indeksa ni u jednom od tri fajla — 
 
 -- That file uses encoding UTF-8
 
-CREATE TABLE [_Log]
+CREATE TABLE [AuditLog]
  (
-	[logID]			Long Integer, 
-	[PC]			Text (15), 
-	[WinUser]			Text (50), 
-	[UserID]			Long Integer, 
-	[UserTXT]			Text (50), 
-	[Datum]			DateTime, 
-	[Forma]			Text (60), 
-	[TabCode]			Text (50), 
-	[ItemID]			Long Integer, 
+	[AuditLogId]			Long Integer, 
+	[ComputerName]			Text (15), 
+	[WindowsUsername]			Text (50), 
+	[StaffId]			Long Integer, 
+	[UserDisplayName]			Text (50), 
+	[Date]			DateTime, 
+	[FormName]			Text (60), 
+	[TableCode]			Text (50), 
+	[ItemId]			Long Integer, 
 	[ActionType]			Text (20), 
-	[msgExtra]			Text (255), 
-	[msgErrNum]			Text (255), 
-	[msg]			Text (255), 
-	[msgPromene]			Memo/Hyperlink (255), 
+	[ExtraMessage]			Text (255), 
+	[ErrorNumber]			Text (255), 
+	[Message]			Text (255), 
+	[ChangeMessage]			Memo/Hyperlink (255), 
 	[Module]			Text (50)
 );
 
-CREATE TABLE [_Recnik]
+CREATE TABLE [Dictionary]
  (
-	[ID]			Long Integer, 
-	[Poruka]			Text (255), 
-	[Jezik]			Text (50), 
-	[Index]			Long Integer, 
-	[dlg]			Long Integer
+	[Id]			Long Integer, 
+	[Message]			Text (255), 
+	[Language]			Text (50), 
+	[SortIndex]			Long Integer, 
+	[DialogId]			Long Integer
 );
 
-CREATE TABLE [_RecnikJezik]
+CREATE TABLE [DictionaryLanguage]
  (
-	[RecLang]			Text (10) NOT NULL, 
-	[Recnik]			Text (50), 
-	[On]			Boolean NOT NULL, 
-	[Def]			Boolean NOT NULL
+	[LanguageCode]			Text (10) NOT NULL, 
+	[DictionaryName]			Text (50), 
+	[IsEnabled]			Boolean NOT NULL, 
+	[IsDefault]			Boolean NOT NULL
 );
 
-CREATE TABLE [_RecnikN]
+CREATE TABLE [DictionaryCyrillic]
  (
-	[ID]			Long Integer NOT NULL, 
-	[CIR]			Text (255)
+	[Id]			Long Integer NOT NULL, 
+	[CyrillicText]			Text (255)
 );
 
-CREATE TABLE [_TableList]
+CREATE TABLE [TableCatalog]
  (
 	[Id]			Long Integer, 
 	[TableName]			Text (255), 
 	[Description]			Text (255), 
-	[ClearMe]			Long Integer
+	[ClearFlag]			Long Integer
 );
 
-CREATE TABLE [BenefitGrupa]
+CREATE TABLE [BenefitGroup]
  (
-	[IDBenefitGrupa]			Long Integer, 
-	[BenefitNaziv]			Text (255), 
-	[BenefitPrint]			Text (255)
+	[BenefitGroupId]			Long Integer, 
+	[Name]			Text (255), 
+	[PrintLabel]			Text (255)
 );
 
-CREATE TABLE [Benefiti]
+CREATE TABLE [Benefit]
  (
-	[IDBenefit]			Long Integer, 
-	[ObjekatID]			Long Integer, 
-	[KupacID]			Long Integer, 
-	[MesecYYMM]			Text (255), 
-	[Used]			Long Integer, 
-	[DateEntry]			DateTime, 
-	[DateUsed]			DateTime, 
-	[RacunId]			Long Integer, 
-	[BenefitGrupaId]			Long Integer, 
-	[RacunStornoID]			Long Integer
+	[BenefitId]			Long Integer, 
+	[UnitId]			Long Integer, 
+	[PartnerAccountingId]			Long Integer, 
+	[PeriodYyMm]			Text (255), 
+	[IsUsed]			Long Integer, 
+	[EntryDate]			DateTime, 
+	[UsedDate]			DateTime, 
+	[InvoiceId]			Long Integer, 
+	[BenefitGroupId]			Long Integer, 
+	[CancelledInvoiceId]			Long Integer
 );
 
-CREATE TABLE [Dobavljac_Racuni]
+CREATE TABLE [SupplierInvoice]
  (
-	[IDTRRAC]			Long Integer, 
-	[SK_ID]			Long Integer, 
-	[RacunNO]			Long Integer, 
-	[NazivRacuna]			Text (255), 
-	[Napomena]			Text (255), 
-	[Dobavljac]			Text (50), 
-	[DobavljacKonto]			Long Integer, 
-	[TipObracuna]			Long Integer, 
-	[MesecRacuna]			Text (50), 
-	[IznosRacunaEUR]			Double, 
-	[IznosRacunaRSD]			Currency, 
-	[IznosPoKoefEUR]			Double, 
-	[IznosPoKoefRSD]			Currency, 
-	[PrioritetNaplate]			Long Integer, 
-	[SifraKN]			Text (6), 
-	[TMPprevID]			Long Integer, 
-	[KontoKnjizenja]			Text (255), 
-	[TipDokumenta]			Long Integer, 
-	[MarkerVandrednogRacuna]			Text (255), 
-	[FunkcijaNazivaRacuna]			Text (255), 
-	[RBR]			Text (50), 
-	[IznosRacunaKN]			Currency, 
-	[DatumRacuna]			DateTime, 
-	[DatumKnjizenja]			DateTime, 
-	[DatumPlacanja]			DateTime, 
-	[OpisRacuna]			Text (255), 
-	[PozivNaBroj]			Text (255), 
-	[PrethodniIDRdob]			Long Integer, 
-	[NoviIDRdob]			Long Integer, 
-	[NalogKnjizenja]			Long Integer, 
-	[PDV]			Long Integer, 
-	[ZatvaraKonto]			Text (255)
+	[SupplierInvoiceId]			Long Integer, 
+	[CompanyId]			Long Integer, 
+	[InvoiceNumber]			Long Integer, 
+	[InvoiceName]			Text (255), 
+	[Note]			Text (255), 
+	[Supplier]			Text (50), 
+	[SupplierAccountPartnerAccountingId]			Long Integer, 
+	[CalculationTypeId]			Long Integer, 
+	[InvoiceMonth]			Text (50), 
+	[InvoiceAmountEur]			Double, 
+	[InvoiceAmountRsd]			Currency, 
+	[AmountByCoefficientEur]			Double, 
+	[AmountByCoefficientRsd]			Currency, 
+	[CollectionPriority]			Long Integer, 
+	[PostingCode]			Text (6), 
+	[LegacyTempPrevId]			Long Integer, 
+	[PostingAccount]			Text (255), 
+	[DocumentTypeId]			Long Integer, 
+	[ExtraordinaryInvoiceMarker]			Text (255), 
+	[InvoiceNameFunction]			Text (255), 
+	[SequenceNumber]			Text (50), 
+	[PostedInvoiceAmount]			Currency, 
+	[InvoiceDate]			DateTime, 
+	[PostingDate]			DateTime, 
+	[PaymentDate]			DateTime, 
+	[InvoiceDescription]			Text (255), 
+	[PaymentReference]			Text (255), 
+	[PreviousSupplierInvoiceId]			Long Integer, 
+	[NewSupplierInvoiceId]			Long Integer, 
+	[JournalEntryId]			Long Integer, 
+	[Vat]			Long Integer, 
+	[ClosesAccount]			Text (255)
 );
 
-CREATE TABLE [Dobavljaci_Racun_TipObjekta]
+CREATE TABLE [SupplierInvoiceUnitType]
  (
-	[ID]			Long Integer, 
-	[RacunID]			Long Integer, 
-	[TipObjekta]			Long Integer
+	[Id]			Long Integer, 
+	[SupplierInvoiceId]			Long Integer, 
+	[UnitTypeId]			Long Integer
 );
 
-CREATE TABLE [Files]
+CREATE TABLE [Attachment]
  (
-	[IDDokument]			Long Integer, 
-	[IDDocType]			Long Integer, 
-	[IDRefItem]			Long Integer, 
-	[FileNameSufix]			Text (255), 
+	[AttachmentId]			Long Integer, 
+	[DocumentTypeId]			Long Integer, 
+	[ReferenceItemId]			Long Integer, 
+	[FileNameSuffix]			Text (255), 
 	[FileName]			Text (255), 
-	[RelPathName]			Text (255), 
-	[DateAdd]			DateTime, 
-	[Opis]			Text (255), 
-	[Ext]			Text (255), 
-	[TabSource]			Text (255), 
-	[Registrator]			Text (4)
+	[RelativePath]			Text (255), 
+	[DateAdded]			DateTime, 
+	[Description]			Text (255), 
+	[FileExtension]			Text (255), 
+	[SourceTable]			Text (255), 
+	[Registrar]			Text (4)
 );
 
-CREATE TABLE [GK]
+CREATE TABLE [LedgerEntry]
  (
-	[STAVKAID]			Long Integer, 
-	[BR_NALOG]			Double, 
-	[KONTO]			Text (50), 
-	[DATUM]			DateTime, 
-	[DIZNOS]			Double, 
-	[PIZNOS]			Double, 
-	[TIP_STAVKE]			Double, 
-	[DOK]			Text (50), 
-	[lnkSkupstinaID]			Long Integer, 
-	[lnkKUPACID]			Long Integer, 
-	[lnkIzvodStavkaID]			Long Integer, 
-	[NAPOMENA]			Text (255), 
-	[PARAMETRI]			Text (25), 
-	[OPIS]			Text (255), 
-	[SIFRAKONTA]			Long Integer, 
-	[DPO]			DateTime, 
-	[SIFRAKN]			Text (6), 
-	[RDOB]			Long Integer, 
-	[RACID]			Long Integer, 
-	[PRIORITET]			Long Integer, 
-	[KNzaTIP]			Long Integer, 
-	[RacunIN_ID]			Long Integer, 
-	[KontoTroska]			Text (255), 
-	[KnDokID]			Long Integer
+	[LedgerEntryId]			Long Integer, 
+	[JournalEntryNumber]			Double, 
+	[Account]			Text (50), 
+	[Date]			DateTime, 
+	[DebitAmount]			Double, 
+	[CreditAmount]			Double, 
+	[LineTypeId]			Double, 
+	[DocumentRef]			Text (50), 
+	[CompanyId]			Long Integer, 
+	[PartnerAccountingId]			Long Integer, 
+	[BankStatementLineId]			Long Integer, 
+	[Note]			Text (255), 
+	[Parameters]			Text (25), 
+	[Description]			Text (255), 
+	[AccountCode]			Long Integer, 
+	[DueDate]			DateTime, 
+	[PostingCode]			Text (6), 
+	[SupplierInvoiceId]			Long Integer, 
+	[InvoiceId]			Long Integer, 
+	[Priority]			Long Integer, 
+	[PostingTypeCode]			Long Integer, 
+	[InboundInvoiceId]			Long Integer, 
+	[SubAccount]			Text (255), 
+	[AccountingDocumentId]			Long Integer
 );
 
-CREATE TABLE [GK_TMP]
+CREATE TABLE [LedgerEntryTemp]
  (
-	[STAVKAID]			Long Integer, 
-	[BR_NALOG]			Double, 
-	[KONTO]			Text (50), 
-	[DATUM]			DateTime, 
-	[DIZNOS]			Double, 
-	[PIZNOS]			Double, 
-	[TIP_STAVKE]			Double, 
-	[DOK]			Text (50), 
-	[lnkSkupstinaID]			Long Integer, 
-	[lnkKUPACID]			Long Integer, 
-	[lnkIzvodStavkaID]			Long Integer, 
-	[NAPOMENA]			Text (255), 
-	[PARAMETRI]			Text (25), 
-	[OPIS]			Long Integer, 
-	[SIFRAKONTA]			Long Integer, 
-	[DPO]			DateTime, 
-	[fromStavkaID]			Long Integer, 
-	[SIFRAKN]			Text (6), 
-	[RDOB]			Long Integer, 
-	[RACID]			Long Integer, 
-	[PRIORITET]			Long Integer, 
-	[KNzaTIP]			Long Integer, 
-	[RacunIN_ID]			Long Integer, 
-	[KontoTroska]			Text (255), 
-	[KnDokID]			Text (255)
+	[LedgerEntryId]			Long Integer, 
+	[JournalEntryNumber]			Double, 
+	[Account]			Text (50), 
+	[Date]			DateTime, 
+	[DebitAmount]			Double, 
+	[CreditAmount]			Double, 
+	[LineTypeId]			Double, 
+	[DocumentRef]			Text (50), 
+	[CompanyId]			Long Integer, 
+	[PartnerAccountingId]			Long Integer, 
+	[BankStatementLineId]			Long Integer, 
+	[Note]			Text (255), 
+	[Parameters]			Text (25), 
+	[Description]			Long Integer, 
+	[AccountCode]			Long Integer, 
+	[DueDate]			DateTime, 
+	[FromLedgerEntryId]			Long Integer, 
+	[PostingCode]			Text (6), 
+	[SupplierInvoiceId]			Long Integer, 
+	[InvoiceId]			Long Integer, 
+	[Priority]			Long Integer, 
+	[PostingTypeCode]			Long Integer, 
+	[InboundInvoiceId]			Long Integer, 
+	[SubAccount]			Text (255), 
+	[AccountingDocumentId]			Text (255)
 );
 
-CREATE TABLE [Godina]
+CREATE TABLE [FiscalYear]
  (
-	[IDSZ]			Long Integer NOT NULL, 
-	[Godina]			Long Integer NOT NULL, 
-	[StartDatum]			DateTime, 
-	[EndDatum]			DateTime, 
-	[Arhivirana]			Long Integer, 
-	[Prikaz]			Text (255), 
+	[CompanyId]			Long Integer NOT NULL, 
+	[Year]			Long Integer NOT NULL, 
+	[StartDate]			DateTime, 
+	[EndDate]			DateTime, 
+	[IsArchived]			Long Integer, 
+	[Display]			Text (255), 
 	[Folder]			Text (255), 
-	[Datoteka]			Text (255), 
-	[Aktuelna]			Long Integer
+	[FileName]			Text (255), 
+	[IsCurrent]			Long Integer
 );
 
-CREATE TABLE [GrupaOpomena]
+CREATE TABLE [ReminderBatch]
  (
-	[IDGrupaOpomena]			Long Integer, 
-	[Naslov]			Text (50), 
-	[Datum]			DateTime, 
-	[MinBNR]			Long Integer, 
-	[TolerancijaDuga]			Long Integer, 
-	[TolerancijaDugaPoMesecu]			Long Integer, 
-	[lnkSablonOpomene]			Long Integer, 
-	[lnkVrstaOpomene]			Long Integer, 
-	[DatumDI]			DateTime, 
-	[DatumPI]			DateTime, 
-	[IDSZ]			Long Integer, 
-	[lnkGrupaRacuna]			Long Integer, 
-	[GrupaOpomenaTXT]			Text (255), 
-	[SablonTextOpomene]			Text (255), 
-	[Doznaka]			Text (255)
+	[ReminderBatchId]			Long Integer, 
+	[Title]			Text (50), 
+	[Date]			DateTime, 
+	[MinUnpaidInvoiceCount]			Long Integer, 
+	[DebtTolerance]			Long Integer, 
+	[DebtToleranceByMonth]			Long Integer, 
+	[ReminderTemplateId]			Long Integer, 
+	[ReminderTypeId]			Long Integer, 
+	[DebitPeriodDate]			DateTime, 
+	[CreditPeriodDate]			DateTime, 
+	[CompanyId]			Long Integer, 
+	[InvoiceBatchId]			Long Integer, 
+	[Label]			Text (255), 
+	[ReminderTemplateText]			Text (255), 
+	[RemittanceInfo]			Text (255)
 );
 
-CREATE TABLE [GrupaRacuna]
+CREATE TABLE [InvoiceBatch]
  (
-	[IDGrupaRacuna]			Long Integer, 
-	[GrupaRacunaFXN]			Text (50), 
-	[GrupaRacunaFXT]			Text (50), 
-	[Mesec]			Text (50), 
-	[Godina]			Text (50), 
-	[Mesto]			Text (50), 
-	[DatumIzdavanja]			DateTime, 
-	[DatumUsluge]			Text (50), 
-	[DatumPrometa]			DateTime, 
-	[DatumValute]			DateTime, 
-	[NBS]			Currency, 
-	[ID_SK]			Long Integer, 
-	[NalogKN]			Long Integer, 
-	[DatumSys]			DateTime, 
-	[UserSys]			Long Integer, 
-	[MarkerVanderdnihRacuna]			Text (255), 
-	[VrstaRacuna]			Text (255), 
-	[DatumStanja]			DateTime, 
-	[PrethodnaValuta]			DateTime, 
-	[ObracunKamate]			Long Integer
+	[InvoiceBatchId]			Long Integer, 
+	[Code]			Text (50), 
+	[Label]			Text (50), 
+	[Month]			Text (50), 
+	[Year]			Text (50), 
+	[Place]			Text (50), 
+	[IssueDate]			DateTime, 
+	[ServiceDate]			Text (50), 
+	[TransactionDate]			DateTime, 
+	[ValueDate]			DateTime, 
+	[ExchangeRateNbs]			Currency, 
+	[CompanyId]			Long Integer, 
+	[PostingJournalEntryId]			Long Integer, 
+	[SystemDate]			DateTime, 
+	[StaffId]			Long Integer, 
+	[ExtraordinaryInvoiceMarker]			Text (255), 
+	[InvoiceKind]			Text (255), 
+	[BalanceAsOfDate]			DateTime, 
+	[PreviousValueDate]			DateTime, 
+	[IsInterestCalculated]			Long Integer
 );
 
-CREATE TABLE [Izvod]
+CREATE TABLE [BankStatement]
  (
-	[IzvodID]			Long Integer, 
-	[BrojIzvoda]			Long Integer, 
-	[SufixIzvoda]			Text (50), 
-	[ID_SK]			Long Integer, 
-	[Datum]			DateTime, 
-	[PrethodnoStanjeIzvoda]			Currency, 
-	[NovoStanje]			Currency, 
-	[Duguje]			Currency, 
-	[Potrazuje]			Currency, 
-	[NalogaZaduzenja]			Long Integer, 
-	[NalogaOdobranja]			Long Integer, 
-	[Napomena]			Text (50), 
-	[NalogZaKnjizenje]			Long Integer, 
-	[Rasknjizen]			Boolean NOT NULL
+	[BankStatementId]			Long Integer, 
+	[StatementNumber]			Long Integer, 
+	[StatementSuffix]			Text (50), 
+	[CompanyId]			Long Integer, 
+	[Date]			DateTime, 
+	[PreviousBalance]			Currency, 
+	[NewBalance]			Currency, 
+	[Debit]			Currency, 
+	[Credit]			Currency, 
+	[DebitJournalEntryId]			Long Integer, 
+	[CreditJournalEntryId]			Long Integer, 
+	[Note]			Text (50), 
+	[JournalEntryId]			Long Integer, 
+	[IsUnposted]			Boolean NOT NULL
 );
 
-CREATE TABLE [IzvodStavke]
+CREATE TABLE [BankStatementLine]
  (
-	[ID]			Long Integer, 
-	[IzvodLNKID]			Long Integer, 
-	[ID_SK]			Long Integer, 
-	[RbStavke]			Long Integer, 
-	[RbNaloga]			Long Integer, 
-	[NazivPN]			Text (255), 
-	[BrojRacuna]			Text (50), 
-	[Poreklo]			Text (50), 
-	[DatumRealizacije]			DateTime, 
-	[Zaduzenje]			Currency, 
-	[Odobrenje]			Currency, 
-	[Doznaka]			Text (255), 
-	[Sifra]			Long Integer, 
-	[PozivNaBroj]			Text (50), 
-	[PozivNaBrojO]			Text (50), 
-	[opt_lnk_Kupac]			Long Integer, 
-	[Knjizeno]			Boolean NOT NULL, 
-	[Ignore]			Boolean NOT NULL, 
-	[SetP]			Boolean NOT NULL
+	[Id]			Long Integer, 
+	[BankStatementId]			Long Integer, 
+	[CompanyId]			Long Integer, 
+	[LineNumber]			Long Integer, 
+	[JournalEntryLineNumber]			Long Integer, 
+	[PayerRecipientName]			Text (255), 
+	[BankAccountNumber]			Text (50), 
+	[Origin]			Text (50), 
+	[ExecutionDate]			DateTime, 
+	[Debit]			Currency, 
+	[Credit]			Currency, 
+	[RemittanceInfo]			Text (255), 
+	[Code]			Long Integer, 
+	[PaymentReference]			Text (50), 
+	[PaymentReferenceOut]			Text (50), 
+	[PartnerAccountingId]			Long Integer, 
+	[IsPosted]			Boolean NOT NULL, 
+	[IsIgnored]			Boolean NOT NULL, 
+	[IsMatched]			Boolean NOT NULL
 );
 
-CREATE TABLE [KnjiznaDokumenta]
+CREATE TABLE [AccountingDocument]
  (
-	[IDDokument]			Long Integer, 
-	[IDSZ]			Long Integer, 
-	[IDKR]			Long Integer, 
-	[IDTipDok]			Long Integer, 
-	[Iznos]			Currency, 
-	[NalogKN]			Long Integer, 
-	[Datum]			DateTime, 
-	[DokumentNaziv]			Text (255), 
-	[DokumentOpis]			Text (255), 
-	[KontoTroska]			Long Integer, 
-	[IDTipGrupa]			Long Integer, 
-	[refFromIDDok]			Long Integer, 
-	[PB]			Text (30)
+	[AttachmentId]			Long Integer, 
+	[CompanyId]			Long Integer, 
+	[AccountingDocumentIdRef]			Long Integer, 
+	[DocumentTypeId]			Long Integer, 
+	[Amount]			Currency, 
+	[PostingJournalEntryId]			Long Integer, 
+	[Date]			DateTime, 
+	[DocumentName]			Text (255), 
+	[DocumentDescription]			Text (255), 
+	[SubAccount]			Long Integer, 
+	[TypeGroupId]			Long Integer, 
+	[RefFromAccountingDocumentId]			Long Integer, 
+	[ReferenceCode]			Text (30)
 );
 
-CREATE TABLE [Konta]
+CREATE TABLE [Account]
  (
-	[Konto]			Long Integer NOT NULL, 
-	[Opis]			Text (50), 
+	[Account]			Long Integer NOT NULL, 
+	[Description]			Text (50), 
 	[PrintText]			Text (255)
 );
 
-CREATE TABLE [KontniOkvir]
+CREATE TABLE [ChartOfAccounts]
  (
-	[Konto]			Text (255) NOT NULL, 
-	[SkraceniNaziv]			Text (255), 
-	[Naziv]			Text (255), 
-	[Prethodni]			Text (255), 
-	[Nivo]			Long Integer, 
-	[Znak]			Text (255), 
-	[Aktivan]			Long Integer
+	[Account]			Text (255) NOT NULL, 
+	[ShortName]			Text (255), 
+	[Name]			Text (255), 
+	[ParentAccount]			Text (255), 
+	[Level]			Long Integer, 
+	[Sign]			Text (255), 
+	[IsActive]			Long Integer
 );
 
-CREATE TABLE [Kupac]
+CREATE TABLE [Partner]
  (
-	[ID_K]			Long Integer NOT NULL, 
-	[Naziv]			Text (100), 
-	[PBroj]			Text (50), 
-	[Adresa]			Text (50), 
-	[MB]			Text (50), 
-	[PIB]			Text (50), 
-	[Adresa_Ugovor]			Text (255), 
-	[Telefon]			Text (50), 
-	[eMail]			Text (100), 
-	[napomena]			Text (255), 
-	[TR_K]			Text (50), 
-	[web]			Text (50), 
-	[lnk_ID_SK]			Long Integer, 
-	[lnkNaselje]			Long Integer, 
-	[PrintNaziv]			Text (255), 
-	[PAK]			Text (50), 
-	[KONTO]			Text (50), 
-	[ExterniKonto]			Text (255), 
-	[PDprefix]			Text (255), 
-	[LK]			Text (255), 
-	[Tip]			Long Integer, 
-	[AutoKontoTroska]			Text (50), 
-	[IDGrupniRacunMaster]			Long Integer, 
-	[chkSkipPrintRacunGrupa]			Long Integer, 
-	[PDVobaveznik]			Long Integer, 
-	[JBJKS]			Text (255), 
-	[KupacGrad]			Text (255), 
-	[ZemljaKod]			Text (255), 
-	[IDMaster]			Long Integer, 
-	[LokacijaDostava]			Text (255), 
-	[DostavaSifraPD]			Long Integer, 
+	[PartnerId]			Long Integer NOT NULL, 
+	[Name]			Text (100), 
+	[PostalCode]			Text (50), 
+	[Address]			Text (50), 
+	[RegistrationNumber]			Text (50), 
+	[TaxId]			Text (50), 
+	[ContractAddress]			Text (255), 
+	[Phone]			Text (50), 
+	[Email]			Text (100), 
+	[Note]			Text (255), 
+	[PrimaryBankAccountNumber]			Text (50), 
+	[Website]			Text (50), 
+	[CompanyId]			Long Integer, 
+	[CategoryLocationId]			Long Integer, 
+	[PrintName]			Text (255), 
+	[LegacyShortCode]			Text (50), 
+	[Account]			Text (50), 
+	[ExternalAccount]			Text (255), 
+	[PaymentSlipPrefix]			Text (255), 
+	[LegalRepresentative]			Text (255), 
+	[Type]			Long Integer, 
+	[AutoSubAccount]			Text (50), 
+	[GroupInvoiceTagId]			Long Integer, 
+	[SkipPrintInvoiceGroup]			Long Integer, 
+	[IsVatPayer]			Long Integer, 
+	[Jbjks]			Text (255), 
+	[PartnerCity]			Text (255), 
+	[CountryCode]			Text (255), 
+	[LegacyMasterId]			Long Integer, 
+	[DeliveryLocation]			Text (255), 
+	[DeliveryUnitTypeCode]			Long Integer, 
 	[PrintInvoiceMandatory]			Long Integer, 
 	[SendToPostOffice]			Long Integer, 
 	[Language]			Text (255), 
-	[NapomenaExtended]			Memo/Hyperlink (255)
+	[ExtendedNote]			Memo/Hyperlink (255)
 );
 
-CREATE TABLE [Kurs]
+CREATE TABLE [ExchangeRate]
  (
-	[IDk]			Long Integer, 
-	[Kurs]			Currency, 
-	[DatumOd]			DateTime, 
-	[Skolska]			Long Integer, 
-	[RefCena]			Long Integer, 
-	[DatumUpisa]			DateTime
+	[ExchangeRateId]			Long Integer, 
+	[Rate]			Currency, 
+	[RateDateFrom]			DateTime, 
+	[SchoolYearLegacy]			Long Integer, 
+	[ReferencePriceLegacy]			Long Integer, 
+	[EntryDateLegacy]			DateTime
 );
 
-CREATE TABLE [Mail]
+CREATE TABLE [PartnerEmail]
  (
-	[IDeMail]			Long Integer, 
-	[IDPartner]			Long Integer, 
-	[eMail]			Text (255), 
+	[PartnerEmailId]			Long Integer, 
+	[PartnerId]			Long Integer, 
+	[Email]			Text (255), 
 	[SortOrder]			Long Integer, 
 	[LoginAppMaster]			Long Integer, 
 	[LoginAppView]			Long Integer, 
-	[SendMailRacun]			Long Integer
+	[SendInvoiceByEmail]			Long Integer
 );
 
-CREATE TABLE [Mail_Send]
+CREATE TABLE [SentEmail]
  (
-	[IDMail]			Long Integer, 
+	[SentEmailId]			Long Integer, 
 	[Subject]			Text (255), 
-	[To]			Text (255), 
-	[CC]			Text (255), 
-	[BCC]			Text (255), 
+	[ToAddress]			Text (255), 
+	[Cc]			Text (255), 
+	[Bcc]			Text (255), 
 	[Body]			Memo/Hyperlink (255), 
-	[BodyHTML]			Memo/Hyperlink (255), 
+	[BodyHtml]			Memo/Hyperlink (255), 
 	[DateCreated]			DateTime, 
-	[DateSend]			DateTime, 
+	[DateSent]			DateTime, 
 	[Archive]			Boolean NOT NULL, 
 	[ErrorDescription]			Memo/Hyperlink (255), 
 	[ErrorStatus]			Text (255)
 );
 
-CREATE TABLE [Mail_Send_Attachment]
+CREATE TABLE [SentEmailAttachment]
  (
-	[IDMailAttachment]			Long Integer, 
-	[IDMail]			Long Integer, 
+	[SentEmailAttachmentId]			Long Integer, 
+	[SentEmailId]			Long Integer, 
 	[AttachmentFilePath]			Text (255), 
 	[AttachmentFilePath2]			Text (255)
 );
 
-CREATE TABLE [Nalog]
+CREATE TABLE [JournalEntry]
  (
-	[Br_Nalog]			Double NOT NULL, 
-	[Datum]			DateTime, 
-	[Saldo]			Currency, 
-	[Napomena]			Text (255), 
-	[Reserve]			Text (50), 
-	[OpisNaloga]			Text (50), 
-	[SZID]			Long Integer, 
-	[DodatneNapomene]			Text (255), 
-	[TipNaloga]			Long Integer
+	[LegacyJournalEntryNumber]			Double NOT NULL, 
+	[Date]			DateTime, 
+	[Balance]			Currency, 
+	[Note]			Text (255), 
+	[Reserved]			Text (50), 
+	[Description]			Text (50), 
+	[CompanyId]			Long Integer, 
+	[AdditionalNotes]			Text (255), 
+	[JournalEntryTypeId]			Long Integer
 );
 
-CREATE TABLE [Naselje]
+CREATE TABLE [CategoryLocation]
  (
-	[NaseljeID]			Long Integer NOT NULL, 
-	[Naselje]			Text (50)
+	[CategoryLocationId]			Long Integer NOT NULL, 
+	[Name]			Text (50)
 );
 
-CREATE TABLE [Notes]
+CREATE TABLE [Note]
  (
-	[ID]			Long Integer, 
-	[Datum]			Text (50), 
-	[Korisnik]			Text (50), 
-	[Notes]			Memo/Hyperlink (255)
+	[Id]			Long Integer, 
+	[Date]			Text (50), 
+	[UserName]			Text (50), 
+	[Text]			Memo/Hyperlink (255)
 );
 
-CREATE TABLE [Objekti]
+CREATE TABLE [Unit]
  (
-	[ID_O]			Long Integer, 
-	[lnkSkupstinaID]			Long Integer, 
-	[naziv]			Text (255), 
-	[lnk_ID_K]			Long Integer NOT NULL, 
-	[lnk_tip]			Long Integer, 
+	[UnitId]			Long Integer, 
+	[CompanyId]			Long Integer, 
+	[Name]			Text (255), 
+	[PartnerId]			Long Integer NOT NULL, 
+	[UnitTypeId]			Long Integer, 
 	[Status]			Long Integer, 
-	[IO]			Double, 
-	[RF_DIN]			Double, 
-	[IONaslov]			Text (50), 
-	[StaraKv]			Double, 
-	[STatusPromene]			Text (50), 
-	[Koeficijent]			Double, 
-	[Ukupno]			Currency, 
-	[Ulaz]			Text (50), 
-	[Kategorija]			Text (5), 
-	[Adresa]			Text (50), 
-	[Napomena]			Text (255), 
-	[Naziv_Slanja]			Text (50), 
-	[Adresa_Slanja]			Text (50), 
-	[PBroj_Slanja]			Text (50), 
-	[PIB_Slanja]			Text (50), 
-	[PLATILAC_lnk_ID_K]			Long Integer, 
-	[PLATILAC_lnk_ID_K2]			Long Integer, 
-	[BRGM]			Long Integer, 
+	[IoLegacy]			Double, 
+	[InvestmentMaintenanceReserve]			Double, 
+	[InvestmentMaintenanceTitle]			Text (50), 
+	[PreviousArea]			Double, 
+	[StatusChangeNote]			Text (50), 
+	[Coefficient]			Double, 
+	[Total]			Currency, 
+	[Entrance]			Text (50), 
+	[Category]			Text (5), 
+	[Address]			Text (50), 
+	[Note]			Text (255), 
+	[MailingName]			Text (50), 
+	[MailingAddress]			Text (50), 
+	[MailingPostalCode]			Text (50), 
+	[MailingTaxId]			Text (50), 
+	[LegacyPayerPartnerId]			Long Integer, 
+	[LegacyPayerPartnerId2]			Long Integer, 
+	[GarageSpotNumber]			Long Integer, 
 	[K1]			Double, 
 	[K2]			Double, 
 	[K3]			Double, 
 	[K4]			Double, 
 	[K5]			Double, 
-	[PAK_SLANJA]			Text (50), 
-	[KV]			Double, 
-	[BrStanara]			Long Integer, 
-	[BrojPD]			Long Integer, 
-	[IDVlasnik]			Long Integer, 
-	[IDZakupac]			Long Integer, 
-	[IDGrupnogRacuna]			Long Integer, 
-	[SifraPD]			Text (255), 
-	[netoKV]			Double, 
-	[terasa]			Double, 
-	[netoKVsaTerasom]			Double, 
+	[MailingLegacyCode]			Text (50), 
+	[Area]			Double, 
+	[ResidentCount]			Long Integer, 
+	[UnitTypeCode]			Long Integer, 
+	[LegacyOwnerPartnerId]			Long Integer, 
+	[LegacyTenantPartnerId]			Long Integer, 
+	[LegacyGroupInvoiceId]			Long Integer, 
+	[UnitTypeShortCode]			Text (255), 
+	[NetArea]			Double, 
+	[Terrace]			Double, 
+	[NetAreaWithTerrace]			Double, 
 	[HandOverDate]			DateTime, 
-	[SpratN]			Long Integer, 
-	[SpratT]			Text (255)
+	[FloorNumber]			Long Integer, 
+	[FloorText]			Text (255)
 );
 
-CREATE TABLE [Opomena]
+CREATE TABLE [Reminder]
  (
-	[IDOpomena]			Long Integer, 
-	[lnkGrupaOpomena]			Long Integer, 
-	[lnkKupac]			Long Integer, 
-	[BNR]			Long Integer, 
-	[Dug]			Double, 
-	[txtRacunOp]			Text (255), 
-	[ActivnaOpomena]			Long Integer, 
-	[SumaPoStavkama]			Double, 
-	[PozivNaBroj]			Text (255), 
-	[Troskovi]			Long Integer, 
-	[Ukupno]			Long Integer
+	[ReminderId]			Long Integer, 
+	[ReminderBatchId]			Long Integer, 
+	[PartnerAccountingId]			Long Integer, 
+	[UnpaidInvoiceCount]			Long Integer, 
+	[Debt]			Double, 
+	[InvoiceText]			Text (255), 
+	[IsActive]			Long Integer, 
+	[LineItemSum]			Double, 
+	[PaymentReference]			Text (255), 
+	[Costs]			Long Integer, 
+	[Total]			Long Integer
 );
 
-CREATE TABLE [OpomenaStavke]
+CREATE TABLE [ReminderLine]
  (
-	[IDOpomenaStavka]			Long Integer, 
-	[lnkOpomena]			Long Integer, 
-	[lnkIDGO]			Long Integer, 
-	[lnkKupacID]			Long Integer, 
-	[PARAMETRI]			Text (25), 
-	[DOK]			Text (255), 
-	[Di]			Double, 
-	[Pi]			Double, 
-	[Suma]			Double, 
-	[mTXT]			Text (255), 
-	[DatumDospeca]			DateTime, 
-	[IDRacun]			Long Integer, 
-	[DatumRacuna]			DateTime, 
-	[PProstor]			Text (255)
+	[ReminderLineId]			Long Integer, 
+	[ReminderId]			Long Integer, 
+	[ReminderBatchId]			Long Integer, 
+	[PartnerAccountingId]			Long Integer, 
+	[Parameters]			Text (25), 
+	[DocumentRef]			Text (255), 
+	[Debit]			Double, 
+	[Credit]			Double, 
+	[Sum]			Double, 
+	[Text]			Text (255), 
+	[DueDate]			DateTime, 
+	[InvoiceId]			Long Integer, 
+	[InvoiceDate]			DateTime, 
+	[UnitAddress]			Text (255)
 );
 
-CREATE TABLE [OpomeneSabloni]
+CREATE TABLE [ReminderTemplate]
  (
-	[IDOpomenaSablon]			Long Integer, 
-	[lnkVrstaOpomene]			Long Integer, 
-	[Reportname]			Text (255), 
-	[Naslov]			Text (255), 
-	[rptField01]			Text (255), 
-	[rptField02]			Text (255), 
-	[rptField03]			Memo/Hyperlink (255), 
-	[rptField04]			Memo/Hyperlink (255), 
-	[rptField05]			Memo/Hyperlink (255), 
-	[rptField06]			Memo/Hyperlink (255), 
-	[rptField07]			Text (255), 
-	[rptField08]			Text (255), 
-	[rptField09]			Text (255)
+	[ReminderTemplateId]			Long Integer, 
+	[ReminderTypeId]			Long Integer, 
+	[ReportName]			Text (255), 
+	[Title]			Text (255), 
+	[ReportField01]			Text (255), 
+	[ReportField02]			Text (255), 
+	[ReportField03]			Memo/Hyperlink (255), 
+	[ReportField04]			Memo/Hyperlink (255), 
+	[ReportField05]			Memo/Hyperlink (255), 
+	[ReportField06]			Memo/Hyperlink (255), 
+	[ReportField07]			Text (255), 
+	[ReportField08]			Text (255), 
+	[ReportField09]			Text (255)
 );
 
-CREATE TABLE [PrinterBinLOCAL]
+CREATE TABLE [SelectionBasket]
  (
-	[IDlocalPrinterbin]			Long Integer, 
-	[ID_Item]			Long Integer, 
+	[SelectionBasketId]			Long Integer, 
+	[TargetId]			Long Integer, 
 	[TypeIndex]			Long Integer
 );
 
-CREATE TABLE [Promene]
+CREATE TABLE [Events]
  (
-	[IDChange]			Long Integer, 
+	[EventId]			Long Integer, 
 	[DateOfRequest]			DateTime, 
 	[DateOfExecution]			DateTime, 
-	[IDK]			Long Integer, 
-	[IDO]			Long Integer, 
+	[PartnerId]			Long Integer, 
+	[UnitId]			Long Integer, 
 	[Description]			Text (255), 
-	[PreviusValue]			Text (255), 
+	[PreviousValue]			Text (255), 
 	[NewValue]			Text (255), 
 	[FieldsRelated]			Text (255), 
 	[RequestType]			Text (255), 
 	[RequestBy]			Text (255), 
-	[RequestThrou]			Text (255)
+	[RequestThrough]			Text (255)
 );
 
-CREATE TABLE [Racun]
+CREATE TABLE [Invoice]
  (
-	[IDRacun]			Long Integer, 
-	[RBR]			Text (20), 
-	[lnkGR]			Long Integer, 
-	[DatumIzdavanja]			DateTime, 
-	[MestoIzdavanja]			Text (50), 
-	[DatumUsluge]			Text (50), 
-	[DatumPrometa]			DateTime, 
-	[DatumValute]			DateTime, 
-	[ID_K]			Long Integer, 
-	[ID_SK]			Long Integer, 
-	[Kupac]			Text (255), 
-	[PBroj_K]			Text (50), 
-	[Adresa_K]			Text (50), 
-	[PIB]			Text (50), 
-	[MB]			Text (255), 
-	[Suma]			Double, 
-	[PDVStopa]			Double, 
-	[PDVIznos]			Double, 
-	[Ukupno]			Double, 
+	[InvoiceId]			Long Integer, 
+	[SequenceNumber]			Text (20), 
+	[InvoiceBatchId]			Long Integer, 
+	[IssueDate]			DateTime, 
+	[PlaceOfIssue]			Text (50), 
+	[ServiceDate]			Text (50), 
+	[TransactionDate]			DateTime, 
+	[ValueDate]			DateTime, 
+	[PartnerId]			Long Integer, 
+	[CompanyId]			Long Integer, 
+	[PartnerName]			Text (255), 
+	[PostalCode]			Text (50), 
+	[Address]			Text (50), 
+	[TaxId]			Text (50), 
+	[RegistrationNumber]			Text (255), 
+	[Sum]			Double, 
+	[VatRate]			Double, 
+	[VatAmount]			Double, 
+	[Total]			Double, 
 	[PrethodniDug]			Single, 
-	[SvrhaUplate]			Text (255), 
-	[Valuta]			Text (50), 
-	[PozivNaBroj]			Text (50), 
-	[PD_text]			Text (255), 
-	[Napomena]			Text (255), 
-	[Co]			Long Integer, 
-	[Storno]			Boolean NOT NULL, 
-	[extraNapomena]			Text (255), 
-	[objekatNaziv]			Text (50), 
-	[Upravnik]			Long Integer, 
-	[SvrhaUplate2]			Text (255), 
-	[ID_OX]			Long Integer, 
-	[AdresaProstora]			Text (255), 
-	[ZaUplatu]			Double, 
-	[Naziv_Slanja]			Text (50), 
-	[Adresa_Slanja]			Text (50), 
-	[PBroj_Slanja]			Text (50), 
-	[PIB_Slanja]			Text (50), 
-	[tmpID]			Long Integer, 
-	[tmpID2]			Long Integer, 
-	[tmpPB]			Text (50), 
-	[tmpPB2]			Text (50), 
-	[SPC]			Long Integer, 
-	[PD_iznos]			Double, 
-	[TipPoljaZaUplatu]			Long Integer, 
-	[lnkOpomenaID]			Long Integer, 
-	[IDKGrupniRacun]			Long Integer, 
-	[Grad_K]			Text (255), 
-	[Lokacija]			Text (255), 
-	[SortRacun]			Long Integer, 
-	[DatumStorno]			DateTime, 
-	[RacunShema]			Text (255), 
-	[DatumStanja]			DateTime, 
-	[KamataIznos]			Double, 
-	[UkupnoRacun]			Double
+	[PaymentPurpose]			Text (255), 
+	[Currency]			Text (50), 
+	[PaymentReference]			Text (50), 
+	[PaymentSlipText]			Text (255), 
+	[Note]			Text (255), 
+	[PageCount]			Long Integer, 
+	[IsCancelled]			Boolean NOT NULL, 
+	[AdditionalNote]			Text (255), 
+	[UnitName]			Text (50), 
+	[Manager]			Long Integer, 
+	[PaymentPurpose2]			Text (255), 
+	[UnitId]			Long Integer, 
+	[UnitAddress]			Text (255), 
+	[AmountDue]			Double, 
+	[MailingName]			Text (50), 
+	[MailingAddress]			Text (50), 
+	[MailingPostalCode]			Text (50), 
+	[MailingTaxId]			Text (50), 
+	[LegacyTempId1]			Long Integer, 
+	[LegacyTempId2]			Long Integer, 
+	[LegacyTempCode1]			Text (50), 
+	[LegacyTempCode2]			Text (50), 
+	[QrCodeFlag]			Long Integer, 
+	[PaymentSlipAmount]			Double, 
+	[PaymentFieldTypeId]			Long Integer, 
+	[ReminderId]			Long Integer, 
+	[GroupInvoiceId]			Long Integer, 
+	[City]			Text (255), 
+	[Location]			Text (255), 
+	[SortOrder]			Long Integer, 
+	[CancelledDate]			DateTime, 
+	[InvoiceLayout]			Text (255), 
+	[BalanceAsOfDate]			DateTime, 
+	[InterestAmount]			Double, 
+	[InvoiceTotal]			Double
 );
 
-CREATE TABLE [RacunIN]
+CREATE TABLE [InboundInvoice]
  (
-	[IDRacunIN]			Long Integer, 
-	[PartnerID]			Long Integer, 
-	[SkupstinaID]			Long Integer, 
-	[BrojRacunaIn]			Text (255), 
-	[DatumRacuna]			DateTime, 
-	[DatumKnjizenja]			DateTime, 
-	[DatumPlacanja]			DateTime, 
-	[KontoTroska]			Text (255), 
-	[IznosRacuna]			Currency
+	[InboundInvoiceId]			Long Integer, 
+	[PartnerId]			Long Integer, 
+	[CompanyId]			Long Integer, 
+	[InboundInvoiceNumber]			Text (255), 
+	[InvoiceDate]			DateTime, 
+	[PostingDate]			DateTime, 
+	[PaymentDate]			DateTime, 
+	[SubAccount]			Text (255), 
+	[InvoiceAmount]			Currency
 );
 
-CREATE TABLE [RacunObjekti]
+CREATE TABLE [InvoiceUnit]
  (
-	[IDRacun]			Long Integer, 
-	[IDObjekat]			Long Integer
+	[InvoiceId]			Long Integer, 
+	[UnitId]			Long Integer
 );
 
-CREATE TABLE [RacunStavke]
+CREATE TABLE [InvoiceLine]
  (
-	[IDRacunStavke]			Long Integer, 
-	[ID_R]			Long Integer, 
-	[lnkGR]			Long Integer, 
-	[ID_K]			Long Integer, 
-	[ID_SK]			Long Integer, 
-	[ID_RDOB]			Long Integer, 
-	[Naziv]			Text (255), 
-	[TipObracuna]			Long Integer, 
+	[InvoiceLineId]			Long Integer, 
+	[InvoiceId]			Long Integer, 
+	[InvoiceBatchId]			Long Integer, 
+	[PartnerId]			Long Integer, 
+	[CompanyId]			Long Integer, 
+	[SupplierInvoiceId]			Long Integer, 
+	[Name]			Text (255), 
+	[CalculationTypeId]			Long Integer, 
 	[K1]			Double, 
 	[K2]			Double, 
 	[K3]			Double, 
 	[K4]			Double, 
 	[K5]			Double, 
-	[Kolicina]			Double, 
-	[CenaE]			Double, 
-	[NBS]			Double, 
-	[Iznos]			Double, 
-	[Suma]			Double, 
-	[PDVStopa]			Double, 
-	[PDVIznos]			Double, 
-	[UkupnoRSD]			Double, 
-	[Sort]			Long Integer, 
-	[DobavljacKonto]			Long Integer, 
-	[IZNOSRACUNA]			Double, 
+	[Quantity]			Double, 
+	[PriceEur]			Double, 
+	[ExchangeRateNbs]			Double, 
+	[Amount]			Double, 
+	[Sum]			Double, 
+	[VatRate]			Double, 
+	[VatAmount]			Double, 
+	[TotalRsd]			Double, 
+	[SortOrder]			Long Integer, 
+	[SupplierAccountPartnerAccountingId]			Long Integer, 
+	[InvoiceAmount]			Double, 
 	[K1xK2]			Double, 
 	[K2xK3]			Double, 
 	[K2xK4]			Double, 
 	[K2xK5]			Double, 
-	[JM]			Text (255), 
-	[ID_O]			Long Integer, 
-	[M]			Double
+	[UnitOfMeasure]			Text (255), 
+	[UnitId]			Long Integer, 
+	[QuantityAlt]			Double
 );
 
-CREATE TABLE [RacunStavkeBenefitArhiva]
+CREATE TABLE [InvoiceLineBenefitArchive]
  (
-	[IDRacunStavke]			Long Integer NOT NULL, 
-	[ID_R]			Long Integer, 
-	[lnkGR]			Long Integer, 
-	[ID_K]			Long Integer, 
-	[ID_SK]			Long Integer, 
-	[ID_RDOB]			Long Integer, 
-	[Naziv]			Text (255), 
-	[TipObracuna]			Long Integer, 
+	[InvoiceLineId]			Long Integer NOT NULL, 
+	[InvoiceId]			Long Integer, 
+	[InvoiceBatchId]			Long Integer, 
+	[PartnerId]			Long Integer, 
+	[CompanyId]			Long Integer, 
+	[SupplierInvoiceId]			Long Integer, 
+	[Name]			Text (255), 
+	[CalculationTypeId]			Long Integer, 
 	[K1]			Double, 
 	[K2]			Double, 
 	[K3]			Double, 
 	[K4]			Double, 
 	[K5]			Double, 
-	[Kolicina]			Double, 
-	[CenaE]			Double, 
-	[NBS]			Double, 
-	[Iznos]			Double, 
-	[Suma]			Double, 
-	[PDVStopa]			Double, 
-	[PDVIznos]			Double, 
-	[UkupnoRSD]			Double, 
-	[Sort]			Long Integer, 
-	[DobavljacKonto]			Long Integer, 
-	[IZNOSRACUNA]			Double, 
+	[Quantity]			Double, 
+	[PriceEur]			Double, 
+	[ExchangeRateNbs]			Double, 
+	[Amount]			Double, 
+	[Sum]			Double, 
+	[VatRate]			Double, 
+	[VatAmount]			Double, 
+	[TotalRsd]			Double, 
+	[SortOrder]			Long Integer, 
+	[SupplierAccountPartnerAccountingId]			Long Integer, 
+	[InvoiceAmount]			Double, 
 	[K1xK2]			Double, 
 	[K2xK3]			Double, 
 	[K2xK4]			Double, 
 	[K2xK5]			Double, 
-	[JM]			Text (255), 
-	[ID_O]			Long Integer
+	[UnitOfMeasure]			Text (255), 
+	[UnitId]			Long Integer
 );
 
-CREATE TABLE [Settings]
+CREATE TABLE [Setting]
  (
-	[IDSettings]			Long Integer, 
+	[SettingId]			Long Integer, 
 	[SettingName]			Text (255), 
-	[SettingVal]			Text (255), 
-	[Descrition]			Text (255), 
+	[SettingValue]			Text (255), 
+	[Description]			Text (255), 
 	[Category]			Text (50), 
-	[MFF]			Text (50), 
-	[DefVal]			Text (255), 
-	[FilterUser]			Long Integer, 
-	[FilterPC]			Text (255), 
+	[ModuleFormField]			Text (50), 
+	[DefaultValue]			Text (255), 
+	[FilterUserId]			Long Integer, 
+	[FilterComputerName]			Text (255), 
 	[FilterCustom1Num]			Long Integer, 
 	[FilterCustom2Num]			Long Integer, 
 	[FilterCustom3Num]			Long Integer, 
-	[FilterCustom1Txt]			Text (255), 
-	[FilterCustom2Txt]			Text (255), 
-	[FilterCustom3Txt]			Text (255), 
-	[SettingVal_LT]			Memo/Hyperlink (255)
+	[FilterCustom1Text]			Text (255), 
+	[FilterCustom2Text]			Text (255), 
+	[FilterCustom3Text]			Text (255), 
+	[SettingValueLong]			Memo/Hyperlink (255)
 );
 
-CREATE TABLE [Settings_eMail]
+CREATE TABLE [EmailSetting]
  (
-	[IDSettingsEML]			Long Integer NOT NULL, 
+	[EmailSettingId]			Long Integer NOT NULL, 
 	[SettingName]			Text (255), 
-	[SettingVal]			Memo/Hyperlink (255), 
+	[SettingValue]			Memo/Hyperlink (255), 
 	[Category]			Text (255), 
-	[Descrition]			Text (255), 
-	[SZID]			Long Integer
+	[Description]			Text (255), 
+	[CompanyId]			Long Integer
 );
 
-CREATE TABLE [Settings_eNalog_Grupa]
+CREATE TABLE [EPaymentOrderSettingGroup]
  (
-	[Index]			Long Integer NOT NULL, 
-	[Kategorija]			Text (50), 
-	[SQL_memo]			Memo/Hyperlink (255), 
-	[SQL]			Text (255)
+	[SortIndex]			Long Integer NOT NULL, 
+	[Category]			Text (50), 
+	[SqlMemo]			Memo/Hyperlink (255), 
+	[Sql]			Text (255)
 );
 
-CREATE TABLE [Settings_FormGrid]
+CREATE TABLE [FormGridSetting]
  (
-	[IDSettGrid]			Long Integer, 
+	[FormGridSettingId]			Long Integer, 
 	[FormName]			Text (255), 
-	[FormParent]			Text (255), 
-	[CompName]			Text (255), 
-	[mUserID]			Long Integer, 
+	[ParentFormName]			Text (255), 
+	[ComponentName]			Text (255), 
+	[StaffId]			Long Integer, 
 	[LayoutIndex]			Long Integer, 
-	[clnName]			Text (255), 
-	[clnOrder]			Long Integer, 
-	[clnWidth]			Long Integer, 
-	[clnHidden]			Long Integer
+	[ColumnName]			Text (255), 
+	[ColumnOrder]			Long Integer, 
+	[ColumnWidth]			Long Integer, 
+	[ColumnHidden]			Long Integer
 );
 
-CREATE TABLE [Skustina]
+CREATE TABLE [Company]
  (
-	[IDSkupstina]			Long Integer NOT NULL, 
-	[NazivSS]			Text (255), 
-	[Zgrada]			Text (50), 
-	[Adresa]			Text (50), 
-	[Opstina]			Text (255), 
-	[PBroj]			Text (50), 
-	[PredstavnikSS_ID]			Long Integer, 
-	[PIB]			Long Integer, 
-	[TR]			Text (50), 
-	[MB]			Text (50), 
-	[Napomena]			Text (255), 
-	[RB]			Long Integer, 
-	[PrintNaziv]			Text (255), 
+	[CompanyId]			Long Integer NOT NULL, 
+	[Name]			Text (255), 
+	[Building]			Text (50), 
+	[Address]			Text (50), 
+	[Municipality]			Text (255), 
+	[PostalCode]			Text (50), 
+	[RepresentativeId]			Long Integer, 
+	[TaxId]			Long Integer, 
+	[PrimaryBankAccountNumber]			Text (50), 
+	[RegistrationNumber]			Text (50), 
+	[Note]			Text (255), 
+	[SortOrder]			Long Integer, 
+	[PrintName]			Text (255), 
 	[Folder]			Text (50), 
-	[UplatnicaTip]			Long Integer, 
-	[NaseljeLNK]			Long Integer, 
-	[Konto]			Long Integer, 
-	[SkStatus]			Long Integer, 
-	[ExterniKonto]			Text (255), 
-	[PDtext]			Text (255), 
-	[Upravnik]			Long Integer, 
-	[DatumUgovora]			DateTime, 
-	[SZPDV]			Long Integer, 
-	[TipSubjekta]			Long Integer, 
-	[InvoiceIssuer]			Long Integer, 
-	[Doznaka]			Text (255), 
-	[RacunInfoReklamacija]			Text (255), 
-	[eMail]			Text (255), 
-	[eMailDisplay]			Text (255), 
-	[PBrojSZ]			Text (255), 
-	[GradSZ]			Text (255), 
+	[PaymentSlipTypeId]			Long Integer, 
+	[CategoryLocationId]			Long Integer, 
+	[Account]			Long Integer, 
+	[CompanyStatusId]			Long Integer, 
+	[ExternalAccount]			Text (255), 
+	[PaymentSlipText]			Text (255), 
+	[Manager]			Long Integer, 
+	[ContractDate]			DateTime, 
+	[IsVatPayer]			Long Integer, 
+	[SubjectTypeId]			Long Integer, 
+	[InvoiceIssuerId]			Long Integer, 
+	[RemittanceInfo]			Text (255), 
+	[InvoiceComplaintInfo]			Text (255), 
+	[Email]			Text (255), 
+	[EmailDisplay]			Text (255), 
+	[InvoicePostalCode]			Text (255), 
+	[InvoiceCity]			Text (255), 
 	[Logo]			Text (255), 
-	[Field1]			Text (255), 
-	[QRName]			Text (255)
+	[Field1Legacy]			Text (255), 
+	[QrName]			Text (255)
 );
 
 CREATE TABLE [Staff]
  (
-	[IDUser]			Long Integer, 
-	[User]			Text (50), 
+	[StaffId]			Long Integer, 
+	[UserName]			Text (50), 
 	[StaffLogin]			Text (50), 
 	[Level]			Long Integer, 
-	[LastLog]			Text (50), 
-	[UseLang]			Text (50), 
-	[RESTRICT]			Text (255), 
-	[LastPC]			Text (255)
+	[LastLoginAt]			Text (50), 
+	[PreferredLanguage]			Text (50), 
+	[AccessRestriction]			Text (255), 
+	[LastComputerName]			Text (255)
 );
 
-CREATE TABLE [StaffPermition]
+CREATE TABLE [StaffPermission]
  (
-	[IDPermition]			Long Integer, 
-	[IDStaff]			Long Integer, 
+	[StaffPermissionId]			Long Integer, 
+	[StaffId]			Long Integer, 
 	[KeyName]			Text (255), 
 	[FormName]			Text (255), 
-	[PermitionVal]			Long Integer, 
-	[DisablePermition]			Long Integer
+	[PermissionValue]			Long Integer, 
+	[IsDisabled]			Long Integer
 );
 
-CREATE TABLE [StaffTMP]
+CREATE TABLE [StaffTemp]
  (
-	[IDUser]			Long Integer, 
-	[User]			Text (50), 
+	[StaffId]			Long Integer, 
+	[UserName]			Text (50), 
 	[Level]			Text (50), 
-	[UseLang]			Text (50), 
-	[RESTRICT]			Text (255), 
-	[LastPC]			Text (255)
+	[PreferredLanguage]			Text (50), 
+	[AccessRestriction]			Text (255), 
+	[LastComputerName]			Text (255)
 );
 
-CREATE TABLE [SzObjekat]
+CREATE TABLE [CompanyBuilding]
  (
 	[Id]			Long Integer NOT NULL, 
-	[SzId]			Long Integer, 
-	[Objekat]			Text (255)
+	[CompanyId]			Long Integer, 
+	[Unit]			Text (255)
 );
 
-CREATE TABLE [SzUlaz]
+CREATE TABLE [BuildingEntrance]
  (
-	[IDUlaz]			Long Integer NOT NULL, 
-	[SZ]			Long Integer, 
-	[Ulaz]			Text (255), 
-	[Zgrada]			Text (255), 
-	[Adresa]			Text (255), 
-	[Oznaka]			Text (255), 
-	[Opis]			Text (255), 
-	[Sort]			Long Integer
+	[BuildingEntranceId]			Long Integer NOT NULL, 
+	[CompanyId]			Long Integer, 
+	[Entrance]			Text (255), 
+	[Building]			Text (255), 
+	[Address]			Text (255), 
+	[Label]			Text (255), 
+	[Description]			Text (255), 
+	[SortOrder]			Long Integer
 );
 
-CREATE TABLE [Table1]
+CREATE TABLE [ContactImport]
  (
-	[ID1]			Long Integer, 
-	[ID]			Long Integer, 
-	[Ph]			Text (255), 
-	[Lang]			Text (255), 
+	[LegacyRowId]			Long Integer, 
+	[Id]			Long Integer, 
+	[Phone]			Text (255), 
+	[Language]			Text (255), 
 	[Email]			Text (255)
 );
 
-CREATE TABLE [tblShortList]
+CREATE TABLE [CodeList]
  (
-	[Index]			Long Integer NOT NULL, 
-	[TableFrom]			Text (255) NOT NULL, 
+	[SortIndex]			Long Integer NOT NULL, 
+	[Category]			Text (255) NOT NULL, 
 	[Caption]			Text (255), 
 	[ShortName]			Text (255), 
 	[Description]			Text (255), 
-	[IndexValue]			Long Integer, 
-	[Cat1]			Long Integer
-);
-
-CREATE TABLE [tblSTATS]
- (
-	[IDstt]			Long Integer, 
-	[StatGrup]			Text (255), 
-	[StatNaziv]			Text (255), 
-	[StatQuery]			Text (255), 
-	[StatSQL]			Memo/Hyperlink (255), 
-	[StatReport]			Text (50), 
-	[StatWHRCap]			Text (50), 
-	[StatWHRComboSQL]			Memo/Hyperlink (255), 
-	[StatSQLName]			Text (50)
-);
-
-CREATE TABLE [tblWhrEx]
- (
-	[IDwhrex]			Long Integer, 
-	[WhrNaslov]			Text (50), 
-	[WhrEx]			Memo/Hyperlink (255), 
-	[frmToDo]			Text (50)
-);
-
-CREATE TABLE [TekuciRacun]
- (
-	[IDTR]			Long Integer, 
-	[TR]			Text (255), 
-	[Aktivan]			Long Integer, 
 	[SortOrder]			Long Integer, 
-	[IDPARTNER]			Long Integer, 
-	[IDSZ]			Long Integer, 
-	[IDUPRAVNIK]			Long Integer
+	[GroupCode]			Long Integer
 );
 
-CREATE TABLE [TipADDTXT]
+CREATE TABLE [StatReportDefinition]
  (
-	[IDAddTXT]			Long Integer NOT NULL, 
-	[AddTxT]			Text (255)
+	[StatReportDefinitionId]			Long Integer, 
+	[StatGroup]			Text (255), 
+	[StatName]			Text (255), 
+	[StatQueryName]			Text (255), 
+	[StatSql]			Memo/Hyperlink (255), 
+	[StatReportName]			Text (50), 
+	[StatWhereCaption]			Text (50), 
+	[StatWhereComboSql]			Memo/Hyperlink (255), 
+	[StatSqlName]			Text (50)
 );
 
-CREATE TABLE [TipObjekta]
+CREATE TABLE [WhereClauseTemplate]
  (
-	[IDTipObj]			Long Integer NOT NULL, 
-	[TipObj]			Text (50), 
-	[Print]			Text (50), 
-	[SortObj]			Long Integer, 
-	[binVrednost]			Long Integer, 
-	[NaslovRC]			Text (50), 
+	[WhereClauseTemplateId]			Long Integer, 
+	[Title]			Text (50), 
+	[WhereExpression]			Memo/Hyperlink (255), 
+	[TargetFormName]			Text (50)
+);
+
+CREATE TABLE [BankAccount]
+ (
+	[BankAccountId]			Long Integer, 
+	[PrimaryBankAccountNumber]			Text (255), 
+	[IsActive]			Long Integer, 
+	[SortOrder]			Long Integer, 
+	[PartnerId]			Long Integer, 
+	[CompanyId]			Long Integer, 
+	[ManagerId]			Long Integer
+);
+
+CREATE TABLE [AdditionalTextType]
+ (
+	[AdditionalTextTypeId]			Long Integer NOT NULL, 
+	[Text]			Text (255)
+);
+
+CREATE TABLE [UnitType]
+ (
+	[UnitTypeId]			Long Integer NOT NULL, 
+	[Name]			Text (50), 
+	[PrintLabel]			Text (50), 
+	[SortOrder]			Long Integer, 
+	[BinaryValue]			Long Integer, 
+	[InvoiceTitle]			Text (50), 
 	[Disclaimer]			Memo/Hyperlink (255), 
-	[Disclaimerspc]			Memo/Hyperlink (255), 
-	[NaslovRC-spc]			Text (50), 
-	[CB_V]			Double, 
-	[IG_V]			Double, 
-	[CB_KONTO]			Long Integer, 
-	[IG_KONTO]			Long Integer
+	[DisclaimerSpc]			Memo/Hyperlink (255), 
+	[InvoiceTitleSpc]			Text (50), 
+	[CbValue]			Double, 
+	[IgValue]			Double, 
+	[CbAccount]			Long Integer, 
+	[IgAccount]			Long Integer
 );
 
-CREATE TABLE [TipObracuna]
+CREATE TABLE [CalculationType]
  (
-	[IDTipObr]			Long Integer NOT NULL, 
-	[TipObracuna]			Text (100), 
-	[IznosRacunaDobavljac]			Text (100), 
-	[Napomena]			Text (255), 
-	[IZNOS]			Text (255), 
-	[KOLICINA]			Text (255), 
-	[JM]			Text (255), 
-	[JMindex]			Long Integer
+	[CalculationTypeId]			Long Integer NOT NULL, 
+	[Name]			Text (100), 
+	[SupplierInvoiceAmountLabel]			Text (100), 
+	[Note]			Text (255), 
+	[AmountLabel]			Text (255), 
+	[QuantityLabel]			Text (255), 
+	[UnitOfMeasure]			Text (255), 
+	[UnitOfMeasureIndex]			Long Integer
 );
 
-CREATE TABLE [TipPartnera]
+CREATE TABLE [PartnerCategory]
  (
-	[IDTipPartnera]			Long Integer NOT NULL, 
-	[TipNaziv]			Text (255)
+	[PartnerCategoryId]			Long Integer NOT NULL, 
+	[Name]			Text (255)
 );
 
-CREATE TABLE [TipStavke]
+CREATE TABLE [LineItemType]
  (
-	[ID_TIP]			Long Integer NOT NULL, 
-	[TipStavke]			Text (50)
+	[LineItemTypeId]			Long Integer NOT NULL, 
+	[Name]			Text (50)
 );
 
-CREATE TABLE [TipTODO]
+CREATE TABLE [TaskType]
  (
-	[IDToDo]			Long Integer NOT NULL, 
-	[ToDo]			Text (50)
+	[TaskTypeId]			Long Integer NOT NULL, 
+	[Name]			Text (50)
 );
 
-CREATE TABLE [TipUplatnice]
+CREATE TABLE [PaymentSlipType]
  (
-	[IDTipUplatnice]			Long Integer, 
-	[TipUpl]			Text (255), 
-	[Opis]			Text (50)
+	[PaymentSlipTypeId]			Long Integer, 
+	[Name]			Text (255), 
+	[Description]			Text (50)
 );
 
-CREATE TABLE [Troskovi_PodKonta]
+CREATE TABLE [SubAccount]
  (
-	[PodKonto]			Text (255) NOT NULL, 
-	[Naziv]			Text (255), 
-	[SifraKnj_Prethodni]			Text (255), 
-	[TrosakNa]			Text (255), 
-	[Kamata]			Text (255)
+	[SubAccountCode]			Text (255) NOT NULL, 
+	[Name]			Text (255), 
+	[PreviousSubAccountCode]			Text (255), 
+	[CostAllocationTarget]			Text (255), 
+	[Interest]			Text (255)
 );
 
-CREATE TABLE [Troskovi_PodKonta_DefDob]
+CREATE TABLE [SubAccountDefaultSupplier]
  (
-	[IDSZ]			Long Integer NOT NULL, 
-	[Konto]			Text (255) NOT NULL, 
-	[DefDob]			Text (255)
+	[CompanyId]			Long Integer NOT NULL, 
+	[Account]			Text (255) NOT NULL, 
+	[DefaultSupplierPartnerAccountingId]			Text (255)
 );
 
-CREATE TABLE [TRs]
+CREATE TABLE [PartnerBankAccount]
  (
-	[ID_TR]			Long Integer, 
-	[TR_L]			Text (50), 
-	[lnkKUP]			Long Integer
+	[PartnerBankAccountId]			Long Integer, 
+	[AccountNumber]			Text (50), 
+	[PartnerId]			Long Integer
 );
 
-CREATE TABLE [VERSION-HISTORY]
+CREATE TABLE [VersionHistory]
  (
-	[DAT]			DateTime, 
-	[VER]			Text (50), 
-	[DESC]			Text (255), 
-	[FullDesc]			Memo/Hyperlink (255)
+	[VersionDate]			DateTime, 
+	[VersionNumber]			Text (50), 
+	[ShortDescription]			Text (255), 
+	[FullDescription]			Memo/Hyperlink (255)
 );
 
-CREATE TABLE [Virman]
+CREATE TABLE [PaymentOrder]
  (
-	[IDVirman]			Long Integer, 
-	[NaslovSablona]			Text (50), 
-	[Nalogodavac]			Text (255), 
-	[SvrhaPlacanja]			Text (255), 
-	[Primalac]			Text (255), 
-	[SifraPlacanja]			Integer, 
-	[Valuta]			Text (3), 
-	[Iznos]			Currency, 
-	[BrojRacunaNalogodavca]			Text (50), 
-	[BrojModelaNal]			Integer, 
-	[PozivNaBrojNal]			Text (50), 
-	[BrojRacunaPrimaoca]			Text (50), 
-	[BrojModelaPrim]			Integer, 
-	[PozivNaBrojPrim]			Text (50), 
-	[Mesto]			Text (50), 
-	[Datum]			DateTime, 
-	[DatumV]			DateTime, 
-	[Hitno]			Boolean NOT NULL, 
-	[Tip]			Long Integer, 
-	[Arhivirano]			DateTime, 
-	[refSourceID]			Long Integer, 
-	[refSourceTag]			Text (255), 
+	[PaymentOrderId]			Long Integer, 
+	[TemplateTitle]			Text (50), 
+	[PayerName]			Text (255), 
+	[PaymentPurpose]			Text (255), 
+	[RecipientName]			Text (255), 
+	[PaymentCode]			Integer, 
+	[Currency]			Text (3), 
+	[Amount]			Currency, 
+	[PayerAccountNumber]			Text (50), 
+	[PayerModelNumber]			Integer, 
+	[PayerPaymentReference]			Text (50), 
+	[RecipientAccountNumber]			Text (50), 
+	[RecipientModelNumber]			Integer, 
+	[RecipientPaymentReference]			Text (50), 
+	[Place]			Text (50), 
+	[Date]			DateTime, 
+	[ValueDate]			DateTime, 
+	[IsUrgent]			Boolean NOT NULL, 
+	[Type]			Long Integer, 
+	[ArchivedAt]			DateTime, 
+	[RefSourceId]			Long Integer, 
+	[RefSourceTag]			Text (255), 
 	[PrintMe]			Boolean NOT NULL, 
-	[Favorit]			Boolean NOT NULL
+	[IsFavorite]			Boolean NOT NULL
 );
 
-CREATE TABLE [ZK]
+CREATE TABLE [PenaltyInterestStaging]
  (
-	[IDzk]			Long Integer, 
-	[IDSK]			Long Integer, 
-	[NALOG]			Double, 
-	[KONTO]			Text (50), 
-	[DATUM]			DateTime, 
-	[PIZNOS]			Double, 
-	[DIZNOS]			Double, 
-	[TIPSTAVKE]			Double, 
-	[PARAMETRI]			Text (25), 
-	[NAPOMENA]			Text (20), 
-	[PARTNERID]			Long Integer, 
-	[DATUMVALUTE]			DateTime, 
-	[RACUNID]			Long Integer, 
-	[Dokument]			Text (255), 
-	[PODKONTO]			Text (255), 
-	[IDGR]			Long Integer, 
-	[KNPODKONTO]			Text (255), 
-	[KNDOB]			Long Integer, 
-	[RDOB]			Long Integer, 
-	[Prioritet]			Long Integer
+	[PenaltyInterestStagingId]			Long Integer, 
+	[CompanyId]			Long Integer, 
+	[JournalEntryId]			Double, 
+	[Account]			Text (50), 
+	[Date]			DateTime, 
+	[CreditAmount]			Double, 
+	[DebitAmount]			Double, 
+	[LineTypeId]			Double, 
+	[Parameters]			Text (25), 
+	[Note]			Text (20), 
+	[PartnerAccountingId]			Long Integer, 
+	[ValueDate]			DateTime, 
+	[InvoiceId]			Long Integer, 
+	[Document]			Text (255), 
+	[SubAccountCode]			Text (255), 
+	[InvoiceBatchId]			Long Integer, 
+	[PostingSubAccount]			Text (255), 
+	[PostingSupplierInvoiceId]			Long Integer, 
+	[SupplierInvoiceId]			Long Integer, 
+	[Priority]			Long Integer
 );
 
-CREATE TABLE [KamatniList]
+CREATE TABLE [InterestStatement]
  (
-	[IDKamList]			Long Integer, 
-	[IDSK]			Long Integer, 
-	[Konto]			Text (50), 
-	[Datum]			DateTime, 
-	[DIPI]			Double, 
-	[Saldo]			Double, 
-	[Dana]			Long Integer, 
-	[Stopa]			Double, 
-	[Koeficijent]			Numeric (18, 8), 
-	[Kamata]			Double, 
-	[PAR]			Text (50), 
-	[partnerID]			Long Integer, 
-	[prostorID]			Long Integer, 
-	[PodKonto]			Text (255), 
-	[IDGR]			Long Integer
+	[InterestStatementId]			Long Integer, 
+	[CompanyId]			Long Integer, 
+	[Account]			Text (50), 
+	[Date]			DateTime, 
+	[BaseAmount]			Double, 
+	[Balance]			Double, 
+	[Days]			Long Integer, 
+	[Rate]			Double, 
+	[Coefficient]			Numeric (18, 8), 
+	[Interest]			Double, 
+	[ReferenceTag]			Text (50), 
+	[PartnerAccountingId]			Long Integer, 
+	[UnitId]			Long Integer, 
+	[SubAccountCode]			Text (255), 
+	[InvoiceBatchId]			Long Integer
 );
 
-CREATE TABLE [RacunStavke_Troskovi]
+CREATE TABLE [InvoiceLineCostCache]
  (
-	[IDRacunStavke]			Long Integer, 
-	[ID_R]			Long Integer, 
-	[lnkGR]			Long Integer, 
-	[ID_K]			Long Integer, 
-	[ID_SK]			Long Integer, 
-	[Ukupno]			Currency
+	[InvoiceLineId]			Long Integer, 
+	[InvoiceId]			Long Integer, 
+	[InvoiceBatchId]			Long Integer, 
+	[PartnerId]			Long Integer, 
+	[CompanyId]			Long Integer, 
+	[Total]			Currency
 );
 
-CREATE TABLE [Settings_eNalog]
+CREATE TABLE [EPaymentOrderSetting]
  (
-	[IDeNalog]			Long Integer, 
-	[Index]			Long Integer, 
-	[BrCHR]			Long Integer, 
-	[TipCHR]			Text (50), 
-	[Funkcija]			Text (50), 
-	[Kategorija]			Text (50), 
-	[Opis]			Text (255), 
-	[Defs]			Text (50), 
+	[EPaymentOrderSettingId]			Long Integer, 
+	[SortIndex]			Long Integer, 
+	[CharacterCount]			Long Integer, 
+	[CharacterType]			Text (50), 
+	[Function]			Text (50), 
+	[Category]			Text (50), 
+	[Description]			Text (255), 
+	[Defaults]			Text (50), 
 	[FieldName]			Text (50), 
 	[Format]			Text (50), 
-	[rN]			Long Integer
+	[RowNumber]			Long Integer
 );
 
-CREATE TABLE [Switchboard Items]
+CREATE TABLE [SwitchboardMenuItem]
  (
-	[SwitchboardID]			Long Integer NOT NULL, 
+	[SwitchboardMenuItemId]			Long Integer NOT NULL, 
 	[ItemNumber]			Integer NOT NULL, 
 	[ItemText]			Text (255), 
 	[Command]			Integer, 
 	[Argument]			Text (255), 
-	[fLevel]			Text (50)
+	[FormLevel]			Text (50)
 );
 
-CREATE TABLE [TemplateIzvodaKnjizenje]
+CREATE TABLE [BankStatementPostingTemplate]
  (
-	[IDTemplateSub]			Long Integer, 
-	[IDTemplate]			Long Integer, 
+	[BankStatementPostingTemplateId]			Long Integer, 
+	[TemplateGroupId]			Long Integer, 
 	[Template]			Text (255), 
 	[FieldName]			Text (255), 
 	[FieldValue]			Text (255), 
 	[Function]			Text (255), 
-	[SETID]			Long Integer, 
-	[FFunction]			Long Integer, 
-	[SETKONTO]			Text (50)
+	[SetId]			Long Integer, 
+	[OverrideFunction]			Long Integer, 
+	[SetAccount]			Text (50)
 );
 
-CREATE TABLE [ugovori]
+CREATE TABLE [Contract]
  (
-	[ID1]			Long Integer, 
-	[Gradska opština Stambene zajednice]			Text (255), 
-	[ID Stambene zajednice]			Double, 
-	[prodavac           (Stambena zajednica)]			Text (255), 
-	[Adresa stambene zajednice]			Text (255), 
-	[PIB                            Stambene zajednice]			Double, 
-	[Poštanski broj]			Text (255), 
-	[Tekući račun  Stambene zajednice]			Text (255), 
-	[Matični broj Stambene zajednice]			Double, 
-	[Račun br]			Text (255), 
-	[Mesto izdavanja računa:]			Text (255), 
-	[Datum izdavanja računa:]			Text (255), 
-	[broj objekta, posebnog dela]			Text (255), 
-	[Datum pružanja usluge:]			Text (255), 
-	[Objekat]			Text (255), 
-	[kupac]			Text (255), 
-	[Field16]			Text (255), 
-	[adresa        kupca]			Text (255), 
-	[maticni_broj]			Double, 
-	[pib naziv]			Text (255), 
-	[pib]			Text (255), 
-	[kolicina u m2]			Double, 
-	[jedinica]			Text (255), 
-	[Jedinica za obračun - koeficijent]			Double, 
-	[Mesečni fond zgrade po posebnoj jedinici od 122019-2822019]			Double, 
-	[kontrolna]			Double, 
-	[koeficijent]			Double, 
-	[Osiguranje zajedničkih prostorija]			Double, 
-	[Mesečno upravljanje]			Double, 
-	[Redovan mesečni servis putničkog  lifta]			Double, 
-	[Redovan mesečni servis auto lifta]			Double, 
-	[Vanredan servis auto-lifta]			Double, 
-	[Higijensko održavanje zgrade sa domarom]			Double, 
-	[Higijensko održavanje garaže]			Double, 
-	[Higijensko održavanje zgrade]			Double, 
-	[tehničko održavanje]			Double, 
-	[Vanrednan servis]			Double, 
-	[Field37]			Double, 
-	[UKUPNO]			Double, 
-	[Stanje iz predhodnog perioda do]			Text (255), 
-	[iznos Stanje iz predhodnog perioda do _ Maxi upravnik]			Text (255), 
-	[ID]			Text (255), 
-	[Stanje iz predhodnog perioda do 31122018 SZ]			Text (255), 
-	[Ukupan dug za 2018]			Text (255), 
-	[Rok za uplatu:]			Text (255), 
-	[Model i poziv na broj:]			Text (255), 
-	[Srvha uplate:]			Text (255), 
-	[Valuta:]			Text (255), 
-	[*Molimo Vas da izmirite dugovanje koje se odnosi na period do (M]			Text (255), 
-	[Poziv na broj za dug do 31122018]			Text (255), 
-	[NAPOMENA]			Text (255), 
-	[Field51]			Text (255), 
-	[KUPAC_IME]			Text (255)
+	[LegacyRowId]			Long Integer, 
+	[Company municipality]			Text (255), 
+	[Company legacy id]			Double, 
+	[Seller (Company)]			Text (255), 
+	[Company address]			Text (255), 
+	[Company tax id]			Double, 
+	[Postal code]			Text (255), 
+	[Company bank account]			Text (255), 
+	[Company registration number]			Double, 
+	[Invoice number]			Text (255), 
+	[Place of invoice issue]			Text (255), 
+	[Invoice issue date]			Text (255), 
+	[Unit number]			Text (255), 
+	[Service date]			Text (255), 
+	[Unit]			Text (255), 
+	[Partner]			Text (255), 
+	[Field16Legacy]			Text (255), 
+	[Partner address]			Text (255), 
+	[Registration number]			Double, 
+	[Tax id name]			Text (255), 
+	[Tax id]			Text (255), 
+	[Quantity in sqm]			Double, 
+	[Unit of measure]			Text (255), 
+	[Calculation unit coefficient]			Double, 
+	[Monthly building fund per unit (Dec 2019 - Feb 2822019)]			Double, 
+	[Control value]			Double, 
+	[Coefficient]			Double, 
+	[Common area insurance]			Double, 
+	[Monthly management fee]			Double, 
+	[Regular monthly passenger elevator service]			Double, 
+	[Regular monthly car elevator service]			Double, 
+	[Extraordinary car elevator service]			Double, 
+	[Building hygiene maintenance with caretaker]			Double, 
+	[Garage hygiene maintenance]			Double, 
+	[Building hygiene maintenance]			Double, 
+	[Technical maintenance]			Double, 
+	[Extraordinary service]			Double, 
+	[Field37Legacy]			Double, 
+	[Total]			Double, 
+	[Balance carried forward as of]			Text (255), 
+	[Balance carried forward amount (Maxi manager)]			Text (255), 
+	[Id]			Text (255), 
+	[Balance carried forward as of 2018-12-31 (Company)]			Text (255), 
+	[Total debt for 2018]			Text (255), 
+	[Payment deadline]			Text (255), 
+	[Model and payment reference]			Text (255), 
+	[Payment purpose]			Text (255), 
+	[Value date]			Text (255), 
+	[Please settle the debt relating to the period up to (note]			Text (255), 
+	[Payment reference for debt as of 2018-12-31]			Text (255), 
+	[Note]			Text (255), 
+	[Field51Legacy]			Text (255), 
+	[PartnerName]			Text (255)
 );
 
 
 ```
 
-## SZAPP.mdb — 27 lokalnih/pomoćnih tabela (front-end, privremene/GK backup/switchboard tabele)
+## SZAPP.mdb — 27 local/helper tables (front-end, temp/LedgerEntry-backup/switchboard tables)
 ```sql
 -- ----------------------------------------------------------
 -- MDB Tools - A library for reading MS Access database files
@@ -1185,421 +1194,421 @@ CREATE TABLE [ugovori]
 
 -- That file uses encoding UTF-8
 
-CREATE TABLE [BenefitUpdate]
+CREATE TABLE [BenefitUsageUpdate]
  (
 	[Id]			Long Integer, 
-	[Datum]			DateTime, 
-	[UnitApp]			Text (255), 
-	[YYMM]			Long Integer, 
-	[CountMM]			Long Integer
+	[Date]			DateTime, 
+	[UnitId]			Text (255), 
+	[PeriodYyMm]			Long Integer, 
+	[MonthCount]			Long Integer
 );
 
-CREATE TABLE [GK_PRK]
+CREATE TABLE [LedgerEntryBackupPrk]
  (
-	[STAVKAID]			Long Integer, 
-	[BR_NALOG]			Double, 
-	[KONTO]			Text (50), 
-	[DATUM]			DateTime, 
-	[DIZNOS]			Double, 
-	[PIZNOS]			Double, 
-	[TIP_STAVKE]			Double, 
-	[DOK]			Text (50), 
-	[lnkSkupstinaID]			Long Integer, 
-	[lnkKUPACID]			Long Integer, 
-	[lnkIzvodStavkaID]			Long Integer, 
-	[NAPOMENA]			Text (255), 
-	[PARAMETRI]			Text (25), 
-	[OPIS]			Text (255), 
-	[SIFRAKONTA]			Long Integer, 
-	[DPO]			DateTime, 
-	[SIFRAKN]			Text (6), 
-	[RDOB]			Long Integer, 
-	[RACID]			Long Integer, 
-	[PRIORITET]			Long Integer, 
-	[KNzaTIP]			Long Integer, 
-	[RacunIN_ID]			Long Integer, 
-	[KontoTroska]			Text (255)
+	[LedgerEntryId]			Long Integer, 
+	[JournalEntryNumber]			Double, 
+	[Account]			Text (50), 
+	[Date]			DateTime, 
+	[DebitAmount]			Double, 
+	[CreditAmount]			Double, 
+	[LineTypeId]			Double, 
+	[DocumentRef]			Text (50), 
+	[CompanyId]			Long Integer, 
+	[PartnerAccountingId]			Long Integer, 
+	[BankStatementLineId]			Long Integer, 
+	[Note]			Text (255), 
+	[Parameters]			Text (25), 
+	[Description]			Text (255), 
+	[AccountCode]			Long Integer, 
+	[DueDate]			DateTime, 
+	[PostingCode]			Text (6), 
+	[SupplierInvoiceId]			Long Integer, 
+	[InvoiceId]			Long Integer, 
+	[Priority]			Long Integer, 
+	[PostingTypeCode]			Long Integer, 
+	[InboundInvoiceId]			Long Integer, 
+	[SubAccount]			Text (255)
 );
 
-CREATE TABLE [GK_TMP]
+CREATE TABLE [LedgerEntryTemp]
  (
-	[STAVKAID]			Long Integer, 
-	[BR_NALOG]			Double, 
-	[KONTO]			Text (50), 
-	[DATUM]			DateTime, 
-	[PIZNOS]			Double, 
-	[DIZNOS]			Double, 
-	[TIP_STAVKE]			Double, 
-	[DOK]			Text (50), 
-	[lnkSkupstinaID]			Long Integer, 
-	[lnkKUPACID]			Long Integer, 
-	[lnkIzvodStavkaID]			Long Integer, 
-	[NAPOMENA]			Text (255), 
-	[PARAMETRI]			Text (25), 
-	[OPIS]			Text (255), 
-	[SIFRAKONTA]			Long Integer, 
-	[DPO]			DateTime, 
-	[fromStavkaID]			Long Integer, 
-	[SIFRAKN]			Text (6), 
-	[RDOB]			Long Integer, 
-	[RACID]			Long Integer, 
-	[PRIORITET]			Long Integer, 
-	[KNzaTIP]			Long Integer, 
-	[RacunIN_ID]			Long Integer, 
-	[KontoTroska]			Text (255)
+	[LedgerEntryId]			Long Integer, 
+	[JournalEntryNumber]			Double, 
+	[Account]			Text (50), 
+	[Date]			DateTime, 
+	[CreditAmount]			Double, 
+	[DebitAmount]			Double, 
+	[LineTypeId]			Double, 
+	[DocumentRef]			Text (50), 
+	[CompanyId]			Long Integer, 
+	[PartnerAccountingId]			Long Integer, 
+	[BankStatementLineId]			Long Integer, 
+	[Note]			Text (255), 
+	[Parameters]			Text (25), 
+	[Description]			Text (255), 
+	[AccountCode]			Long Integer, 
+	[DueDate]			DateTime, 
+	[FromLedgerEntryId]			Long Integer, 
+	[PostingCode]			Text (6), 
+	[SupplierInvoiceId]			Long Integer, 
+	[InvoiceId]			Long Integer, 
+	[Priority]			Long Integer, 
+	[PostingTypeCode]			Long Integer, 
+	[InboundInvoiceId]			Long Integer, 
+	[SubAccount]			Text (255)
 );
 
-CREATE TABLE [IMPORT_BENEFIT]
+CREATE TABLE [BenefitImport]
  (
-	[PDI]			Text (255) NOT NULL
+	[BenefitImportRow]			Text (255) NOT NULL
 );
 
-CREATE TABLE [IMPORTKV]
+CREATE TABLE [UnitAreaImport]
  (
-	[Unit]			Text (255) NOT NULL, 
-	[Client]			Text (255), 
-	[HD]			DateTime, 
-	[P1]			Double, 
-	[p2]			Double, 
-	[p3]			Double, 
-	[pt]			Double
+	[UnitLabel]			Text (255) NOT NULL, 
+	[ClientName]			Text (255), 
+	[HandOverDate]			DateTime, 
+	[Percentage1]			Double, 
+	[Percentage2]			Double, 
+	[Percentage3]			Double, 
+	[PercentageTotal]			Double
 );
 
-CREATE TABLE [GK_20250531_backup_p24_bEFOREUpravljanjeSplit]
+CREATE TABLE [LedgerEntry_Backup_20250531_BeforeManagementSplit]
  (
-	[STAVKAID]			Long Integer NOT NULL, 
-	[BR_NALOG]			Double, 
-	[KONTO]			Text (50), 
-	[DATUM]			DateTime, 
-	[DIZNOS]			Double, 
-	[PIZNOS]			Double, 
-	[TIP_STAVKE]			Double, 
-	[DOK]			Text (50), 
-	[lnkSkupstinaID]			Long Integer, 
-	[lnkKUPACID]			Long Integer, 
-	[lnkIzvodStavkaID]			Long Integer, 
-	[NAPOMENA]			Text (255), 
-	[PARAMETRI]			Text (25), 
-	[OPIS]			Text (255), 
-	[SIFRAKONTA]			Long Integer, 
-	[DPO]			DateTime, 
-	[SIFRAKN]			Text (6), 
-	[RDOB]			Long Integer, 
-	[RACID]			Long Integer, 
-	[PRIORITET]			Long Integer, 
-	[KNzaTIP]			Long Integer, 
-	[RacunIN_ID]			Long Integer, 
-	[KontoTroska]			Text (255), 
-	[KnDokID]			Long Integer
+	[LedgerEntryId]			Long Integer NOT NULL, 
+	[JournalEntryNumber]			Double, 
+	[Account]			Text (50), 
+	[Date]			DateTime, 
+	[DebitAmount]			Double, 
+	[CreditAmount]			Double, 
+	[LineTypeId]			Double, 
+	[DocumentRef]			Text (50), 
+	[CompanyId]			Long Integer, 
+	[PartnerAccountingId]			Long Integer, 
+	[BankStatementLineId]			Long Integer, 
+	[Note]			Text (255), 
+	[Parameters]			Text (25), 
+	[Description]			Text (255), 
+	[AccountCode]			Long Integer, 
+	[DueDate]			DateTime, 
+	[PostingCode]			Text (6), 
+	[SupplierInvoiceId]			Long Integer, 
+	[InvoiceId]			Long Integer, 
+	[Priority]			Long Integer, 
+	[PostingTypeCode]			Long Integer, 
+	[InboundInvoiceId]			Long Integer, 
+	[SubAccount]			Text (255), 
+	[AccountingDocumentId]			Long Integer
 );
 
-CREATE TABLE [OpomenaSablonEx]
+CREATE TABLE [ReminderTemplateField]
  (
-	[IDOpomenaSablonEx]			Long Integer, 
-	[IDOpomenaSablon]			Long Integer, 
+	[ReminderTemplateFieldId]			Long Integer, 
+	[ReminderTemplateId]			Long Integer, 
 	[KeyName]			Text (255), 
 	[KeyIndex]			Long Integer, 
-	[SablonText]			Text (255)
+	[TemplateText]			Text (255)
 );
 
-CREATE TABLE [Paste Errors]
+CREATE TABLE [PasteErrorLog]
  (
-	[IDTRRAC]			Long Integer, 
-	[PrioritetNaplate]			Long Integer, 
-	[SK_ID]			Long Integer, 
-	[RacunNO]			Long Integer, 
-	[KontoKnjizenja]			Text (255), 
-	[NazivRacuna]			Text (255), 
-	[Napomena]			Text (255), 
-	[Dobavljac]			Text (255), 
-	[DobavljacKonto]			Long Integer, 
-	[TipObracuna]			Long Integer, 
-	[MesecRacuna]			Text (255), 
-	[IznosRacunaEUR]			Double, 
-	[IznosRacunaRSD]			Currency, 
-	[IznosPoKoefEUR]			Double, 
-	[IznosPoKoefRSD]			Currency, 
-	[SifraKN]			Text (255), 
-	[TMPprevID]			Long Integer, 
-	[TipDokumenta]			Long Integer, 
-	[MarkerVandrednogRacuna]			Text (255), 
-	[FunkcijaNazivaRacuna]			Text (255), 
-	[RBR]			Text (255), 
-	[IznosRacunaKN]			Currency, 
-	[DatumRacuna]			DateTime, 
-	[DatumKnjizenja]			DateTime, 
-	[DatumPlacanja]			DateTime, 
-	[OpisRacuna]			Text (255), 
-	[PozivNaBroj]			Text (255), 
-	[PrethodniIDRdob]			Long Integer, 
-	[NoviIDRdob]			Long Integer, 
-	[NalogKnjizenja]			Long Integer, 
-	[PDV]			Long Integer, 
-	[ZatvaraKonto]			Text (255)
+	[SupplierInvoiceId]			Long Integer, 
+	[CollectionPriority]			Long Integer, 
+	[CompanyId]			Long Integer, 
+	[InvoiceNumber]			Long Integer, 
+	[PostingAccount]			Text (255), 
+	[InvoiceName]			Text (255), 
+	[Note]			Text (255), 
+	[Supplier]			Text (255), 
+	[SupplierAccountPartnerAccountingId]			Long Integer, 
+	[CalculationTypeId]			Long Integer, 
+	[InvoiceMonth]			Text (255), 
+	[InvoiceAmountEur]			Double, 
+	[InvoiceAmountRsd]			Currency, 
+	[AmountByCoefficientEur]			Double, 
+	[AmountByCoefficientRsd]			Currency, 
+	[PostingCode]			Text (255), 
+	[LegacyTempPrevId]			Long Integer, 
+	[DocumentTypeId]			Long Integer, 
+	[ExtraordinaryInvoiceMarker]			Text (255), 
+	[InvoiceNameFunction]			Text (255), 
+	[SequenceNumber]			Text (255), 
+	[PostedInvoiceAmount]			Currency, 
+	[InvoiceDate]			DateTime, 
+	[PostingDate]			DateTime, 
+	[PaymentDate]			DateTime, 
+	[InvoiceDescription]			Text (255), 
+	[PaymentReference]			Text (255), 
+	[PreviousSupplierInvoiceId]			Long Integer, 
+	[NewSupplierInvoiceId]			Long Integer, 
+	[JournalEntryId]			Long Integer, 
+	[Vat]			Long Integer, 
+	[ClosesAccount]			Text (255)
 );
 
-CREATE TABLE [PRENOS]
+CREATE TABLE [BalanceCarryForward]
  (
-	[ID]			Long Integer, 
-	[PB]			Text (255), 
-	[IDK]			Long Integer, 
-	[R01]			Text (255), 
-	[U1]			Double, 
-	[U2]			Double, 
-	[PS]			Double, 
-	[txt]			Text (255), 
-	[sk]			Long Integer
+	[Id]			Long Integer, 
+	[ReferenceCode]			Text (255), 
+	[PartnerId]			Long Integer, 
+	[LegacyRow]			Text (255), 
+	[AmountUnit1]			Double, 
+	[AmountUnit2]			Double, 
+	[PreviousBalance]			Double, 
+	[Text]			Text (255), 
+	[CompanyId]			Long Integer
 );
 
-CREATE TABLE [PrinterBinLOCAL]
+CREATE TABLE [SelectionBasket]
  (
-	[IDlocalPrinterbin]			Long Integer, 
-	[ID_Item]			Long Integer, 
+	[SelectionBasketId]			Long Integer, 
+	[TargetId]			Long Integer, 
 	[TypeIndex]			Long Integer
 );
 
-CREATE TABLE [SemaKnjizenja]
+CREATE TABLE [PostingScheme]
  (
-	[IDtplKN]			Long Integer, 
-	[SemaKnjizenja]			Text (255), 
+	[PostingSchemeId]			Long Integer, 
+	[Name]			Text (255), 
 	[SourceTable]			Text (255), 
-	[SourceTableWhrField]			Text (255), 
-	[Stavka]			Text (255), 
-	[Konto]			Text (255), 
-	[DIPI]			Text (255), 
-	[Znak]			Long Integer, 
-	[SubAnlField]			Text (255), 
-	[SubAnlFieldSource]			Text (255), 
-	[Opis]			Text (255), 
-	[GK_TipStavke]			Long Integer, 
-	[GK_DokFn]			Text (255), 
-	[GK_PNB]			Text (255), 
-	[GK_IDPrtner]			Text (255), 
-	[GK_RacunID]			Text (255), 
-	[Sort]			Long Integer, 
-	[Nalog_Opis]			Text (255), 
-	[SourceSQL]			Memo/Hyperlink (255), 
-	[SourceSQLValue]			Text (255)
+	[SourceTableWhereField]			Text (255), 
+	[Line]			Text (255), 
+	[Account]			Text (255), 
+	[BaseAmount]			Text (255), 
+	[Sign]			Long Integer, 
+	[SubAnalyticField]			Text (255), 
+	[SubAnalyticFieldSource]			Text (255), 
+	[Description]			Text (255), 
+	[LedgerLineTypeId]			Long Integer, 
+	[LedgerDocumentFunction]			Text (255), 
+	[LedgerPaymentReference]			Text (255), 
+	[LedgerPartnerId]			Text (255), 
+	[LedgerInvoiceId]			Text (255), 
+	[SortOrder]			Long Integer, 
+	[JournalEntryDescription]			Text (255), 
+	[SourceSql]			Memo/Hyperlink (255), 
+	[SourceSqlValue]			Text (255)
 );
 
-CREATE TABLE [StaffTMP]
+CREATE TABLE [StaffTemp]
  (
-	[IDUser]			Long Integer, 
-	[User]			Text (50), 
+	[StaffId]			Long Integer, 
+	[UserName]			Text (50), 
 	[Level]			Text (50), 
-	[UseLang]			Text (50), 
-	[RESTRICT]			Text (50), 
-	[LastPC]			Text (255)
+	[PreferredLanguage]			Text (50), 
+	[AccessRestriction]			Text (50), 
+	[LastComputerName]			Text (255)
 );
 
-CREATE TABLE [Stope]
+CREATE TABLE [InterestRate]
  (
-	[ID]			Long Integer, 
-	[Datum]			DateTime, 
-	[Stopa]			Currency, 
+	[Id]			Long Integer, 
+	[Date]			DateTime, 
+	[Rate]			Currency, 
 	[Period]			Text (50)
 );
 
-CREATE TABLE [Switchboard Items]
+CREATE TABLE [SwitchboardMenuItem]
  (
-	[SwitchboardID]			Long Integer, 
+	[SwitchboardMenuItemId]			Long Integer, 
 	[ItemNumber]			Integer, 
 	[ItemText]			Text (255), 
 	[Command]			Integer, 
 	[Argument]			Text (255), 
-	[fLevel]			Text (255)
+	[FormLevel]			Text (255)
 );
 
-CREATE TABLE [tblAnaliza]
+CREATE TABLE [AnalysisReportDefinition]
  (
-	[ID]			Long Integer, 
-	[GrupaPodataka]			Text (255), 
-	[Naziv]			Text (255), 
-	[CritcnaGrupa]			Long Integer, 
-	[aQuery]			Text (255), 
-	[aQuerySQL]			Memo/Hyperlink (255), 
+	[Id]			Long Integer, 
+	[DataGroup]			Text (255), 
+	[Name]			Text (255), 
+	[IsCriticalGroup]			Long Integer, 
+	[QueryName]			Text (255), 
+	[QuerySql]			Memo/Hyperlink (255), 
 	[ReportName]			Text (50), 
-	[StatWHRCap]			Text (50), 
-	[StatWHRComboSQL]			Memo/Hyperlink (255), 
-	[StatSQLName]			Text (50), 
-	[DatumRun]			DateTime, 
-	[CountData]			Long Integer, 
+	[StatWhereCaption]			Text (50), 
+	[StatWhereComboSql]			Memo/Hyperlink (255), 
+	[StatSqlName]			Text (50), 
+	[LastRunAt]			DateTime, 
+	[RowCount]			Long Integer, 
 	[AutoRunAll]			Long Integer, 
 	[SortOrder]			Long Integer, 
-	[stLinkCreatia]			Text (255), 
-	[stLinkFormName]			Text (255), 
-	[Active]			Long Integer, 
+	[LinkCreationTag]			Text (255), 
+	[LinkFormName]			Text (255), 
+	[IsActive]			Long Integer, 
 	[AdminAlert]			Long Integer, 
-	[stOpenArgs]			Text (255), 
-	[Opis]			Memo/Hyperlink (255), 
-	[dellDataInQuery]			Long Integer, 
-	[ExecuteQdef]			Text (255)
+	[OpenArgs]			Text (255), 
+	[Description]			Memo/Hyperlink (255), 
+	[DeleteDataInQuery]			Long Integer, 
+	[ExecuteQueryDefName]			Text (255)
 );
 
-CREATE TABLE [tblIzvestaj]
+CREATE TABLE [ReportDefinition]
  (
-	[ID]			Long Integer, 
-	[Naziv]			Text (255), 
+	[Id]			Long Integer, 
+	[Name]			Text (255), 
 	[Datasheet]			Text (255), 
-	[Naslov]			Text (255), 
-	[Btn1Cap]			Text (255), 
-	[Btn1FF]			Text (255), 
-	[Btn1Fn]			Long Integer, 
-	[Btn2Cap]			Text (255), 
-	[Btn2FF]			Text (255), 
-	[Btn2Fn]			Long Integer, 
-	[Btn3Cap]			Text (255), 
-	[Btn3FF]			Text (255), 
-	[Btn3Fn]			Long Integer, 
+	[Title]			Text (255), 
+	[Button1Caption]			Text (255), 
+	[Button1Function]			Text (255), 
+	[Button1FunctionId]			Long Integer, 
+	[Button2Caption]			Text (255), 
+	[Button2Function]			Text (255), 
+	[Button2FunctionId]			Long Integer, 
+	[Button3Caption]			Text (255), 
+	[Button3Function]			Text (255), 
+	[Button3FunctionId]			Long Integer, 
 	[SortOrder]			Long Integer, 
-	[cmbFilterSQL]			Memo/Hyperlink (255), 
-	[cmbFilterCaption]			Text (255), 
-	[cmbFilterID]			Long Integer
+	[FilterComboSql]			Memo/Hyperlink (255), 
+	[FilterComboCaption]			Text (255), 
+	[FilterComboId]			Long Integer
 );
 
-CREATE TABLE [tblIzvestajSub]
+CREATE TABLE [ReportDefinitionDetail]
  (
-	[IDsi]			Long Integer, 
-	[ID_I]			Long Integer, 
-	[QuerySQL]			Memo/Hyperlink (255), 
+	[ReportDefinitionDetailId]			Long Integer, 
+	[ReportDefinitionId]			Long Integer, 
+	[QuerySql]			Memo/Hyperlink (255), 
 	[QueryName]			Text (255), 
-	[Sort]			Long Integer, 
-	[Funkcija]			Text (255)
+	[SortOrder]			Long Integer, 
+	[Function]			Text (255)
 );
 
-CREATE TABLE [tblSifrarnik]
+CREATE TABLE [CodeListCatalog]
  (
-	[ID]			Long Integer, 
-	[Naziv]			Text (255), 
+	[Id]			Long Integer, 
+	[Name]			Text (255), 
 	[Datasheet]			Text (255), 
-	[Btn1Cap]			Text (255), 
-	[Btn1FF]			Text (255), 
-	[Btn2Cap]			Text (255), 
-	[Btn2FF]			Text (255), 
-	[Btn3Cap]			Text (255), 
-	[Btn3FF]			Text (255)
+	[Button1Caption]			Text (255), 
+	[Button1Function]			Text (255), 
+	[Button2Caption]			Text (255), 
+	[Button2Function]			Text (255), 
+	[Button3Caption]			Text (255), 
+	[Button3Function]			Text (255)
 );
 
-CREATE TABLE [tblSifrarnikSub]
+CREATE TABLE [CodeListCatalogDetail]
  (
-	[IDSubSfrID]			Long Integer, 
-	[SifrID]			Long Integer, 
-	[SQL]			Text (255), 
+	[CodeListCatalogDetailId]			Long Integer, 
+	[CodeListCatalogId]			Long Integer, 
+	[Sql]			Text (255), 
 	[Type]			Text (255), 
 	[Caption]			Text (255), 
-	[Sort]			Long Integer
+	[SortOrder]			Long Integer
 );
 
-CREATE TABLE [tblSTATS_update_tblstat]
+CREATE TABLE [StatReportDefinitionBackup]
  (
-	[IDstt]			Long Integer, 
-	[StatGrup]			Text (255), 
-	[StatNaziv]			Text (255), 
-	[StatQuery]			Text (255), 
-	[StatSQL]			Memo/Hyperlink (255), 
-	[StatReport]			Text (50), 
-	[StatWHRCap]			Text (50), 
-	[StatWHRComboSQL]			Memo/Hyperlink (255), 
-	[StatSQLName]			Text (50)
+	[StatReportDefinitionId]			Long Integer, 
+	[StatGroup]			Text (255), 
+	[StatName]			Text (255), 
+	[StatQueryName]			Text (255), 
+	[StatSql]			Memo/Hyperlink (255), 
+	[StatReportName]			Text (50), 
+	[StatWhereCaption]			Text (50), 
+	[StatWhereComboSql]			Memo/Hyperlink (255), 
+	[StatSqlName]			Text (50)
 );
 
-CREATE TABLE [tblWhrEx]
+CREATE TABLE [WhereClauseTemplate]
  (
-	[IDwhrex]			Long Integer, 
-	[WhrNaslov]			Text (50), 
-	[WhrEx]			Memo/Hyperlink (255), 
-	[frmToDo]			Text (50)
+	[WhereClauseTemplateId]			Long Integer, 
+	[Title]			Text (50), 
+	[WhereExpression]			Memo/Hyperlink (255), 
+	[TargetFormName]			Text (50)
 );
 
-CREATE TABLE [TEMP_GEN]
+CREATE TABLE [ScratchSum]
  (
-	[ID]			Long Integer, 
-	[SUMA]			Currency
+	[Id]			Long Integer, 
+	[Sum]			Currency
 );
 
-CREATE TABLE [tipStatus]
+CREATE TABLE [StatusType]
  (
-	[IDStatus]			Long Integer NOT NULL, 
+	[StatusTypeId]			Long Integer NOT NULL, 
 	[Status]			Text (255), 
-	[limitTable]			Text (255), 
-	[desc]			Text (255)
+	[LimitTable]			Text (255), 
+	[Description]			Text (255)
 );
 
-CREATE TABLE [VERSION-HISTORY]
+CREATE TABLE [VersionHistory]
  (
-	[DAT]			DateTime, 
-	[VER]			Text (50), 
-	[DESC]			Text (255), 
-	[FullDesc]			Memo/Hyperlink (255)
+	[VersionDate]			DateTime, 
+	[VersionNumber]			Text (50), 
+	[ShortDescription]			Text (255), 
+	[FullDescription]			Memo/Hyperlink (255)
 );
 
-CREATE TABLE [GK_20250531_backup_p24_UpravljanjeSplit]
+CREATE TABLE [LedgerEntry_Backup_20250531_ManagementSplit]
  (
-	[STAVKAID]			Long Integer NOT NULL, 
-	[BR_NALOG]			Double, 
-	[KONTO]			Text (50), 
-	[DATUM]			DateTime, 
-	[DIZNOS]			Double, 
-	[PIZNOS]			Double, 
-	[TIP_STAVKE]			Double, 
-	[DOK]			Text (50), 
-	[lnkSkupstinaID]			Long Integer, 
-	[lnkKUPACID]			Long Integer, 
-	[lnkIzvodStavkaID]			Long Integer, 
-	[NAPOMENA]			Text (255), 
-	[PARAMETRI]			Text (25), 
-	[OPIS]			Text (255), 
-	[SIFRAKONTA]			Long Integer, 
-	[DPO]			DateTime, 
-	[SIFRAKN]			Text (6), 
-	[RDOB]			Long Integer, 
-	[RACID]			Long Integer, 
-	[PRIORITET]			Long Integer, 
-	[KNzaTIP]			Long Integer, 
-	[RacunIN_ID]			Long Integer, 
-	[KontoTroska]			Text (255), 
-	[KnDokID]			Long Integer
+	[LedgerEntryId]			Long Integer NOT NULL, 
+	[JournalEntryNumber]			Double, 
+	[Account]			Text (50), 
+	[Date]			DateTime, 
+	[DebitAmount]			Double, 
+	[CreditAmount]			Double, 
+	[LineTypeId]			Double, 
+	[DocumentRef]			Text (50), 
+	[CompanyId]			Long Integer, 
+	[PartnerAccountingId]			Long Integer, 
+	[BankStatementLineId]			Long Integer, 
+	[Note]			Text (255), 
+	[Parameters]			Text (25), 
+	[Description]			Text (255), 
+	[AccountCode]			Long Integer, 
+	[DueDate]			DateTime, 
+	[PostingCode]			Text (6), 
+	[SupplierInvoiceId]			Long Integer, 
+	[InvoiceId]			Long Integer, 
+	[Priority]			Long Integer, 
+	[PostingTypeCode]			Long Integer, 
+	[InboundInvoiceId]			Long Integer, 
+	[SubAccount]			Text (255), 
+	[AccountingDocumentId]			Long Integer
 );
 
-CREATE TABLE [GK_PS]
+CREATE TABLE [LedgerEntrySnapshot]
  (
-	[STAVKAID]			Long Integer, 
-	[BR_NALOG]			Double, 
-	[KONTO]			Text (50), 
-	[DATUM]			DateTime, 
-	[DIZNOS]			Double, 
-	[PIZNOS]			Double, 
-	[TIP_STAVKE]			Double, 
-	[DOK]			Text (50), 
-	[lnkSkupstinaID]			Long Integer, 
-	[lnkKUPACID]			Long Integer, 
-	[lnkIzvodStavkaID]			Long Integer, 
-	[NAPOMENA]			Text (255), 
-	[PARAMETRI]			Text (25), 
-	[OPIS]			Text (255), 
-	[SIFRAKONTA]			Long Integer, 
-	[DPO]			DateTime, 
-	[SIFRAKN]			Text (6), 
-	[RDOB]			Long Integer, 
-	[RACID]			Long Integer, 
-	[PRIORITET]			Long Integer, 
-	[KNzaTIP]			Long Integer, 
-	[RacunIN_ID]			Long Integer, 
-	[KontoTroska]			Text (255), 
-	[KnDokID]			Long Integer
+	[LedgerEntryId]			Long Integer, 
+	[JournalEntryNumber]			Double, 
+	[Account]			Text (50), 
+	[Date]			DateTime, 
+	[DebitAmount]			Double, 
+	[CreditAmount]			Double, 
+	[LineTypeId]			Double, 
+	[DocumentRef]			Text (50), 
+	[CompanyId]			Long Integer, 
+	[PartnerAccountingId]			Long Integer, 
+	[BankStatementLineId]			Long Integer, 
+	[Note]			Text (255), 
+	[Parameters]			Text (25), 
+	[Description]			Text (255), 
+	[AccountCode]			Long Integer, 
+	[DueDate]			DateTime, 
+	[PostingCode]			Text (6), 
+	[SupplierInvoiceId]			Long Integer, 
+	[InvoiceId]			Long Integer, 
+	[Priority]			Long Integer, 
+	[PostingTypeCode]			Long Integer, 
+	[InboundInvoiceId]			Long Integer, 
+	[SubAccount]			Text (255), 
+	[AccountingDocumentId]			Long Integer
 );
 
-CREATE TABLE [Table1]
+CREATE TABLE [ContactImport]
  (
-	[stavkaid]			Long Integer NOT NULL, 
-	[rdob]			Long Integer, 
-	[knpodkonto]			Text (255)
+	[LedgerEntryId]			Long Integer NOT NULL, 
+	[SupplierInvoiceId]			Long Integer, 
+	[PostingSubAccount]			Text (255)
 );
 
 
 ```
 
-## aj_fn_cmn.mdb — 23 tabele (zajednički AJ_ framework: Staff/login, Settings, rečnik za prevode)
+## aj_fn_cmn.mdb — 23 tables (shared AJ_ framework: Staff/login, Settings, translation dictionary)
 ```sql
 -- ----------------------------------------------------------
 -- MDB Tools - A library for reading MS Access database files
@@ -1611,283 +1620,283 @@ CREATE TABLE [Table1]
 
 -- That file uses encoding UTF-8
 
-CREATE TABLE [_Log]
+CREATE TABLE [AuditLog]
  (
-	[logID]			Long Integer, 
-	[PC]			Text (15), 
-	[WinUser]			Text (50), 
-	[UserID]			Long Integer, 
-	[UserTXT]			Text (50), 
-	[Datum]			DateTime, 
-	[Forma]			Text (60), 
-	[TabCode]			Text (50), 
-	[ItemID]			Long Integer, 
+	[AuditLogId]			Long Integer, 
+	[ComputerName]			Text (15), 
+	[WindowsUsername]			Text (50), 
+	[StaffId]			Long Integer, 
+	[UserDisplayName]			Text (50), 
+	[Date]			DateTime, 
+	[FormName]			Text (60), 
+	[TableCode]			Text (50), 
+	[ItemId]			Long Integer, 
 	[ActionType]			Text (20), 
-	[msgExtra]			Text (255), 
-	[msgErrNum]			Text (255), 
-	[msg]			Text (255), 
-	[msgPromene]			Memo/Hyperlink (255), 
+	[ExtraMessage]			Text (255), 
+	[ErrorNumber]			Text (255), 
+	[Message]			Text (255), 
+	[ChangeMessage]			Memo/Hyperlink (255), 
 	[Module]			Text (50)
 );
 
-CREATE TABLE [_Recnik]
+CREATE TABLE [Dictionary]
  (
-	[ID]			Long Integer, 
-	[Poruka]			Text (255), 
-	[Jezik]			Text (50), 
-	[Index]			Long Integer, 
-	[dlg]			Long Integer, 
+	[Id]			Long Integer, 
+	[Message]			Text (255), 
+	[Language]			Text (50), 
+	[SortIndex]			Long Integer, 
+	[DialogId]			Long Integer, 
 	[Info]			Text (255)
 );
 
-CREATE TABLE [_RecnikJezik]
+CREATE TABLE [DictionaryLanguage]
  (
-	[RecLang]			Text (10), 
-	[Recnik]			Text (50), 
-	[On]			Boolean NOT NULL, 
-	[Def]			Boolean NOT NULL
+	[LanguageCode]			Text (10), 
+	[DictionaryName]			Text (50), 
+	[IsEnabled]			Boolean NOT NULL, 
+	[IsDefault]			Boolean NOT NULL
 );
 
-CREATE TABLE [_RecnikN]
+CREATE TABLE [DictionaryCyrillic]
  (
-	[ID]			Long Integer, 
-	[CIR]			Text (255)
+	[Id]			Long Integer, 
+	[CyrillicText]			Text (255)
 );
 
-CREATE TABLE [_TextFunction]
+CREATE TABLE [TextFunction]
  (
-	[ID]			Long Integer, 
+	[Id]			Long Integer, 
 	[KeyName]			Text (255), 
 	[Description]			Memo/Hyperlink (255)
 );
 
-CREATE TABLE [Functions]
+CREATE TABLE [HelperFunction]
  (
-	[ID]			Long Integer, 
-	[Mod]			Text (50), 
-	[Fnc]			Text (50), 
-	[Primer]			Memo/Hyperlink (255), 
-	[fullFunction]			Text (255), 
-	[Opis]			Memo/Hyperlink (255), 
-	[LastUpdate]			DateTime, 
-	[TanksTo]			Text (255)
+	[Id]			Long Integer, 
+	[ModuleName]			Text (50), 
+	[FunctionName]			Text (50), 
+	[Example]			Memo/Hyperlink (255), 
+	[FullFunctionSignature]			Text (255), 
+	[Description]			Memo/Hyperlink (255), 
+	[LastUpdatedAt]			DateTime, 
+	[ThanksTo]			Text (255)
 );
 
-CREATE TABLE [References]
+CREATE TABLE [VbaLibraryReference]
  (
-	[ID]			Long Integer, 
-	[References]			Text (50), 
-	[PathDesc]			Text (50), 
+	[Id]			Long Integer, 
+	[ReferenceName]			Text (50), 
+	[PathDescription]			Text (50), 
 	[FileName]			Text (255), 
-	[Pathx86]			Text (255), 
-	[Pathx64]			Text (255), 
-	[Desc]			Text (255), 
-	[Ver]			Text (255), 
-	[Datum]			DateTime
+	[PathX86]			Text (255), 
+	[PathX64]			Text (255), 
+	[Description]			Text (255), 
+	[Version]			Text (255), 
+	[Date]			DateTime
 );
 
-CREATE TABLE [Settings]
+CREATE TABLE [Setting]
  (
-	[IDSettings]			Long Integer, 
+	[SettingId]			Long Integer, 
 	[SettingName]			Text (50), 
-	[SettingVal]			Text (50), 
-	[Descrition]			Text (255), 
+	[SettingValue]			Text (50), 
+	[Description]			Text (255), 
 	[Category]			Text (50), 
-	[MFF]			Text (50), 
-	[DefVal]			Text (50), 
-	[FilterUser]			Long Integer, 
-	[FilterPC]			Text (255), 
+	[ModuleFormField]			Text (50), 
+	[DefaultValue]			Text (50), 
+	[FilterUserId]			Long Integer, 
+	[FilterComputerName]			Text (255), 
 	[FilterCustom1Num]			Long Integer, 
 	[FilterCustom2Num]			Long Integer, 
 	[FilterCustom3Num]			Long Integer, 
-	[FilterCustom1Txt]			Text (255), 
-	[FilterCustom2Txt]			Text (255), 
-	[FilterCustom3Txt]			Text (255), 
-	[SettingVal_LT]			Memo/Hyperlink (255)
+	[FilterCustom1Text]			Text (255), 
+	[FilterCustom2Text]			Text (255), 
+	[FilterCustom3Text]			Text (255), 
+	[SettingValueLong]			Memo/Hyperlink (255)
 );
 
-CREATE TABLE [Settings-STRUKTURA]
+CREATE TABLE [SettingStructure]
  (
-	[IDSettings]			Long Integer, 
+	[SettingId]			Long Integer, 
 	[SettingName]			Text (50), 
-	[SettingVal]			Text (50), 
-	[Descrition]			Text (255), 
+	[SettingValue]			Text (50), 
+	[Description]			Text (255), 
 	[Category]			Text (50), 
-	[MFF]			Text (50), 
-	[DefVal]			Text (50), 
-	[FilterUser]			Long Integer, 
-	[FilterPC]			Text (255), 
+	[ModuleFormField]			Text (50), 
+	[DefaultValue]			Text (50), 
+	[FilterUserId]			Long Integer, 
+	[FilterComputerName]			Text (255), 
 	[FilterCustom1Num]			Long Integer, 
 	[FilterCustom2Num]			Long Integer, 
 	[FilterCustom3Num]			Long Integer, 
-	[FilterCustom1Txt]			Text (255), 
-	[FilterCustom2Txt]			Text (255), 
-	[FilterCustom3Txt]			Text (255), 
-	[SettingVal_LT]			Memo/Hyperlink (255)
+	[FilterCustom1Text]			Text (255), 
+	[FilterCustom2Text]			Text (255), 
+	[FilterCustom3Text]			Text (255), 
+	[SettingValueLong]			Memo/Hyperlink (255)
 );
 
 CREATE TABLE [Staff]
  (
-	[IDUser]			Long Integer, 
-	[User]			Text (50), 
+	[StaffId]			Long Integer, 
+	[UserName]			Text (50), 
 	[StaffLogin]			Text (50), 
 	[Level]			Long Integer, 
-	[LastLog]			Text (50), 
-	[UseLang]			Text (50), 
-	[RESTRICT]			Text (255), 
-	[LastPC]			Text (255), 
-	[INC]			Text (6)
+	[LastLoginAt]			Text (50), 
+	[PreferredLanguage]			Text (50), 
+	[AccessRestriction]			Text (255), 
+	[LastComputerName]			Text (255), 
+	[IncrementCode]			Text (6)
 );
 
-CREATE TABLE [StaffPermition]
+CREATE TABLE [StaffPermission]
  (
-	[IDPermition]			Long Integer, 
-	[IDStaff]			Long Integer, 
+	[StaffPermissionId]			Long Integer, 
+	[StaffId]			Long Integer, 
 	[KeyName]			Text (255), 
 	[FormName]			Text (255), 
-	[PermitionVal]			Long Integer, 
-	[DisablePermition]			Long Integer
+	[PermissionValue]			Long Integer, 
+	[IsDisabled]			Long Integer
 );
 
-CREATE TABLE [Staff-STRUKTURA]
+CREATE TABLE [StaffStructure]
  (
-	[IDUser]			Long Integer, 
-	[User]			Text (50), 
+	[StaffId]			Long Integer, 
+	[UserName]			Text (50), 
 	[StaffLogin]			Text (50), 
 	[Level]			Long Integer, 
-	[LastLog]			Text (50), 
-	[UseLang]			Text (50), 
-	[RESTRICT]			Text (255), 
-	[LastPC]			Text (255)
+	[LastLoginAt]			Text (50), 
+	[PreferredLanguage]			Text (50), 
+	[AccessRestriction]			Text (255), 
+	[LastComputerName]			Text (255)
 );
 
-CREATE TABLE [StaffTMP]
+CREATE TABLE [StaffTemp]
  (
-	[IDUser]			Long Integer NOT NULL, 
-	[User]			Text (50), 
+	[StaffId]			Long Integer NOT NULL, 
+	[UserName]			Text (50), 
 	[StaffLogin]			Text (50), 
 	[Level]			Long Integer, 
-	[LastLog]			Text (50), 
-	[UseLang]			Text (50), 
-	[RESTRICT]			Text (255), 
-	[LastPC]			Text (255)
+	[LastLoginAt]			Text (50), 
+	[PreferredLanguage]			Text (50), 
+	[AccessRestriction]			Text (255), 
+	[LastComputerName]			Text (255)
 );
 
-CREATE TABLE [StaffTMP-STRUKTURA]
+CREATE TABLE [StaffTempStructure]
  (
-	[IDUser]			Long Integer, 
-	[User]			Text (50), 
+	[StaffId]			Long Integer, 
+	[UserName]			Text (50), 
 	[Level]			Long Integer, 
-	[UseLang]			Text (50), 
-	[RESTRICT]			Text (255), 
-	[LastPC]			Text (255)
+	[PreferredLanguage]			Text (50), 
+	[AccessRestriction]			Text (255), 
+	[LastComputerName]			Text (255)
 );
 
-CREATE TABLE [Switchboard Items]
+CREATE TABLE [SwitchboardMenuItem]
  (
-	[SwitchboardID]			Long Integer, 
+	[SwitchboardMenuItemId]			Long Integer, 
 	[ItemNumber]			Integer, 
 	[ItemText]			Text (255), 
 	[Command]			Integer, 
 	[Argument]			Text (255), 
-	[fLevel]			Text (50)
+	[FormLevel]			Text (50)
 );
 
-CREATE TABLE [Switchboard Items-STRUKTURA]
+CREATE TABLE [SwitchboardMenuItemStructure]
  (
-	[SwitchboardID]			Long Integer, 
+	[SwitchboardMenuItemId]			Long Integer, 
 	[ItemNumber]			Integer, 
 	[ItemText]			Text (255), 
 	[Command]			Integer, 
 	[Argument]			Text (255), 
-	[fLevel]			Text (50)
+	[FormLevel]			Text (50)
 );
 
-CREATE TABLE [tblFixSQL-STRUKTURA-PRIMER]
+CREATE TABLE [SqlFixTemplateExample]
  (
-	[IDRef]			Long Integer, 
-	[objectName]			Text (50), 
-	[SQL]			Memo/Hyperlink (255), 
-	[repName]			Text (50), 
-	[objectType]			Text (50)
+	[SqlFixTemplateExampleId]			Long Integer, 
+	[ObjectName]			Text (50), 
+	[Sql]			Memo/Hyperlink (255), 
+	[ReportName]			Text (50), 
+	[ObjectType]			Text (50)
 );
 
-CREATE TABLE [tblSTATS]
+CREATE TABLE [StatReportDefinition]
  (
-	[IDstt]			Long Integer, 
-	[StatGrup]			Text (255), 
-	[StatNaziv]			Text (255), 
-	[StatQuery]			Text (255), 
-	[StatSQL]			Memo/Hyperlink (255), 
-	[StatReport]			Text (50), 
-	[StatWHRCap]			Text (50), 
-	[StatWHRComboSQL]			Memo/Hyperlink (255), 
-	[StatSQLName]			Text (50), 
+	[StatReportDefinitionId]			Long Integer, 
+	[StatGroup]			Text (255), 
+	[StatName]			Text (255), 
+	[StatQueryName]			Text (255), 
+	[StatSql]			Memo/Hyperlink (255), 
+	[StatReportName]			Text (50), 
+	[StatWhereCaption]			Text (50), 
+	[StatWhereComboSql]			Memo/Hyperlink (255), 
+	[StatSqlName]			Text (50), 
 	[TextFilterCaption]			Text (50), 
-	[StatWHRCap2]			Text (50), 
-	[StatWHRComboSQL2]			Memo/Hyperlink (255), 
+	[StatWhereCaption2]			Text (50), 
+	[StatWhereComboSql2]			Memo/Hyperlink (255), 
 	[TextFilterCaption2]			Text (50), 
 	[StaffLevel]			Text (255), 
-	[StaffUID]			Text (255)
+	[StaffUid]			Text (255)
 );
 
-CREATE TABLE [tblSTATS-STRUKTURA]
+CREATE TABLE [StatReportDefinitionStructure]
  (
-	[IDstt]			Long Integer, 
-	[StatGrup]			Text (255), 
-	[StatNaziv]			Text (255), 
-	[StatQuery]			Text (255), 
-	[StatSQL]			Memo/Hyperlink (255), 
-	[StatReport]			Text (50), 
-	[StatWHRCap]			Text (50), 
-	[StatWHRComboSQL]			Memo/Hyperlink (255), 
-	[StatSQLName]			Text (50), 
+	[StatReportDefinitionId]			Long Integer, 
+	[StatGroup]			Text (255), 
+	[StatName]			Text (255), 
+	[StatQueryName]			Text (255), 
+	[StatSql]			Memo/Hyperlink (255), 
+	[StatReportName]			Text (50), 
+	[StatWhereCaption]			Text (50), 
+	[StatWhereComboSql]			Memo/Hyperlink (255), 
+	[StatSqlName]			Text (50), 
 	[TextFilterCaption]			Text (50), 
-	[StatWHRCap2]			Text (50), 
-	[StatWHRComboSQL2]			Memo/Hyperlink (255), 
+	[StatWhereCaption2]			Text (50), 
+	[StatWhereComboSql2]			Memo/Hyperlink (255), 
 	[TextFilterCaption2]			Text (50), 
 	[StaffLevel]			Text (255), 
-	[StaffUID]			Text (255)
+	[StaffUid]			Text (255)
 );
 
-CREATE TABLE [tblWhrEx-STRUKTURA]
+CREATE TABLE [WhereClauseTemplateStructure]
  (
-	[IDwhrex]			Long Integer, 
-	[WhrNaslov]			Text (50), 
-	[WhrEx]			Memo/Hyperlink (255), 
-	[frmToDo]			Text (50)
+	[WhereClauseTemplateId]			Long Integer, 
+	[Title]			Text (50), 
+	[WhereExpression]			Memo/Hyperlink (255), 
+	[TargetFormName]			Text (50)
 );
 
-CREATE TABLE [UserLevelList]
+CREATE TABLE [UserLevel]
  (
-	[UserLevelID]			Long Integer NOT NULL, 
+	[UserLevelId]			Long Integer NOT NULL, 
 	[Caption]			Text (255)
 );
 
-CREATE TABLE [VERSION-HISTORY]
+CREATE TABLE [VersionHistory]
  (
-	[DAT]			DateTime, 
-	[VER]			Text (50), 
-	[DESC]			Memo/Hyperlink (255), 
-	[FullDesc]			Memo/Hyperlink (255)
+	[VersionDate]			DateTime, 
+	[VersionNumber]			Text (50), 
+	[ShortDescription]			Memo/Hyperlink (255), 
+	[FullDescription]			Memo/Hyperlink (255)
 );
 
-CREATE TABLE [_Log-STRUKTURA]
+CREATE TABLE [AuditLogStructure]
  (
-	[logID]			Long Integer, 
-	[PC]			Text (15), 
-	[WinUser]			Text (50), 
-	[UserID]			Long Integer, 
-	[UserTXT]			Text (50), 
-	[Datum]			DateTime, 
-	[Forma]			Text (60), 
-	[TabCode]			Text (50), 
-	[ItemID]			Long Integer, 
+	[AuditLogId]			Long Integer, 
+	[ComputerName]			Text (15), 
+	[WindowsUsername]			Text (50), 
+	[StaffId]			Long Integer, 
+	[UserDisplayName]			Text (50), 
+	[Date]			DateTime, 
+	[FormName]			Text (60), 
+	[TableCode]			Text (50), 
+	[ItemId]			Long Integer, 
 	[ActionType]			Text (20), 
-	[msgExtra]			Text (255), 
-	[msgErrNum]			Text (255), 
-	[msg]			Text (255), 
-	[msgPromene]			Memo/Hyperlink (255), 
+	[ExtraMessage]			Text (255), 
+	[ErrorNumber]			Text (255), 
+	[Message]			Text (255), 
+	[ChangeMessage]			Memo/Hyperlink (255), 
 	[Module]			Text (50)
 );
 
