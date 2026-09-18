@@ -1,485 +1,539 @@
-# Tehnički plan — Faza 1: ciljana SQL Server šema + poslovna pravila
+# Tehnički plan — Faza 1: ciljana SQL Server šema (v2 — usaglašeno sa šefom)
 
-Ovaj dokument je **predlog na odobravanje**, ne konačna odluka — pre nego što se generiše
-EF Core model ili migracija, treba proći kroz sekciju 3 ("Otvorena pitanja") sa korisnicom.
+Ovo je **v2** ovog dokumenta. Sve stavke iz v1 su prošle kroz pregled — komentari su ostavljeni
+direktno u v1 (sad zamenjen ovim fajlom, ali odgovori su prepisani ovde) i u
+[`pitanjaZaContext.md`](../pitanjaZaContext.md) (koren repozitorijuma). **Oba fajla su pročitana
+u celosti i sve odluke iz njih su unete ovde.** `pitanjaZaContext.md` ostaje izvor istine za
+tačne formulacije odgovora; ovaj dokument je sređena, primenjena verzija.
 
-**Pun DDL nacrt** (CREATE TABLE za sve zadržane tabele, sa FK i tipovima) nalazi se u
-[`docs/schema-ddl-draft.sql`](schema-ddl-draft.sql) — sekcija 2 ovog dokumenta je narativni
-opis istih odluka, taj fajl je konkretna, izvršiva verzija. Mesta gde sam morala da pretpostavim
-nešto su označena `-- ASSUMPTION` ili brojem pitanja iz sekcije 3 (npr. "pitanje 3.1").
+**Pun DDL nacrt** koji prati ovaj model nalazi se u
+[`docs/schema-ddl-draft.sql`](schema-ddl-draft.sql) (takođe ažuriran na v2).
+
+## 0. Šta se promenilo u odnosu na v1 — pregled
+
+**Preimenovane/restrukturirane tabele:**
+
+| v1 (stara Access šema) | v2 (usvojeno) | Razlog |
+|---|---|---|
+| `Skustina` | `Company` | Šef traži da MyCompany/Company bude koren, proširen podacima o upravniku |
+| `Kupac` | `Partner` | Jedan entitet = jedan pravni subjekt, bez obzira na ulogu |
+| — (novo) | `PartnerAccounting` | Kupac/dobavljač uloga + konto su **knjigovodstvena konfiguracija po firmi**, ne identitet — razdvojeno iz `Partner` |
+| `Objekti` | `Unit` | — |
+| — (novo) | `Contract` | Vremenska istorija vlasnik/zakupac/primalac računa (bivša `ugovori` tabela, proširena) |
+| — (novo) | `UnitBillingAllocation` | Zamenjuje ideju duplog unosa jedinice za podelu troška |
+| `Naselje` | `CategoryLocation` | Hijerarhijska (parent/child), ne ravna šifra |
+| `SzUlaz` | `BuildingEntrance` | Svaki `Unit` mora biti povezan (jedna SZ može imati više adresa/lamela) |
+| `SzObjekat` | *(ukinuto)* | Pokriveno sa `Unit.CompanyId` + `Unit.BuildingEntranceId` |
+| `TipPartnera` | `PartnerCategory` | Cilj kolone `Partner.CategoryId` (pravna forma) |
+| `Troskovi_PodKonta` | `SubAccount` | Šef: "KontoTroska imenovati kao SubAccounting" |
+| `Troskovi_PodKonta_DefDob` | `SubAccountDefaultSupplier` | Isto, i sad pokazuje na `PartnerAccounting`, ne na tekst |
+| `Promene` | `Events` | Nije sistemska tabela — workflow zahteva/odobrenja korisnika |
+| `PrinterBinLOCAL` | `SelectionBasket` | Šef: "dobra praksa, treba zadržati" — **vraćeno iz isključenih** |
+| `ugovori` | `Contract` | **vraćeno iz isključenih**, sad prvorazredna tabela |
+| `BenefitUpdate` | `BenefitUpdate` (bez izmene imena) | Aktivna tabela — **vraćeno iz isključenih** |
+| `OpomenaSablonEx` | `OpomenaSablonEx` (bez izmene imena) | Aktivan rad u toku — **vraćeno iz isključenih** |
+
+**Potpuno uklonjene tabele:**
+
+- `RacunIN` — potvrđeno napušteno ("RacunIN je napustena tabla").
+- `ZK` **ostaje** (nije uklonjena) — pojašnjeno da je to radna/privremena tabela zatezne kamate
+  pre knjiženja, ne napuštena.
+
+**Strukturne izmene (ne samo preimenovanje):**
+
+1. **`PartnerAccounting` je novi centralni FK cilj** za sve knjigovodstveno-vezane kolone koje su
+   u v1 pokazivale direktno na `Kupac` (npr. `GK.lnkKUPACID`, `Racun.ID_K`,
+   `Dobavljac_Racuni.DobavljacKonto`) — jer konto (204x/435x) i podkonto su **po firmi**, ne
+   osobina partnera kao takvog. Vidi sekciju 2.1.
+2. **`RacunStavke.lnkGR/ID_K/ID_SK` VRAĆENI kao namerna denormalizacija** — v1 je predlagao da se
+   uklone (izvode JOIN-om iz `Racun`). Šef je objasnio zašto ERROR_062/063/064 postoje: ciljni
+   partner/firma stavke se ponekad menja posle izdavanja računa (kasno stigao kupoprodajni
+   ugovor i sl.), pa stavka mora zadržati **originalnu** vrednost. Ovo se u v2 vraća kao snapshot
+   kolone na `RacunStavke` (sad prema `PartnerAccounting`/`Company`/`GrupaRacuna`).
+3. **`Nalog.Br_Nalog` NIJE isto što i `NalogId`** — razdvojeno u surogat `NalogId` (identity) i
+   poslovni `NalogNumber` (redni broj **po `CompanyId` po godini**, sa mogućnošću godišnjeg
+   reseta).
+4. **`Nalog` dobija status `Draft`/`Posted`** — i **trigger iz v1 je POGREŠAN i uklonjen**. Šef je
+   eksplicitno rekao: provera ravnoteže se ne sme dešavati posle svakog INSERT-a stavke, samo pri
+   pokušaju knjiženja (Post). Vidi sekciju 2.4.
+5. **`ON DELETE CASCADE` uklonjen** sa knjigovodstvenih stavki (`RacunStavke`, `IzvodStavke`,
+   `OpomenaStavke`) — izdati/proknjiženi dokumenti se **ne brišu fizički, samo storniraju**;
+   brisanje je dozvoljeno jedino za dokumente koji nikad nisu ni izdati (aplikativna provera, ne
+   FK cascade).
+6. **`Unit.PLATILAC_lnk_ID_K` i `_K2` potpuno uklonjeni** — zamenjeni tabelom
+   `UnitBillingAllocation` (partner + procenat + period važenja).
+7. **`Unit` više ne nosi `OwnerId`/`TenantId`/`InvoicingId` direktno** — cela ta vremenska
+   istorija ide kroz `Contract`.
+8. **Dodata `StaffCompany`** (nova, mala tabela) — multi-tenant vidljivost: korisnik vidi samo
+   kompanije koje su mu dodeljene (eksplicitan zahtev iz `pitanjaZaContext.md`).
+9. Dodati nedostajući FK-ovi: `GK.Konto` → `Konta`, `GK.TipStavke` → `TipStavke`.
+10. Uklonjena kolona `RacunStavke.TipObracunaId` — šef: veza preko `DobavljacRacunId` je dovoljna.
+11. `Company.PIB` menja tip iz `INT` u `NVARCHAR` (PIB je identifikator, ne broj za računanje —
+    usklađeno sa `Partner.PIB` koji je već bio tekst).
+12. Dodat `LegacyId` (nullable, za mapiranje pri ETL-u) na tabele koje se pune iz stare baze — šef
+    koristi princip "TransferId" iz stare aplikacije, isti princip se zadržava.
+13. Dodat `RowVersion` (optimistička konkurencija) na `Nalog`, `Racun`, `Izvod`, `IzvodStavke`.
+14. `AuditLog` dobija `CompanyId` i `CorrelationId`.
 
 ## 1. Pravila mapiranja tipova (Access → SQL Server)
 
+Nepromenjeno u odnosu na v1, sa jednom dopunom o zaokruživanju (rešeno pitanje, ranije 3.6):
+
 | Access tip | SQL Server tip | Napomena |
 |---|---|---|
-| Long Integer (surogat PK) | `INT IDENTITY(1,1)` | Access AutoNumber nije eksplicitno markiran u exportu, ali se prepoznaje po konvenciji (IDxxx, prva kolona) |
-| Long Integer (poslovni šifarnik, npr. `Konta.Konto`) | `INT NOT NULL` (PK, bez identity) | Kod nije generisan nego dodeljen |
-| Long Integer (FK) | `INT NULL`/`NOT NULL` prema pravilu | Vidi sekciju 2 za NULL/NOT NULL odluke |
-| Integer (16-bit) | `SMALLINT` | Retko (npr. `Virman.SifraPlacanja`) |
+| Long Integer (surogat PK) | `INT IDENTITY(1,1)` | |
+| Long Integer (poslovni šifarnik) | `INT NOT NULL` (PK, bez identity) | |
 | Text (n) | `NVARCHAR(n)` | |
 | Memo/Hyperlink | `NVARCHAR(MAX)` | |
-| Boolean | `BIT` | |
-| DateTime (samo datum, npr. `DatumIzdavanja`) | `DATE` | |
-| DateTime (i vreme bitno, npr. `DateEntry`, `_Log.Datum`) | `DATETIME2(0)` | |
-| Currency | `DECIMAL(19,4)` | Access Currency je fiksni 4-decimalni tip — ovo je tačan ekvivalent |
-| **Double korišćen za novac** (`GK.DIZNOS/PIZNOS`, `RacunStavke.Iznos/Suma/...`, `Racun.Suma/Ukupno/...`) | `DECIMAL(19,4)` | **Važna izmena u odnosu na izvor** — Access čuva novac kao float (`Double`), što je verovatno uzrok zašto toliko ERROR_ upita mora da radi `Round(...,2)`/`Round(...,4)` da bi uporedilo sume (ERROR_001, ERROR_014, ERROR_104...). U SQL Serveru `decimal` uklanja tu klasu grešaka u korenu. |
-| Double korišćen kao koeficijent/količina (npr. `Objekti.Koeficijent`, `RacunStavke.Kolicina`, `K1..K5`) | `DECIMAL(9,4)` | Nije novac, ali svejedno bolje decimal nego float za reproduktivnost obračuna |
-| Numeric(18,8) (`KamatniList.Koeficijent`) | `DECIMAL(18,8)` | Kamatni koeficijent, zadržati punu preciznost |
+| Boolean | `BIT` | **Oprez:** konverzija Long Integer→BIT iz v1 nije potvrđena profilisanjem stvarnih podataka — proveriti pri ETL-u (šef je ovo eksplicitno flagovao kao rizik). |
+| DateTime (samo datum) | `DATE`, **NULL dozvoljen namerno** | Šef: bolje prazno nego pogrešan datum upisan da bi se izbegao NULL — datumi ostaju nullable svuda gde v1 nije već tražio NOT NULL iz ERROR_ pravila. |
+| DateTime (vreme bitno) | `DATETIME2(0)` | |
+| Currency / Double (novac) | `DECIMAL(19,4)` | |
+| Double (koeficijent/količina) | `DECIMAL(9,4)` | |
+| Numeric(18,8) | `DECIMAL(18,8)` | |
+| Partner/Company PIB | `NVARCHAR(20)` | **Rešeno:** PIB je tekst svuda, ne broj (v1 je imao `Skustina.PIB` kao INT — greška, ispravljeno). |
 
-**Otvoreno pitanje (vidi 3.6):** da li sve iznose zaokruživati na 2 decimale kao standard, ili
-zadržati 4 decimale internog obračuna (kao stara baza) i zaokruživati samo za prikaz/štampu.
+**Zaokruživanje (rešeno pitanje, bivše 3.6):**
+- Stavke računa i konačna suma računa → **2 decimale**.
+- Kurs, stavke pre finalne sume, sve u GK → **4 decimale**.
+- Metod zaokruživanja (standardno vs. bankarsko) **nije konačno odlučeno** — šef sumnja da
+  standardno zaokruživanje uzrokuje neslaganje zbira stavki i ukupnog iznosa, razmatra
+  bankarsko/kombinovano. **Ovo ostaje otvoreno** (vidi sekciju 4, stavka O-1) — dok se ne odluči,
+  implementacija koristi standardno zaokruživanje + eksplicitan "konto zaokruživanja" koji
+  hvata razliku (šef ga pominje kao postojeći mehanizam za podelu troška, isti princip važi i
+  ovde).
 
 ## 2. Predložena šema, po domenima
 
-Za svaku tabelu: **PK**, predložene **FK** (izvedene iz JOIN-ova u `ERROR_*` i drugim upitima —
-označeno da li je potvrđeno upotrebom ili je pretpostavka), i napomene. Tabele koje su u
-`docs/data-model.md` označene kao privremene/backup/probne (vidi sekciju 4) su **isključene** iz
-predloga.
+### 2.1 Partner / Company / Unit / Contract — nova organizaciona osnova
 
+Ovo je najveća promena u odnosu na v1. Umesto `Skustina → Kupac → Objekti` sa dosta preklapajućih
+polja, model je sad:
 
+**`Company`** (bivša `Skustina`) — stambena zajednica, proširena podacima o upravniku i poljima
+koja ne mogu da se svedu na `Partner`. PK `CompanyId`.
+FK: `PredstavnikId`→Partner, `CategoryLocationId`→CategoryLocation, `UpravnikId`→Staff.
+**Multi-tenant:** više upravljačkih kompanija koristi istu aplikaciju; izolacija nije apsolutna —
+korisniku se dodeljuje koje `Company` zapise vidi (vidi `StaffCompany` u sekciji 2.6), podaci koji
+nisu vezani za `CompanyId` mogu biti zajednički.
 
-### 2.1 Matični podaci
+**`Partner`** (bivši `Kupac`) — **jedan zapis po pravnom/fizičkom subjektu**, bez obzira na to u
+koliko uloga se pojavljuje. PK `PartnerId`.
+FK: `CategoryLocationId`→CategoryLocation, `CategoryId`→PartnerCategory (pravna forma: Fizičko
+lice-Domaće, Fizičko lice-Stranac, Kompanija, SZ, Upravnik).
+**`Konto`/`ExterniKonto`/`AutoKontoTroska` su PREMEŠTENI na `PartnerAccounting`** — nisu osobina
+partnera, nego knjigovodstvena konfiguracija po firmi.
+`IDMaster` je **ukinut** (potvrđeno dva puta) — više nema potrebe da se isti kupac "prepoznaje"
+kroz više unosa, jer je sad jedan `Partner` = jedan zapis, a ponavljanje po firmi ide kroz
+`PartnerAccounting`.
+`GrupniRacunGrupaId` (bivši `IDGrupniRacunMaster`) — **zadržan**, ali semantika nije 100% jasna:
+šef je objasnio da je to proizvoljna grupna oznaka koju dele partneri koji ulaze u isti grupni
+račun (npr. vrednost `1731` deli 9 partnera), **bez veze sa `Unit`**. Nije potvrđeno da li ta
+vrednost referencira stvaran `Partner` zapis (npr. "master" primalac) ili je čisto grupni tag —
+**ostaje otvoreno, O-2 u sekciji 4.**
 
-**`Skustina`** (skupština/zgrada) — PK `IDSkupstina`.
-FK: `PredstavnikSS_ID` → Kupac (pretpostavka), `NaseljeLNK` → Naselje, `Upravnik` → Staff (pretp.).
-Ovo je koren organizacione hijerarhije — skoro sve ostale tabele se svode na nju kroz `lnkSkupstinaID`/`ID_SK`/`SK_ID`/`IDSZ` (**nekonzistentno imenovanje kroz staru bazu — u novoj šemi predlažem da svuda bude `SkustinaId`**).
+**`PartnerAccounting`** (**nova tabela**) — knjigovodstvena uloga partnera **po firmi**. PK
+`PartnerAccountingId`. FK `PartnerId`→Partner NOT NULL, `CompanyId`→Company NOT NULL, `Account`
+(bivši `Konto`, npr. `2040` ili `4350` — 204x=kupac/potraživanje, 435x=dobavljač/obaveza, šef
+potvrdio), `DefaultSubAccount`→SubAccount.
+Jedan partner MOŽE istovremeno biti i kupac i dobavljač — to više nije "diskriminator" na jednoj
+tabeli (kao u v1), nego prosto **više redova u `PartnerAccounting`** za istog `PartnerId`, sa
+različitim `Account` vrednostima. `UNIQUE(PartnerId, CompanyId, Account)`.
+**Ovo je sad FK cilj za skoro sve kolone koje su u v1 pokazivale direktno na `Kupac`** iz
+knjigovodstvenog konteksta: `GK.PartnerAccountingId` (bivši `lnkKUPACID`), `Racun.PartnerAccountingId`
+(bivši `ID_K`), `Dobavljac_Racuni.DobavljacPartnerAccountingId` (bivši `DobavljacKonto`),
+`RacunStavke.DobavljacKontoPartnerAccountingId`, `KamatniList`, `Opomena`/`OpomenaStavke`,
+`IzvodStavke.opt_lnk_Kupac`. Tabele koje su vezane za **identitet** partnera nezavisno od uloge
+(npr. `Mail`, `PartnerTekuciRacuni`) i dalje pokazuju direktno na `Partner`.
 
-> **Komentar:**
-Kako bi se idetifikovali partneri za koje se radi kreirao bih posebnu tabelu MyCompany sa strukutorom
-CompanyId - isto što i SkupstinaID / SZID što predstavlja trenutno tabelu Skupstina.
+**`Unit`** (bivši `Objekti`) — stan/poslovni prostor. PK `UnitId`.
+FK: `CompanyId`→Company NOT NULL, `BuildingEntranceId`→BuildingEntrance **NOT NULL** (svaki `Unit`
+mora biti povezan sa ulazom, jer jedna SZ može biti lamela sa više različitih adresa),
+`TipObjektaId`→TipObjekta.
+**Uklonjeno u odnosu na v1:** `lnk_ID_K`/`IDVlasnik`/`IDZakupac` (vlasništvo/zakup se sad vodi kroz
+`Contract`, ne kao kolona na `Unit`), `PLATILAC_lnk_ID_K`/`_K2` (zamenjeno
+`UnitBillingAllocation`), `GrupniRacunId` (grupno fakturisanje je na nivou `Partner`/`Racun`, ne
+`Unit`).
 
-Tabelu Kupac bih preimenovao u Partner, jer se tu nalaze i Vlasnici (kupci) i dobavljači a takođe podatke iz tabele Skupstina bih čuvao u istoj tabeli. 
+**`Contract`** (**nova tabela**, zamenjuje staru `ugovori` i rešava problem "nema vremenske
+istorije vlasnika/zakupca"). PK `ContractId`.
+FK: `UnitId`→Unit NOT NULL, `PartnerAccountingId`→PartnerAccounting NOT NULL (**ASSUMPTION**: šef
+nije eksplicitno rekao da li ovo treba da bude `PartnerId` ili `PartnerAccountingId` — odabrano
+`PartnerAccountingId` jer je `Unit` uvek u kontekstu jedne `Company`, pa je dosledno sa ostatkom
+šeme; **potvrditi**), `RoleId`→ContractRole (mala šifra: Vlasnik/Zakupac/Primalac računa).
+Kolone: `StartInvoicingDate`, `EndInvoicingDate`, `ContractStartDate`, `ContractEndDate`,
+`Napomena`, `StatusId`.
+**Pravilo (aplikativno, ne šema):** kad se unese vlasnik, po defaultu on postaje i primalac
+računa; kad se doda zakupac (nov `Contract` red sa `RoleId=Zakupac`), primalac računa se
+automatski prebacuje na zakupca osim ako se eksplicitno ne zadrži na vlasniku — ovo replicira
+ponašanje stare aplikacije, ali kao aplikativnu logiku nad `Contract` redovima, ne kao posebne
+kolone.
+**Pravno:** dug se uvek potražuje od onoga kome je račun izdat (snapshot na `Racun`, ne
+`Contract`); u slučaju spora, vlasnik odgovara za dug, ali se računi ne menjaju retroaktivno.
 
-Potrebno imati CategoryId za tipologiju partnera Fizičko lice - Domaće, Fizičko lice - Stranac, Kompanija, Sz, Upravnik
-Konto određuje tip Dobavljač/Kupac 435/204 s tim što dobavljačima treba i PodKonto kao primarni PodKonto za automatizaciju knjiženja.
-Ovde bih izvukao napolje i kreirao novu tabelu sa infomacijama PartnerAccounting - Id, PartnerId, CompanyId, Account, defaultSubAccount
-Id koji se ovde dobija je veza koja je ranije bila KupacId tj lnk_kupac_Id, Idk itd.....
-Ovaj Id je ručno unošen i radi lakšeg prepoznavanja korišteni su od 1001-6999 za vlasnike, zakupce... 7000-7999 za posebne refundacije, gde su dobavljaći uneseni kao kupci da bi se izdali računi za refundacije, penale itd. 8000-8999 za sopstevene stambene zajednice npr. ako je SZID bio 101 - to je sad u MyCopmpany kreirao se automatski i 8101 u kupcima sa kontom 4350. U 9001- su unošeni dobavljači.
+**`UnitBillingAllocation`** (**nova tabela**, zamenjuje ideju "unesi jedinicu dva puta sa
+koeficijentima"). PK `UnitBillingAllocationId`.
+FK: `UnitId`→Unit NOT NULL, `PartnerAccountingId`→PartnerAccounting NOT NULL.
+Kolone: `Percentage` `DECIMAL(7,4)` `CHECK (Percentage > 0 AND Percentage <= 1)`, `ValidFrom` DATE
+NOT NULL, `ValidTo` DATE NULL.
+**Pravilo (aplikativno, ne DB CHECK jer je cross-row):** zbir aktivnih `Percentage` za isti `Unit`
+u istom periodu mora biti tačno `1.0000`, uz toleranciju koja se rešava preko konta zaokruživanja
+— šef je potvrdio da ovakva tolerancija već postoji kao koncept.
 
-CategoryLocation / ili / CategoryLocationId - ovde bi trebao da imam kategorizaciju koja je pre bila naselje, ali sa vezom child, parent, kao npr Belvile pa child Plot 24, Plot 23, Plot 25 - svaki od ovih plotova ima nekoliko CompanyId... Sa mogućnosti da nema pripadnost tj da ima vrednost CategoryLocationId = null.
+**`CategoryLocation`** (bivši `Naselje`) — hijerarhijska lokacijska kategorija (npr. Belville →
+Plot 24). PK `CategoryLocationId`. Self-FK `ParentCategoryLocationId` NULL (dozvoljeno da nema
+roditelja).
 
----
+**`BuildingEntrance`** (bivši `SzUlaz`; `SzObjekat` **ukinut**, pokriven kombinacijom
+`Unit.CompanyId` + `Unit.BuildingEntranceId`). PK `BuildingEntranceId`. FK `CompanyId`→Company NOT
+NULL.
 
+**`PartnerCategory`** (bivši `TipPartnera`, sad cilj `Partner.CategoryId`) — pravna forma
+partnera: Fizičko lice-Domaće, Fizičko lice-Stranac, Kompanija, SZ, Upravnik.
 
-**`Objekti`** (stanovi/poslovni prostori) — PK `ID_O`.
-FK: `lnkSkupstinaID` → Skustina (potvrđeno ERROR_020), `lnk_ID_K` → Kupac NOT NULL (vlasnik, potvrđeno ERROR_005/ERROR_020), `lnk_tip` → TipObjekta, `IDVlasnik`/`IDZakupac` → Kupac, `PLATILAC_lnk_ID_K`/`PLATILAC_lnk_ID_K2` → Kupac (**dva "platioca" — nejasna semantika, pitanje 3.3**).
-
-> **Komentar:**tabelu objekti bih preimenovao u Units. lnkSkupstinaID je menja u CompanyID
-Vlasnik, Platilac.....
-Iskustveno: OwnerId, TenantId, InvoicingId
-Osnovna veza je InvoicingId jer to je Id za kontiranje, izdavanje računa i naplatu.
-Po defaultu kad su unese InvoicingId dedeljuje se isti na OwnerId a TenantId je null.
-Unos TenantId se radi menja autoamtski InvoicingId
-PLATILAC_lnk_ID_K2` se za sad izbacu i svi uneti podaci ignorisu
-
-**`Kupac`** (vlasnik/zakupac/**i dobavljač** — vidi pitanje 3.1) — PK `ID_K`.
-FK: `lnk_ID_SK` → Skustina, `lnkNaselje` → Naselje, `IDMaster` → Kupac (self, **pitanje 3.2**), `IDGrupniRacunMaster` → Kupac (self, grupno fakturisanje, pitanje 3.2).
-`Tip` — diskriminator (kupac vs. dobavljač vs. drugo — potvrditi vrednosti).
-
-> **Komentar:**tabelu Kupac kao što sam naveo menjamo u Partner, IDMaster se koristio da bi se identifikovao isti kupac u vise unosa, ali sad to ćemo raditi tako što je jedan unos u partneru a ponavljanje unosa se vrši u tabeli PartnerAccounting
-
-**`Naselje`** — PK `NaseljeID`. Prosta šifra opštine/naselja.
-
-> **Komentar:**Naselje bih ukinuo kao tabelu za sebe i preimenovao u CategoryLocation, kao što sam naveo ranije.
-CategoryLocationId...
-
-
-**`SzUlaz`**, **`SzObjekat`** — pomoćne tabele za ulaze u zgradu / grupisanje objekata. FK `SZ`/`SzId` → Skustina.
-
-> **Komentar:** Svakako preimenovani npr BuildingEntrances - svaki Unit mora da bude povezan sa  BuildingEntrancesId jer se tu definiše adresa Unita jer jedna SZ može biti lamela sa nekoliko različitih adresa.
-
-**Šifarnici bez promene strukture:** `TipObjekta`, `TipPartnera`, `TipStavke`, `TipObracuna`, `TipADDTXT`, `TipUplatnice`, `TipTODO`, `tipStatus`, `Godina`, `Kurs`, `Konta`, `KontniOkvir`.
-
-
+**Šifarnici bez suštinske promene** (samo FK ciljevi ažurirani gde je relevantno):
+`TipObjekta`, `TipStavke`, `TipObracuna`, `TipADDTXT`, `TipUplatnice`, `TipTODO`, `TipStatus`,
+`Godina`, `Kurs`, `Konta`, `KontniOkvir`. Šef je potvrdio da se od `Troskovi_*` grupe koriste samo
+`Troskovi_PodKonta`/`_DefDob` (sad `SubAccount`/`SubAccountDefaultSupplier`) — ostatak (`TKONTO`
+i sl.) nikad nisu bile prave tabele, kao što je već bilo pretpostavljeno.
+`tblShortList` — šef potvrđuje da se koristi kao univerzalna mala lista (umesto pravljenja 50
+sitnih tabela); **zadržava se** kao opcioni mehanizam za proste šifarnike (npr. neke kategorije
+mogu ići kroz `tblShortList` umesto posebne tabele — odluka po slučaju u Fazi 4).
 
 ### 2.2 Fakturisanje
 
-**`GrupaRacuna`** (mesečna serija/obračun) — PK `IDGrupaRacuna`.
-FK: `ID_SK` → Skustina, `NalogKN` → Nalog.Br_Nalog (potvrđeno ERROR_070/ERROR_081/ERROR_085), `UserSys` → Staff.
+**`GrupaRacuna`** — nepromenjeno strukturno, `CompanyId` umesto `SkustinaId`.
 
-**`Racun`** (faktura) — PK `IDRacun`.
-FK: `lnkGR` → GrupaRacuna NOT NULL, `ID_K` → Kupac NOT NULL, `ID_SK` → Skustina NOT NULL (sve tri: **NOT NULL potvrđeno kao pravilo od ERROR_060** — stara baza dozvoljava 0 kao "nepovezano", nova ne sme), `ID_OX` → Objekti, `lnkOpomenaID` → Opomena, `IDKGrupniRacun` → Kupac (self, grupni račun).
+**`Racun`** (faktura) — `PartnerAccountingId` umesto `ID_K`, `CompanyId` umesto `ID_SK`, `UnitId`
+umesto `ID_OX`. **`GrupniRacunId` je ISPRAVLJEN** — u v1 je pogrešno modelovan kao FK na
+`Kupac`; šef je pojasnio da `IDKGrupniRacun` zapravo **pokazuje na `RacunId` samog grupnog
+računa** i upisuje se na originalne (storno) pojedinačne račune kad se grupni račun generiše. U
+v2 je ovo **self-FK `Racun.GrupniRacunId → Racun.RacunId`**.
+Brojevi: format `CompanyId-PartnerAccountingId-GGMM` (npr. `101-1234-1121`), čuva se kao
+formatirani tekst u `RBR`, ne kao zasebne kolone.
 
-**`RacunStavke`** (stavke fakture) — PK `IDRacunStavke`.
-FK: `ID_R` → Racun NOT NULL (potvrđeno ERROR_071, **stara baza ima gotov cleanup-upit za siročad — znak da FK nikad nije bio hard constraint**), `ID_RDOB` → Dobavljac_Racuni.IDTRRAC, `ID_O` → Objekti.
-**Napomena:** `lnkGR`, `ID_K`, `ID_SK` se ovde dupliraju sa `Racun` i **moraju** biti identični (ERROR_062/063/064 su čisto to i proveravaju) → u novoj šemi predlažem da se **ne dupliraju**, nego izvode JOIN-om na `Racun`, čime cela ta klasa grešaka postaje strukturno nemoguća. Ako postoji dobar razlog za denormalizaciju (npr. istorijski snapshot posle promene skupštine), **pitanje 3.5**.
+**`RacunStavke`** — **`lnkGR`/`ID_K`/`ID_SK` VRAĆENI** (sad `GrupaRacunaId`/`PartnerAccountingId`/
+`CompanyId` snapshot kolone) — namerna denormalizacija, potvrđeno pravilo (vidi sekciju 0, stavka
+2). **`TipObracunaId` UKLONJEN** — veza ide preko `DobavljacRacunId`.
 
->**Komentar** OVO MI NIJE JASNO  u novoj šemi predlažem da se **ne dupliraju**, nego izvode JOIN-om na `Racun`
----
+**`RacunObjekti`** → `RacunUnit` — bez izmene svrhe: veza računa sa jedinicama radi štampe (koje
+jedinice su obuhvaćene). Composite PK `(RacunId, UnitId)` ostaje dovoljan — nije potreban surogat.
 
-**`RacunObjekti`** — M:N most Racun↔Objekti (bez sopstvenog PK u exportu — dodati surogat PK ili composite PK).
+**`RacunStavkeBenefitArhiva`** — nepromenjeno.
 
->**Komentar** Da li je potreban PK, prilikom generisanja računa kreiraju se RacunSub tj. stavke računa ali ujedno je potreban informacija na osnovu koji Objekata / Units je kreiran račun da ni se informacija prikazala za printu
----
+**`BenefitGrupa`**, **`Benefiti`** — `PartnerAccountingId` umesto `KupacID`.
 
-**`RacunStavkeBenefitArhiva`** — arhiva stavki sa primenjenim beneficijama (isti oblik kao RacunStavke + PK `IDRacunStavke` NOT NULL).
+**`BenefitUpdate`** — **vraćena iz isključenih, AKTIVNA tabela.** Koristi se za jedinice koje ne
+plaćaju račune (benefit): generiše se račun, pa se stornira, a specifikacija iznosa pod
+beneficijom se prenosi ovde. PK `BenefitUpdateId`. FK `UnitId`→Unit (bivši tekstualni `UnitApp`).
+Kolone: `Datum`, `MesecYYMM` (bivši `YYMM`), `CountMM`.
 
-**`Benefiti`**, **`BenefitGrupa`** — FK `Benefiti.ObjekatID`→Objekti, `KupacID`→Kupac, `RacunId`/`RacunStornoID`→Racun, `BenefitGrupaId`→BenefitGrupa.
+**`KamatniList`** — `PartnerAccountingId` umesto `partnerID`, ostalo nepromenjeno.
 
-**`KamatniList`** (obračun zatezne kamate) — PK `IDKamList`. FK `IDSK`→Skustina, `partnerID`→Kupac, `prostorID`→Objekti, `IDGR`→GrupaRacuna.
+**`Stope`** — nepromenjeno. Kamatne stope se trenutno ručno unose; šef ima postojeći kod za
+automatsko preuzimanje sa NBS koji planira da prenese — **napomena za Fazu 4/5, ne menja šemu.**
 
 ### 2.3 Bankarski izvodi
 
-**`Izvod`** (zaglavlje izvoda) — PK `IzvodID`. FK `ID_SK`→Skustina (potvrđeno ERROR_009), `NalogZaKnjizenje`→Nalog.Br_Nalog.
-`Rasknjizen` (bit) — da li je izvod proknjižen u GK; **poslovno pravilo: kad je True, mora postojati potpuna, izbalansirana GK slika (ERROR_007, ERROR_014, ERROR_019)**.
+**`Izvod`**, **`IzvodStavke`** — `CompanyId` umesto `ID_SK`, `PartnerAccountingId` umesto
+`opt_lnk_Kupac`. **`ON DELETE CASCADE` na `IzvodStavke→Izvod` UKLONJEN** (vidi sekciju 0, stavka 5).
 
-**`IzvodStavke`** (stavke izvoda) — PK `ID`. FK `IzvodLNKID`→Izvod NOT NULL (potvrđeno ERROR_006), `ID_SK`→Skustina (mora se poklapati sa `Izvod.ID_SK`, ERROR_012), `opt_lnk_Kupac`→Kupac (mora se poklapati sa `GK.lnkKUPACID` povezane GK stavke, ERROR_013).
+**`TekuciRacun`** — `CompanyId`, `ManagerId` (bivši `IDUPRAVNIK`)→Staff. `IDPARTNER` ostaje
+pretpostavka (FK→`Partner`, ne `PartnerAccounting` — bankovni račun firme nije vezan za
+knjigovodstvenu ulogu).
 
-**`TekuciRacun`** (tekući računi/banke) — PK `IDTR`. FK `IDSZ`→Skustina, `IDUPRAVNIK`→Staff, `IDPARTNER`→Kupac (pretpostavka).
+**`PartnerTekuciRacuni`** (bivši `TRs`) — `PartnerId` (identitetski nivo, bankovni podaci partnera
+ne zavise od uloge/firme).
 
 ### 2.4 Knjigovodstvo / glavna knjiga
 
-**`GK`** (stavka glavne knjige — centralna tabela sistema) — PK `STAVKAID`.
-FK: `BR_NALOG`→Nalog.Br_Nalog NOT NULL, `lnkSkupstinaID`→Skustina NOT NULL, `lnkKUPACID`→Kupac, `lnkIzvodStavkaID`→IzvodStavke, `RACID`→Racun, `RDOB`→Dobavljac_Racuni.IDTRRAC (**stara baza koristi naziv `RDOB` za FK na `Dobavljac_Racuni.IDTRRAC` — nekonzistentno, u novoj šemi predlažem `DobavljacRacunId`**), `RacunIN_ID`→RacunIN, `KontoTroska`→Troskovi_PodKonta.PodKonto.
-**`SIFRAKONTA` je duplikat `lnkKUPACID`** (ERROR_043 to eksplicitno proverava) → **predlažem da se ne prenosi kao posebna kolona**, pitanje 3.4.
-**`DATUM` NOT NULL** (ERROR_902 lovi baš NULL datume kao grešku).
-**Najvažnije pravilo za dizajn:** svaki `Nalog` mora biti u ravnoteži — `SUM(DIZNOS) = SUM(PIZNOS)` za sve GK stavke tog naloga (ERROR_104). Ovo je kandidat za **trigger ili application-level transakcionu proveru pri knjiženju**, ne samo izveštaj-provera kao u staroj app.
+**`Nalog`** — **potpuno redizajnirano.**
+- `NalogId` `INT IDENTITY` (surogat, interni) — **razdvojen** od poslovnog broja.
+- `NalogNumber` — redni broj **po `CompanyId` po `Godina`** (godišnji reset), poseban od `NalogId`.
+- `CompanyId` **NOT NULL** (u v1 je greškom bio nullable — ispravljeno, nalog mora pripadati
+  jednoj skupštini/firmi).
+- `NalogStatus` — `Draft` / `Posted`. Draft je podrazumevano stanje pri unosu; retko se koristi
+  "rasknjiži" (unposted), uglavnom se sve unosi i stornira ako treba.
+- `UNIQUE(CompanyId, Godina, NalogNumber)`.
 
->**Komantar** SIFRAKONTA moŽe da se ukloni, RDOB je veza koja je sigurno korišćena za RacunIN_ID nisam siguran čemu služi. KontoTroska imenovati kao SubAccounting 
+**`GK`** — `PartnerAccountingId` umesto `lnkKUPACID`, `SubAccount` umesto `KontoTroska`.
+**Dodati nedostajući FK-ovi** (šef eksplicitno tražio): `Konto`→`Konta.Konto`, `TipStavke`→
+`TipStavke.ID_TIP`. **`RacunInId` UKLONJEN** (tabela `RacunIN` je napuštena). `SIFRAKONTA` ostaje
+uklonjena (potvrđeno dva puta — nikad se ne razlikuje od `lnkKUPACID`, izuzev konta koja nemaju
+partnera, npr. 4900, gde je nebitno).
 
+**KRITIČNA ISPRAVKA: trigger za ravnotežu naloga iz v1 je POGREŠAN I UKLONJEN.**
+V1 je predlagao `AFTER INSERT, UPDATE, DELETE` trigger na `GK` koji proverava ravnotežu posle
+**svake pojedinačne izmene**. Šef: "NALOG priilikom unosa ne sme imati triger, kontrola ravnoteže
+se tek radi kada se nalog pokuša proknjižiti... Triger ne sme da radi prilikom unosa stavki. Nalog
+ako nije proknjižen ne utiče na transakcije kao takve i on je tako reći u statusu DRAFT."
+**Novi dizajn:**
+1. Dok je `Nalog.NalogStatus = Draft`, GK stavke se slobodno unose/menjaju/brišu, **bez ikakve
+   provere ravnoteže** — nema trigera na svaki INSERT.
+2. Knjiženje (`Draft → Posted`) ide kroz posebnu operaciju (stored procedure ili aplikativna
+   transakcija, npr. `sp_PostNalog(@NalogId)`), koja: (a) izračuna `SUM(Diznos) - SUM(Piznos)` za
+   sve GK stavke tog naloga, (b) odbija knjiženje ako nije `0` (uz zaokruživanje na 2 decimale u
+   GK kontekstu — vidi pravilo o zaokruživanju), (c) tek ako je uravnoteženo, postavlja
+   `NalogStatus = Posted`.
+3. Poseban, jednostavan trigger (dozvoljen jer proverava samo status roditelja, ne agregira
+   sestrinske redove) **blokira dalje izmene GK redova** čiji `Nalog.NalogStatus = Posted` — ako
+   treba ispraviti proknjižen nalog, ide se kroz storno, ne kroz direktnu izmenu.
 
-**`Nalog`** (knjigovodstveni nalog/batch) — PK `Br_Nalog` (Double u exportu — **verovatno treba postati `INT IDENTITY`**, pitanje 3.7 jer je čudno da PK bude Double). FK `SZID`→Skustina.
-**Pravilo: sve GK stavke jednog naloga moraju pripadati istoj skupštini** (ERROR_027).
+**`SubAccount`** (bivši `Troskovi_PodKonta`) — dodato pravilo iz `pitanjaZaContext.md`: svaka
+transakcija ima `Konto` (2040/2410/4350...), a `SubAccount` daje hijerarhiju namene sredstava.
+Konkretno: **konto 2410 nikad nema `SubAccount`**; **konto 2040 ima `SubAccount` samo kad je u
+pitanju pretplata**; **konto 4350 ima `SubAccount` samo kad je privremeno kod partnera** (i tad
+mora biti vidljivo u error-listingu ako nedostaje).
 
-**`Troskovi_PodKonta`** (hijerarhijski šifarnik podkonta troškova, 2 nivoa: `SifraKnj_Prethodni` i grupe) — PK `PodKonto`. **Pravilo: svaki podkonto naveden kao `GK.KontoTroska` mora postojati ovde, i svaki podkonto mora imati validnog roditelja u hijerarhiji** (ERROR_101/102 — struktura tačne hijerarhije treba potvrditi sa korisnicom jer u exportu nema `TKONTO` kao fizičke tabele, već je to upit/view koji sažima `Troskovi_PodKonta`).
+**`SubAccountDefaultSupplier`** (bivši `Troskovi_PodKonta_DefDob`) — `DefaultSupplierPartnerAccountingId`
+umesto tekstualnog `DefDob`, sad prava FK veza.
 
-**`Troskovi_PodKonta_DefDob`** — podrazumevani dobavljač po skupštini/podkontu. FK `IDSZ`→Skustina, `Konto`→Troskovi_PodKonta.
+**`SemaKnjizenja`**, **`TemplateIzvodaKnjizenje`**, **`RacunStavke_Troskovi`**,
+**`KnjiznaDokumenta`**, **`Settings_eNalog`/`_Grupa`** — strukturno nepromenjeno, samo FK ciljevi
+ažurirani gde je relevantno.
 
-**`SemaKnjizenja`** (šema automatskog knjiženja — template pravila za generisanje GK naloga iz izvornih tabela) — konfiguracioni podaci, prenose se kao podaci, ne kao logika.
-
-**`TemplateIzvodaKnjizenje`** — slično, template za knjiženje izvoda.
-
-**`ZK`** — **nejasna namena, izgleda kao paralelna/starija verzija GK strukture (identične kolone kao GK). Pitanje 3.8: da li se ZK i dalje aktivno koristi, ili je to istorijski/napušten mehanizam?**
-
->**Komantar** ZK je privremena tabla ZateznaKamata, nakon obračuna kamate u tabeli ObračunKamate, kreira se ZK tabela iz koje prilikom izdavanja računa se uzima iznos kamate. Po knjiženju računa inicijalno se knjiži iz ove tabele ZK a može i iz računa. 
-
-**`RacunStavke_Troskovi`** — agregat stavki po troškovima (FK `ID_R`→Racun, `lnkGR`→GrupaRacuna, `ID_K`→Kupac, `ID_SK`→Skustina).
-
-**`KnjiznaDokumenta`** — PK `IDDokument`. FK `IDSZ`→Skustina, `IDKR`→? (pretpostavka: Dobavljac_Racuni ili KnjiznaDokumenta self), `NalogKN`→Nalog, `refFromIDDok`→KnjiznaDokumenta (self).
-
-**`Settings_eNalog`**, **`Settings_eNalog_Grupa`** — konfiguracija za e-nalog/e-fakturu format; prenose se kao podaci.
+**`ZK`** — **zadržana** (u v1 je bila pod znakom pitanja). Potvrđeno: privremena/radna tabela
+zatezne kamate. Nakon obračuna kamate (u `KamatniList`), kreira se `ZK` red; pri izdavanju računa,
+iznos kamate se uzima odatle. Inicijalno knjiženje ide iz `ZK`, ali može i direktno iz `Racun`-a.
 
 ### 2.5 Dobavljači
 
-**`Dobavljac_Racuni`** (ulazni računi dobavljača) — PK `IDTRRAC`.
-FK: `SK_ID`→Skustina, `DobavljacKonto`→**Kupac** (potvrđeno ERROR_032/042 — dobavljači se vode kao zapisi u `Kupac` sa odgovarajućim `Tip`, ne u posebnoj tabeli), `KontoKnjizenja`→Konta, `TipObracuna`→TipObracuna, `PrethodniIDRdob`/`NoviIDRdob`→Dobavljac_Racuni (self, verovatno lanac izmena/storniranja).
-**Pravilo: mora imati i `SK_ID` i `DobavljacKonto` popunjene, ili mora već postojati u GK preko `RDOB`** (ERROR_030) — inače je "nepotpun/neproknjižen" ulazni račun.
+**`Dobavljac_Racuni`** — `CompanyId` umesto `SK_ID`, `DobavljacPartnerAccountingId` umesto
+`DobavljacKonto`. Ostalo nepromenjeno.
 
-**`Dobavljaci_Racun_TipObjekta`** — M:N most Dobavljac_Racuni↔TipObjekta (raspodela troška po tipu objekta).
+**`Dobavljaci_Racun_TipObjekta`** — nepromenjeno.
 
-**`RacunIN`** — drugačiji/stariji oblik ulaznog računa (kolone se preklapaju sa `Dobavljac_Racuni` ali nisu identične). **Pitanje 3.9: da li je `RacunIN` prethodnik `Dobavljac_Racuni` (napušten) ili se oba i dalje koriste paralelno?**
-
-
->**Komantar** RacunIN je napustena tabla
+**`RacunIN`** — **UKLONJENA U POTPUNOSTI.** Potvrđeno napuštena, nije korišćena paralelno.
 
 ### 2.6 Opomene
 
-**`GrupaOpomena`** — PK `IDGrupaOpomena`. FK `lnkSablonOpomene`→OpomenaSabloni, `IDSZ`→Skustina, `lnkGrupaRacuna`→GrupaRacuna.
-**`Opomena`** — PK `IDOpomena`. FK `lnkGrupaOpomena`→GrupaOpomena, `lnkKupac`→Kupac.
-**`OpomenaStavke`** — PK `IDOpomenaStavka`. FK `lnkOpomena`→Opomena, `lnkIDGO`→GrupaOpomena, `lnkKupacID`→Kupac, `IDRacun`→Racun.
-**`OpomenaSabloni`** — PK `IDOpomenaSablon`. Template tekstova za štampu opomena — sadržaj (Text/Memo polja), ne treba menjati strukturu.
+**`GrupaOpomena`**, **`Opomena`**, **`OpomenaStavke`** — `PartnerAccountingId` umesto `lnkKupac`/
+`lnkKupacID`, `CompanyId` umesto `IDSZ`, ostalo nepromenjeno.
 
+**`OpomenaSabloni`** — nepromenjeno.
 
-
+**`OpomenaSablonEx`** — **vraćena iz isključenih.** Rad u toku: fleksibilna opomena sa tekstovima
+koji mogu da se menjaju. FK `OpomenaSablonId`→OpomenaSabloni, kolone `KeyName`, `KeyIndex`,
+`SablonText`.
 
 ### 2.7 Virman / plaćanja
 
-**`Virman`** (nalog za prenos) — PK `IDVirman`. `refSourceID`+`refSourceTag` je **polimorfna referenca** (tag određuje na koju tabelu ID pokazuje — verovatno Racun ili Dobavljac_Racuni) — u SQL Serveru nema prirodan FK za ovo; predlažem da ostane kao par kolona sa aplikativnom validacijom, ili da se razdvoji u tipizirane FK kolone ako se utvrdi da `refSourceTag` ima mali, poznat skup vrednosti.
-
->**Komantar** Ovo je preuzeta tabela iz druge applikacije, tabla koja se generiše da bi se odštampala uplatnica za plaćanje ulaznog računa, ili generisao QR code ili napravila list za plaćanje za verifikaciju u banci.
-
+**`Virman`** — nepromenjeno. Potvrđena namena: tabela preuzeta iz druge aplikacije firme, generiše
+uplatnicu/QR kod/list za plaćanje ulaznog računa radi verifikacije u banci. Polimorfna referenca
+(`RefSourceId`+`RefSourceTag`) ostaje kao par kolona sa aplikativnom validacijom.
 
 ### 2.8 Mail
 
-**`Mail`** — PK `IDeMail`. FK `IDPartner`→Kupac.
-**`Mail_Send`** — PK `IDMail`. Queue slanja; `DateSend IS NULL AND ErrorStatus IS NULL` = zaglavljen u redu (ERROR_022 — korisno kao status-view u novom sistemu, ne kao "greška" koju treba sprečiti šemom).
-**`Mail_Send_Attachment`** — FK `IDMail`→Mail_Send.
-
-
-
+**`Mail`** — `PartnerId` (identitetski nivo — mejl adresa ne zavisi od knjigovodstvene uloge).
+**`Mail_Send`**, **`Mail_Send_Attachment`** — nepromenjeno.
+**Napomena o infrastrukturi** (ne menja šemu): trenutno POP3 za slanje, kod nekih korisnika Gmail
+sa OAuth2; izvodi se preuzimaju automatskim skeniranjem foldera za XML fajlove — ovo je
+integraciona odluka za Fazu 4/5, `Settings_eMail` (per `CompanyId`) već pokriva potrebu za
+konfiguracijom po firmi.
 
 ### 2.9 Fajlovi
 
-**`Files`** — PK `IDDokument`. `IDRefItem`+`TabSource` je opet polimorfna referenca (kao Virman) — ista napomena važi.
-
->**Komantar** Tabla jeste pravljena kao polimirfna referenca, definise se TabSource i odgovarajući Id..... npr Partner i njegov Id čime se dinamički definise na koju tabelu se odnose podaci kao digitalna arhiva Partnera....
-
-
-### 2.10 Sistem / auth / audit
-
-**`Staff`** — korisnici. **`Lozinke su plain-text u izvoru — ne prenositi 1:1, heširati (bcrypt/ASP.NET Identity), planirati reset lozinki.`** (već navedeno u CLAUDE.md, ponavljam ovde jer direktno utiče na šemu — kolona `StaffLogin`/lozinka se ne kopira, nova tabela `AspNetUsers` ili ekvivalent.)
-**`StaffPermition`** — permisije po korisniku/formi — u novom sistemu verovatno postaje role/claims-based auth, ne 1:1 kopija (forme više ne postoje kao Access forme).
-**`UserLevelList`** (iz `aj_fn_cmn.mdb`) — nivoi ovlašćenja, spaja se sa Staff.
-**`_Log`** — audit log; FK `UserID`→Staff.
-**`Promene`** — log izmena (change requests) — FK `IDK`→Kupac, `IDO`→Objekti.
-**`Notes`** — slobodne beleške.
-**`Settings`**, **`Settings_eMail`**, **`Settings_FormGrid`** — konfiguracija; `Settings_FormGrid` je Access-specifično (memorisan raspored kolona u gridovima) — **ne prenosi se**, React ima svoj mehanizam za to ako uopšte treba.
-
-
->**Komantar** Tablea Promene se menja u Events i nije systemska tabela već se vrši unos zahteva korisnika, promena poput zahtev za promenu emaila, ko je i kad podeno i kad je odobreno i kad je proknjizeno ....takođe i promene statusa objekata ili slično ili podaci koje korisnik želi da promeni a zahteva određeni tok processa odobravanja.....
-
-## 3. Otvorena pitanja za korisnicu
-
-Ovo su tačke gde sam morala da pretpostavim nešto na osnovu JOIN-ova/imenovanja, a ne iz
-eksplicitnog izvora — pre generisanja migracije treba potvrditi:
-
-1. **Kupac vs. Dobavljač** — `Dobavljac_Racuni.DobavljacKonto` pokazuje na `Kupac.ID_K`, što znači da se dobavljači vode kao zapisi u `Kupac` sa `Tip`-om. Da li u novoj šemi zadržati jedinstvenu tabelu `Partner`/`Kupac` sa diskriminatorom (verniji prenos, manji rizik), ili razdvojiti u dve tabele (čistije modelovanje, ali zahteva migracionu odluku o tome gde je granica)?
-
->**Komentar:** Usvojiti eng. fraze za imenovanje tabela i polja.
-InvoiceSupplier
-Dobavljac_Racuni.DobavljacKonto je sad partnerId i upućuje na PartnerAccounting tabelu gde je partnerAccount polje Account sa vrednoštu 4350 za dobavljače
-
-
-
-2. **`Kupac.IDMaster`** i **`IDGrupniRacunMaster`** (oba self-reference) — koja je razlika između ova dva mehanizma grupisanja kupaca/računa? (npr. "master" vlasnik firme sa više stanova vs. grupno fakturisanje jednom platiocu)
-
->**Komentar:** Kupac.IDMaster je master vlasnik firme sa više stanova ali ovo ukidamo
-IDGrupniRacunMaster je mehanizam za kreiranje grupnog računa i koristi se tako što recimo 9 Kupaca imaju Units vezu i  IDGrupniRacunMaster upisan 1731 gde taj Id nema nikakvu vezu sa Units. Racuni se normalno kreiraju za 9 kupaca ali onda radi se funkcija za GrupniRacun gde se kreira novi račun i vezuje za tih 9, i podeban izveštaj računa kreiraju se stavke zbirno i ukupno svih 9. Izvorni računi se storniraju. Na tih 9 kupaca nema dugovanja, svaki mesec su iznosi i stornirano a potraživanja se nalazae na IDGrupniRacunMaster
-
-
-3. **`Objekti.PLATILAC_lnk_ID_K`** vs **`PLATILAC_lnk_ID_K2`** — zašto dva platioca po objektu? Da li je jedan primarni a drugi rezervni, ili se koriste istovremeno (npr. podela troška)?
-
->**Komentar** Da, postoji opcija podele korišćenja. Npr. Kompanija koristi garažno mesto u periodu od 9-17h a stan koristi privatno lice. Račun se deli u odnosu na korišćenje tj, 1/3 companija a 2/3 fizičko lice. Ovo je za sad samo pokušano idejno rešenje planiram da odustanem već da se jedinica unese 2 puta sa koficijento računanja k2 .3333 i .6666
-Zako da PLATILAC_lnk_ID_K2 je BRISE.
-
-4. **`GK.SIFRAKONTA`** — potvrđeno je da mora biti identično `lnkKUPACID` (ERROR_043). Da li postoji slučaj gde se razlikuju u praksi (npr. istorijski podaci pre neke izmene), ili je sigurno da se kolona može izbaciti iz nove šeme?
-
->**Komentar** Nikad se ne razlikuje, postoji mogućnost da konta koja nemaju lnkKUPACID nose SIFRAKONTA npr 4900 konto ali definitivno je nebitno BRISI.
-
-5. **Denormalizacija `RacunStavke.lnkGR/ID_K/ID_SK`** — ERROR_062/063/064 postoje baš zato što se ove kolone znaju razminuti sa `Racun`. Da li postoji poslovni razlog da stavka "zamrzne" svoju skupštinu/kupca nezavisno od zaglavlja (npr. promena vlasništva posle izdavanja računa), ili je ovo čisto istorijska Access navika (denormalizacija radi brzine upita bez indeksa) koju nova šema treba da ukloni?
-
->**Komentar** Postoji mogucnost da nakando se menja kome se izdaje račun, kasno stigo kupoprodajni ugovor itd, ovo se ručno menjalo u bazi i iz tog razloga je ova kontrola.
-
-6. **Preciznost zaokruživanja novca** — stara baza meša 2 i 4 decimale zaokruživanja u različitim proverama (ERROR_014 koristi `Round(...,4)` pa `Round(...,2)`, ERROR_104 samo `Round(...,2)`). Koji je ispravan poslovni standard: interni obračun na 4 decimale i zaokруживanje na 2 samo za prikaz/uplatnicu, ili se svuda radi na 2 decimale?
-
->**Komentar** Zakruživanje se radi na 4 i 2 decimale zavisi šta. 
-Računi - ukupni iznosi su na 2 decimale, međutim Kurs je na 4 decimale kao i stavke računa pre konačne sume su na 4 decimale a konačne sume na 2 decimale.
-U GK sve transakcije bi trebalo na 2 decimale.
-Radi sigurnosti, radimo sve u GK na 4 decimale, u računima konačne sume na 2 decimale.
-
-7. **`Nalog.Br_Nalog` je tipa Double** u exportu, iako se ponaša kao PK/broj naloga. Da li su to zaista celi brojevi (pa prelazi bez rizika u `INT IDENTITY`), ili postoji format sa decimalnim delom (npr. `123.1` za storno/anex istog naloga)?
->**Komentar** ne celi brojevi samo i to redni brojevi po companyId (bivši SZID)
-
-
-8. **Tabela `ZK`** — ima skoro identičnu strukturu kao `GK` ali drugo ime. Da li se i dalje aktivno koristi (paralelna knjiga za nešto specifično — možda "zajednička kasa" ili "založena kotizacija"?), ili je napuštena/istorijska?
-
->**Komentar** Već objašnjeno da je to privremena tabela Zatezne kamate pre knjiženja u raćuna u GK. 
-
-
-9. **`RacunIN` vs. `Dobavljac_Racuni`** — obe liče na "ulazni račun". Da li je `RacunIN` stariji, napušten oblik, ili se i dalje koristi za nešto specifično (možda računi bez punog dobavljačkog workflow-a)?
-
->**Komentar**  RacunIN - napušteno
-
-10. **Dinamički izveštaji/statistike** (`tblIzvestaj`, `tblIzvestajSub`, `tblSifrarnik`, `tblSifrarnikSub`, `tblAnaliza`, `tblSTATS`, `tblWhrEx`, `tblShortList`) — ovo je Access-ov interni "generic report/filter builder" (SQL teksta se čuva u koloni i izvršava dinamički). Da li se ovo u praksi svakodnevno koristi za ad-hoc analize (pa novi sistem treba sličan generički mehanizam), ili je uglavnom zamenjeno sa fiksnim skupom izveštaja iz Faze 5 projektnog brief-a?
-
->**Komentar**  tblIzvestaj - koristi se svi izveštaji vrčo često i često se unose ovi SQL-ovi za dobije izveštaja. Treba napraviti i u novom sistemu mogućnost dinamičkih izveštaja ali svakako treba iskoristiti priliku i napraviti čistoću i red u svemu. 
-tblAnaliza  - koristi sve SQL koji počinju sa ERROR i prikazuju podatke koje imaju greške. Vrlo često se koristi. I bez obzira što će nivi sistem imati pravila ako se tokom rada naiđe na grepku ovde se pravi SQL upit koji se automatski pokreće i prikazuje ako se grepka ponovoila.
-tblSTATS - korisiti se za statističke preglede - pregrojavanje, uglavnom napušteno jer je sve prebačeno u tblIzvestaj
-tblWhrEx - koristi se u formama kao dinamički upiti za generisanje podataka, akcije itd.
-tblShortList - Koristi se kao univerzalana tabela kako ne bi pravio 50 sitnih slicnih tabela poput ID, Naziv, Vrednost-....
-
-11. **`ugovori`** tabela — kolone (`Field16`, `Field37`, `Field51`, datumi vezani za 2018/2019...) izgledaju kao jednokratni uvoz iz Excel-a za specifičnu kampanju prelaska ugovora, ne kao tekuća operativna tabela. Potvrditi da se ignoriše u novoj šemi (u skladu sa CLAUDE.md pravilom o privremenim tabelama), ili je i dalje referentna?
-
->**Komentar**  ugovori - Ovo ćeno koristiti, sad će se zvati Contract i biće veza izmedju Units, PartnerAccounting i pored ovih Id imaće Datum preuzimanja - StartInvoicingDate , Datum Prekida - EndInvoicingDate, Datum početka i isteka ugovora, Napomena kao i status ugovora. 
-
-## 4. Tabele isključene iz predloga (privremene/backup/probne)
-
-Po pravilu iz CLAUDE.md ("ignoriši očigledno privremene/backup/probne objekte"):
-
-`GK_TMP` (obe verzije — data.mdb i SZAPP.mdb), `GK_PRK`, `GK_PS`,
-`GK_20250531_backup_p24_bEFOREUpravljanjeSplit`, `GK_20250531_backup_p24_UpravljanjeSplit`,
-`StaffTMP` (sve tri verzije), `Table1` (obe verzije — sadržaji nemaju veze jedna s drugom, čisto
-scratch tabele), `IMPORT_BENEFIT`, `IMPORTKV`, `PRENOS`, `TEMP_GEN`, `Paste Errors`,
-`tblSTATS_update_tblstat`, `PrinterBinLOCAL` (obe verzije), `_TableList`,
-`BenefitUpdate` (**pitanje: verovatno batch-log, ali proveriti pre brisanja**),
-sve `*-STRUKTURA` tabele iz `aj_fn_cmn.mdb` (očigledno backup-kopije šeme, ne podataka),
-`Functions`, `References`, `_TextFunction`, oba `VERSION-HISTORY` (infrastruktura Access dodatka,
-zamenjuje se standardnim tooling-om/git istorijom).
-
-`Switchboard Items` (sve tri verzije) — Access meni sistem, zamenjuje se React navigacijom, ne
-prenosi se.
-
->**Komentar**  React nabigacija bi bilo dobro da dolazi iz baze podataka. PrinterBinLOCAL se koristilo kao lokalna tabela u koju bi se pakovali podaci Id od odredjenih tabla da bi se generisali podaci npr, svi Id računa koji je posle vrši određene radnje, grupni PDF, pojedinačni PDF, slanje emaila itd. To je bio kao npr Kanta za skupljanje podataka i nakon što se završi sa unosom vrše se razne radnje.
-Mislim da je ovo dobra praksa koju treba zadržati i u novom sistemu. 
-
-## 5. Poslovna pravila izvučena iz `ERROR_*` upita (~70 upita)
-
-Grupisano po domenu. Za svako: šta upit otkriva kao "grešku" i predlog kako to postane
-validacija/constraint/test u novom sistemu.
-
->**Komentar**  Tako je, Sa tim što je poželjno da SQL bude upisa u tabeli i da može da se vrši unos novih SQL-ova i da se na osnovu njega dinamički generiše izveštaj. Nema poteba da budu kreirani kao view. Inače svi ERROR koji su trenutno u upotreni su u tabeli tblAnaliza
-
-### 5.1 Bankovni izvod ↔ GK usklađenost
-
-- **ERROR_001** — Suma `(Odobrenje − Zaduzenje)` na stavci izvoda mora biti jednaka sumi `(PIZNOS − DIZNOS)` svih GK stavki povezanih preko `lnkIzvodStavkaID`. → Provera pri knjiženju izvoda (transakciona), ne samo naknadni izveštaj. 
-
-
-
-- **ERROR_003** — Stavke izvoda bez ijedne povezane GK stavke = "na čekanju za knjiženje" (normalno prelazno stanje, ne kvar) → status polje / filter u UI, ne error.
-
->**Komentar**  Ovo su karakteristike Bankovnih izvoda koji čekaju na knjiženje. Znači da su u unosu i da još nisu knjiženi.
-
-- **ERROR_006** — `IzvodStavke` bez roditeljskog `Izvod` (osirotele) → `IzvodLNKID` mora biti `NOT NULL FK`.
-
->**Komentar**  Izvod mora imati roditeljski Izvod. Neće biti omogućen unos i knjiženje bez povezivanja sa Izvodom.
-
-- **ERROR_007** — Izvod markiran `Rasknjizen=True` (proknjižen) ali ima stavke bez GK zapisa → nekonzistentno stanje, znači da se `Rasknjizen` ne sme postaviti dok knjiženje nije kompletno (aplikativna invarijanta, po mogućstvu transakciona).
-
->**Komentar**  Da, tako je.
-
-- **ERROR_008** — Kontrolna suma: `SUM(Zaduzenje)=Izvod.Duguje`, `SUM(Odobrenje)=Izvod.Potrazuje`, i broj stavki mora odgovarati `NalogaZaduzenja+NalogaOdobranja`. → Provera pri unosu/importu izvoda.
-
->**Komentar**  Da, tako je.
-
-- **ERROR_009 (IZVOD-NEPOSTOJECA-SZ)** — `Izvod.ID_SK` mora postojati u `Skustina` → standardni FK constraint.
-- **ERROR_014 (IZVOD-NALOG-SUMA-NIJE-NULA)** — Za proknjižene izvode, `SUM(DIZNOS − PIZNOS)` svih GK stavki vezanih za taj `Nalog` mora biti `0` → nalog mora biti u ravnoteži (specijalan slučaj opštijeg pravila iz 5.3/ERROR_104).
-- **ERROR_019** — Suma `Odobrenje/Zaduzenje` po stavkama izvoda mora odgovarati sumi `DIZNOS/PIZNOS` na kontu **2410** u GK za isti nalog.
-- **ERROR_103** — GK stavke na kontu **2040** sa `TIP_STAVKE=1` moraju imati `lnkIzvodStavkaID` popunjen (≠0) → svaka takva stavka mora biti vezana za konkretnu stavku izvoda, ne sme ostati "visеća".
-
-### 5.2 Organizaciona konzistentnost (Skupština/Kupac/Objekat)
-
-- **ERROR_002 / ERROR_009b (IZVOD-STAVKE-U-GK-POGRESNA-SZ-KORISNIKA) / ERROR_011** — `GK.lnkSkupstinaID` mora biti jednako `Kupac.lnk_ID_SK` kupca na toj stavci (kad `Kupac.lnk_ID_SK ≠ 0`) → GK zapis mora pripadati istoj skupštini kao kupac.
-- **ERROR_004** — GK stavka (preko izvoda) referencira `lnkKUPACID` koji ne postoji u `Kupac` → standardni FK.
-- **ERROR_005** — Kupac (`ID_K < 8000`, tj. isključuje interne/dobavljačke šifre iznad 8000 — **potvrditi prag sa korisnicom**) bez ijednog `Objekti` zapisa → svaki "pravi" kupac mora imati bar jednu nekretninu.
-- **ERROR_010** — GK stavke gde je `lnkSkupstinaID=0` za postojećeg kupca → treba sprečiti unosom (obavezno polje), ne dozvoliti sentinel 0.
-- **ERROR_012** — `Izvod.ID_SK` mora biti isto što i `IzvodStavke.ID_SK` za povezane redove.
-- **ERROR_013** — `IzvodStavke.opt_lnk_Kupac` mora biti isti kupac kao `GK.lnkKUPACID` povezane GK stavke.
-- **ERROR_020** — `Objekti.lnkSkupstinaID` mora biti isto što i `Kupac.lnk_ID_SK` vlasnika objekta.
-- **ERROR_043** — `GK.lnkKUPACID` mora biti jednako `GK.SIFRAKONTA` → potvrđuje da je `SIFRAKONTA` redundantna kolona (vidi pitanje 3.4).
-
-### 5.3 Fakturisanje (Racun/RacunStavke/GrupaRacuna) i GK ravnoteža
-
-- **ERROR_060** — `Racun.ID_K`, `ID_SK`, `lnkGR` ne smeju biti `0` → sve tri FK kolone obavezne, bez sentinel vrednosti.
-- **ERROR_062/063/064** — `RacunStavke.lnkGR`/`ID_SK`/`ID_K` moraju odgovarati vrednostima na roditeljskom `Racun` → kandidat za uklanjanje denormalizacije (pitanje 3.5).
-- **ERROR_065/066** — GK stavke knjižene po računu (`GK.RACID`) moraju imati `lnkSkupstinaID`/`lnkKUPACID` isti kao `Racun.ID_SK`/`ID_K`.
-- **ERROR_070 + \_EXECUTE** — `GrupaRacuna` bez ijednog `Racun`-a → stara app ima **gotov DELETE cleanup upit** (naziv sadrži "ADELL" = auto-delete) → ovo se tretira kao rutinsko smeće koje se periodično čisti, ne kao alarm.
-- **ERROR_071 + \_EXECUTE** — `RacunStavke` bez roditeljskog `Racun`-a → isto, ima gotov DELETE cleanup. U novoj šemi: `ID_R` mora biti `NOT NULL FK` sa `ON DELETE CASCADE`, čime cela ova klasa grešaka postaje strukturno nemoguća.
-- **ERROR_081/082/083/084/085** — Kontrolni zbirovi: suma `Racun.Ukupno` po `GrupaRacuna` mora se slagati sa knjiženim iznosima na kontima **2040/4350/4900/5590** u GK. (`ERROR_081` je hardkodovan na `ID_SK=101` — vidi se da je bio ad-hoc debug upit za jednu skupštinu, ne generička provera; treba parametrizovati u novom sistemu.)
-- **ERROR_101/102** — `GK.KontoTroska` mora postojati u šifarniku `Troskovi_PodKonta`, i taj podkonto mora imati validnog roditelja u hijerarhiji (grupe) → FK + provera kompletnosti hijerarhije šifarnika.
-- **ERROR_104 (NALOG_RAVNOTEZA)** — **Najvažnije pravilo za GK integritet**: za svaki `Nalog`, `SUM(DIZNOS) = SUM(PIZNOS)` (dvojno knjigovodstvo mora biti u ravnoteži). Predlažem trigger ili obaveznu transakcionu proveru pri svakom knjiženju u novom sistemu, ne samo naknadni izveštaj.
-- **ERROR_023 (GK4350_KONTOTROSKANULL)** — GK stavke na kontu **4350** moraju imati popunjen `KontoTroska` (ne sme biti NULL).
-- **ERROR_023/024 (RACUN_STORO_PROKNJIZEN_PLACEN)** — Za stornirane račune (`Storno=True`), GK stavke na kontu **2040** vezane za taj račun moraju imati `SUM(DIZNOS)=0` i `SUM(PIZNOS)=0` → storniran račun ne sme ostaviti trag salda u GK.
-- **ERROR_027** — Jedan `Nalog` ne sme obuhvatati GK stavke iz više od jedne skupštine.
-- **ERROR_075/033** — Duplikat-provera: isti `RDOB` (ulazni račun dobavljača) ne bi trebalo da se pojavi knjižen više puta u različitim nalozima/skupštinama grupisano — koristi se za otkrivanje dvostrukog knjiženja istog ulaznog računa.
-
-### 5.4 Dobavljači (`Dobavljac_Racuni`)
-
-- **ERROR_030** — `Dobavljac_Racuni` bez `SK_ID` ili bez `DobavljacKonto`, a nema ni GK zapisa → nepotpun/neproknjižen ulazni račun.
-- **ERROR_031/041** — `Dobavljac_Racuni.SK_ID` referencira obrisanu `Skustina` → FK integritet.
-- **ERROR_032/042** — `Dobavljac_Racuni.DobavljacKonto` referencira nepostojećeg `Kupac` zapisa → **potvrđuje da se dobavljači vode kao red u `Kupac`** (vidi pitanje 3.1).
-- **ERROR_033** — Duplikat provera po `IDTRRAC` grupisano po nalogu/kontu → višestruko knjiženje istog ulaznog računa.
-
-### 5.5 Ostalo
-
-- **ERROR_021 + \_FIX** — `GK.DATUM` na fakturnim nalozima treba da bude jednako `GrupaRacuna.DatumPrometa` — stara app ima **gotov UPDATE-fix upit** (auto-heal), što znači da je ovo poznat, rutinski data-drift koji se ispravlja, ne stroga invarijanta koja se sprečava unosom. U novom sistemu: izvesti `GK.DATUM` iz `GrupaRacuna.DatumPrometa` automatski pri knjiženju, čime drift postaje nemoguć.
-- **ERROR_022** — `Mail_Send` zapisi bez `DateSend` i bez `ErrorStatus` = "zaglavljeni" u redu za slanje → status/health-check u novom mail sistemu, ne šematska greška.
-- **ERROR_902** — GK stavke bez `DATUM` → obavezno polje (`NOT NULL`).
-- **ERROR_901 (A/AB/AC)** — `Nalog` koji ima povezan više od jednog `Izvod` zapisa (normalno očekivanje: 1:1) → anomalija za ručnu istragu, ne strogo pravilo (nema `_EXECUTE`/`_FIX` varijantu, znači se ne rešava automatski).
-- **ERROR_015/016/017/018** — Grupa provera oko GK konta **"204x"** (subkonto po `RDOB`+`DOK`+partner mora imati usklađen saldo — ne sme imati istovremeno i pozitivan i negativan iznos na istoj "kartici", i mora imati `DATUM`+`DPO` popunjeno). Ovo verovatno odgovara kontu tipa "kupci/dobavljači u prolazu" iz srpskog kontnog plana — **tačna poslovna semantika 204x grupe treba potvrdu (pitanje van liste 3.x — dodati ako zatreba tokom Faze 2 VBA analize)**.
-
-## 6. Predlog sledećeg koraka
-
-1. Prođemo kroz sekciju 3 (11 otvorenih pitanja) — u razgovoru, ne nagađanjem.
-2. Na osnovu odgovora, finalizujem DDL (`CREATE TABLE` skripte) za SQL Server 2025 + EF Core
-   entitete, tabelu po tabelu iz sekcije 2.
-3. Pravila iz sekcije 5 pretvorim u konkretnu listu: (a) DB-level constraint/trigger, (b)
-   application-level validacija, (c) automatski test nad migriranim podacima (ETL sanity
-   check) — sa jasnom oznakom za svako koje je od ta tri.
-4. Tek posle toga — generisanje EF Core migracija i početak ETL-a (Faza 3 iz project-brief.md).
-
-Ovaj dokument **ne uvodi nikakav kod** — čisto je predlog šeme i lista pravila na pregled.
-
-## 7. Predložena struktura projekta (repo layout)
-
-Repozitorijum ostaje monorepo (backend + frontend + docs zajedno, kao sada). Namerno **bez**
-Clean Architecture/CQRS/MediatR slojeva — CLAUDE.md eksplicitno traži jednostavnost i kod koji
-korisnica može lako da prati; za ovaj obim (jedna firma, desetine hiljada redova) to bi bilo
-prekomplikovano bez realne koristi.
+**`Files`** — nepromenjeno; polimorfna referenca (`TabSource`+`RefItemId`) potvrđena kao
+namerna (npr. digitalna arhiva partnera). **Otvoreno:** gde fajlovi fizički žive (trenutno se
+uopšte ne čuvaju) — implementaciona odluka za Fazu 4, ne blokira šemu.
+
+### 2.10 Selekcije za batch operacije (nova, bivša isključena tabela)
+
+**`SelectionBasket`** (bivši `PrinterBinLOCAL`, **vraćena iz isključenih** — šef: "dobra praksa,
+treba zadržati"). PK `SelectionBasketId`. FK `StaffId`→Staff.
+Kolone: `TargetTable` (NVARCHAR, npr. naziv tabele/entiteta), `TargetId` (INT), `BatchTag`
+(NVARCHAR NULL, opciona oznaka serije), `CreatedDate`.
+Namena: "korpa" u koju se skupljaju ID-jevi zapisa (npr. svi računi za grupni PDF, masovni email)
+pre nego što se pokrene batch operacija.
+
+### 2.11 Sistem / auth / audit
+
+**`Staff`** — nepromenjeno (lozinke i dalje idu kroz ASP.NET Core Identity, ne 1:1 kopija).
+
+**`StaffCompany`** (**nova tabela**) — rešava eksplicitno potvrđen zahtev za multi-tenant
+vidljivost. PK composite `(StaffId, CompanyId)`. FK oba polja. Definiše koje `Company` zapise dati
+korisnik sme da vidi.
+
+**`StaffPermition`** — **model ovlašćenja je namerno odložen.** Šef: plan je `root`, `upravnik`,
+`moderator` (radi za upravnika), `review`, `stanari` (verovatno posebna, pojednostavljena
+aplikacija) — ali "ostavljeno za budućnost, da se izbegne posao prerade." U v2 šemi
+`StaffPermition` ostaje kao fleksibilna tabela, ali se **ne pokušava mapirati 1:1** na stare
+Access forme — finalni model uloga čeka Fazu 4/5.
+
+**`UserLevelList`** — nepromenjeno, informativno do finalizacije modela uloga.
+
+**`AuditLog`** (bivši `_Log`) — dodato: `CompanyId` (NULL — neke akcije su cross-company),
+`CorrelationId` (`UNIQUEIDENTIFIER` NULL). **Insert-only** — aplikativna rola za pisanje u ovu
+tabelu ne sme imati UPDATE/DELETE.
+
+**`Events`** (bivša `Promene`) — **nije sistemska tabela**, nego workflow korisničkih zahteva
+(npr. zahtev za promenu emaila, promena statusa jedinice) sa tokom odobravanja: ko je i kad
+podneo, ko je i kad odobrio, kad je proknjiženo. Dodato: `StatusId` (šifra: Zahtevano/Odobreno/
+Odbijeno/Proknjiženo), `ApprovedByStaffId`→Staff NULL, `ApprovedDate` NULL.
+**Otvoreno (O-3, sekcija 4):** tačan skup statusa i koraka odobravanja nije potpuno specificiran —
+gornji predlog je razuman minimum, treba potvrditi pre finalnog DDL-a.
+
+**`Notes`**, **`Settings`** — nepromenjeno.
+
+**`Settings_eMail`** — `CompanyId` umesto `SZID`. **Bezbednosna napomena:** `SettingVal` može
+sadržati lozinke/tokene za mejl naloge — ovo **ne sme** ostati u običnoj tabeli u čistom tekstu.
+Preporuka: čuvati tajne kroz ASP.NET Core user-secrets/Key Vault (ili bar enkriptovanu kolonu), ne
+u `SettingVal`. **Ovo je bezbednosni zahtev, ne opciona preporuka — mora biti rešeno pre nego što
+se ova tabela stvarno napuni produkcionim kredencijalima.**
+
+## 3. Konkurencija i sledljivost (novi zahtevi, nisu bili u v1)
+
+- **`RowVersion`** (`ROWVERSION`/`TIMESTAMP`) dodat na `Nalog`, `Racun`, `Izvod`, `IzvodStavke` —
+  optimistička konkurencija za dokumente koji se uređuju pre knjiženja/uparivanja.
+- **`LegacyId`** (`NVARCHAR(50) NULL`) dodat na glavne migrirane tabele (`Company`, `Partner`,
+  `PartnerAccounting`, `Unit`, `Racun`, `GK`, `Nalog`, `Izvod`, `Dobavljac_Racuni`, ...) — čuva
+  originalni Access ID radi sledljivosti/mapiranja pri ETL-u. Šef već koristi princip "TransferId"
+  u staroj bazi — isti princip se prenosi.
+
+## 4. Preostala otvorena pitanja (nisu rešena ni u v1 ni u razmeni komentara)
+
+Ranija lista od 11 pitanja iz v1 je **u potpunosti rešena** (odgovori uneti kroz ceo dokument
+iznad, izvor `pitanjaZaContext.md`). Ostaju sledeća, novootvorena ili delimično rešena pitanja
+pre nego što se pusti finalni DDL i počne implementacija:
+
+- **O-1 (zaokruživanje).** Metod zaokruživanja (standardno vs. bankarsko/kombinovano) nije
+  konačno odlučen — šef izražava sumnju u standardno, ali nije potvrdio zamenu. Treba odluka pre
+  implementacije obračuna računa i kamate, jer utiče na testove/tolerancije.
+- **O-2 (`Partner.GrupniRacunGrupaId`).** Da li ta vrednost referencira postojeći `Partner` zapis
+  (npr. "master" primalac grupnog računa) ili je čisto proizvoljna grupna oznaka bez FK cilja?
+  Utiče na to da li kolona dobija `FOREIGN KEY` ili ostaje običan `INT`/`NVARCHAR` tag.
+- **O-3 (`Events` workflow).** Tačan skup statusa i koraka odobravanja (ko sme da odobri šta,
+  da li ima više nivoa odobravanja) nije specificiran — predložen minimalan model
+  (`StatusId`/`ApprovedByStaffId`/`ApprovedDate`) čeka potvrdu.
+- **O-4 (`Contract.PartnerAccountingId` vs `PartnerId`).** Pretpostavljeno `PartnerAccountingId`
+  radi doslednosti sa ostatkom šeme — nije eksplicitno potvrđeno od šefa.
+- **O-5 (šifarnici za `Company.UplatnicaTip`/`SkStatus`/`TipSubjekta`).** Flagovano kao
+  nedostajući FK/šifarnik u pregledu problema, nije razrešeno koje tačno vrednosti/šifarnik
+  koristiti — kandidat da idu kroz `tblShortList` umesto posebnih tabela, ali nije potvrđeno.
+- **O-6 (permisije/role).** Namerno odloženo od strane šefa za Fazu 4/5 — **ne blokira Fazu 1**,
+  ali mora biti rešeno pre nego što se uvede pravi multi-role auth.
+- **O-7 (skladištenje fajlova).** Gde `Files.RelPathName` fizički živi (server, blob storage) —
+  implementaciona odluka, ne blokira šemu, ali blokira funkcionalno korišćenje modula priloga.
+- **O-8 (indeksi, UNIQUE i CHECK ograničenja).** Šef je flagovao da nedostaju: UNIQUE za broj
+  računa/izvoda/PIB/bankovni račun, indeksi na FK i česta polja pretrage, CHECK pravila za
+  duguje/potražuje, procente, stope, negativne iznose, statuse. Ovo je **namerno odloženo za
+  finalni DDL prolaz** (posle Faze 4 modula), ne za ovaj nacrt — previše je specifično da se radi
+  napamet bez profilisanja stvarnih podataka, ali **mora biti odrađeno pre produkcije**.
+
+## 5. Isključene tabele (ažurirano)
+
+Po pravilu iz CLAUDE.md, **i dalje isključeno** (privremene/backup/probne — bez izmena u odnosu
+na v1):
+
+`GK_TMP` (obe verzije), `GK_PRK`, `GK_PS`, `GK_20250531_backup_*`, `StaffTMP` (sve verzije),
+`Table1` (obe verzije), `IMPORT_BENEFIT`, `IMPORTKV`, `PRENOS`, `TEMP_GEN`, `Paste Errors`,
+`tblSTATS_update_tblstat`, `_TableList`, sve `*-STRUKTURA` tabele iz `aj_fn_cmn.mdb`, `Functions`,
+`References`, `_TextFunction`, oba `VERSION-HISTORY`, `Switchboard Items` (sve tri verzije —
+menu se zamenjuje React navigacijom; **napomena:** šef želi da navigacija bude data-driven iz
+baze, ne hardkodovana — ovo je Faza 4/5 stavka, ne zahteva novu tabelu u Fazi 1).
+
+**Vraćeno iz isključenih u v2** (vidi sekciju 0): `PrinterBinLOCAL`→`SelectionBasket`,
+`ugovori`→`Contract`, `BenefitUpdate`, `OpomenaSablonEx`.
+
+**Novododato u isključene:** `RacunIN` (potvrđeno napušteno, v1 ju je još uvek imao kao tabelu
+pod pitanjem).
+
+**Ostaje pod pitanjem:** `tblIzvestaj`/`tblIzvestajSub`/`tblSifrarnik`/`tblSifrarnikSub`/
+`tblAnaliza`/`tblSTATS`/`tblWhrEx`/`tblShortList` — šef je potvrdio da se **aktivno koriste**
+(posebno `tblIzvestaj` i `tblAnaliza`) i da novi sistem treba sličan mehanizam, "uz priliku da se
+napravi red". Ovo **nije uneto u DDL nacrt** jer zahteva poseban dizajn (dinamički
+upit/izveštaj sistem), ne prostu migraciju tabele — planirano za **posebnu fazu dizajna** posle
+osnovne šeme, vidi sekciju 7.
+
+## 6. Poslovna pravila iz `ERROR_*` upita — ažurirana napomena
+
+Sekcija 5 iz v1 (detaljna lista ~70 pravila po domenu) **ostaje suštinski tačna** i nije
+prepisivana ovde red-po-red (videti v1 istoriju u git-u ako je potrebna). Dve važne izmene:
+
+1. **Mehanizam provere se NE svodi samo na DB constraint/trigger.** Šef: "poželjno je da SQL
+   bude upisan u tabeli i da može da se vrši unos novih SQL-ova i da se na osnovu njega dinamički
+   generiše izveštaj... svi ERROR upiti koji su trenutno u upotrebi su u tabeli `tblAnaliza`."
+   Znači: **čvrsta pravila** (npr. ERROR_104 — nalog mora biti u ravnoteži) i dalje postaju DB-level
+   provere (vidi sekciju 2.4, Post-time provera), ali **veći deo ERROR_* liste ostaje kao
+   dinamički, korisnički editabilan SQL** u `tblAnaliza`-ekvivalentu nove šeme — ne tvrdi
+   constraint. Ovo direktno utiče na dizajn: treba tabela tipa `AnalysisQuery` (naslednik
+   `tblAnaliza`) koja čuva SQL tekst i metapodatke, izvršava se na zahtev — **nije uneta u DDL
+   nacrt u ovoj fazi** jer zavisi od dizajna dinamičkog izveštajnog sistema (vidi sekciju 5 gore,
+   ista napomena).
+2. **ERROR_104 (ravnoteža naloga) je i dalje najvažnije pravilo**, ali implementacija je
+   ispravljena da radi na Post, ne na svaki unos — vidi sekciju 2.4.
+
+## 7. Sledeći koraci
+
+1. ~~Otvorena pitanja iz v1~~ — **rešeno**, uneto kroz ceo dokument.
+2. Rešiti preostalih 8 otvorenih pitanja iz sekcije 4 (O-1 do O-8) — nijedno od njih ne blokira
+   početak rada na matičnim podacima (Company/Partner/Unit), ali O-1, O-4, O-5 blokiraju
+   fakturisanje i knjigovodstvo.
+3. Dizajnirati dinamički izveštajni sistem (`tblIzvestaj`/`tblAnaliza`-ekvivalent) kao **posebnu
+   stavku**, van osnovne transakcione šeme — nije blokada za Fazu 1-4, ali mora postojati pre nego
+   što se stari sistem stvarno ugasi (aktivno se koristi svakodnevno).
+4. Finalizovati DDL (indeksi, UNIQUE, CHECK — sekcija 4, O-8) tek kad matični podaci i fakturisanje
+   prođu kroz stvarnu implementaciju i profilisanje podataka — ne unapred napamet.
+5. Tek posle toga — EF Core migracije i početak ETL-a (`SzApp.Etl`, sa `LegacyId`/TransferId
+   mapiranjem).
+
+## 8. Da li je projekat spreman za implementaciju?
+
+**Delimično — matični podaci i osnovna struktura DA, fakturisanje/knjigovodstvo JOŠ NE u punom
+obimu.** Konkretno:
+
+- **Spremno za implementaciju:** `Company`, `Partner`, `PartnerAccounting`, `Unit`,
+  `CategoryLocation`, `BuildingEntrance`, `PartnerCategory`, `Contract` (uz O-4 kao manji rizik
+  koji ne blokira rad, samo FK cilj), `StaffCompany`, `Staff`. Ovo je dovoljno za Fazu 4/koraka 1
+  iz `project-brief.md` (matični podaci).
+- **NIJE spremno bez odluke o O-1 (zaokruživanje):** `Racun`/`RacunStavke`/`KamatniList` — obračun
+  bez odluke o metodi zaokruživanja rizikuje da se testovi/tolerancije moraju prepravljati.
+- **NIJE spremno bez odluke o O-5:** puna `Company` tabela (par nedovršenih šifarnika).
+- **NIJE spremno (namerno odloženo, ne greška):** dinamički izveštajni sistem
+  (`tblIzvestaj`/`tblAnaliza`), model permisija/uloga (O-6), skladištenje fajlova (O-7),
+  finalni indeksi/UNIQUE/CHECK (O-8).
+- **`Events` workflow (O-3)** i **`UnitBillingAllocation`** procentualna validacija su
+  implementabilni odmah uz razumne podrazumevane vrednosti, ali finalni detalji čekaju potvrdu.
+
+**Preporuka:** krenuti sa implementacijom `Company`/`Partner`/`PartnerAccounting`/`Unit`/
+`Contract` sloja (EF Core model + prve migracije) odmah — to je čvrsto categorizovano i ne zavisi
+od preostalih otvorenih pitanja. Fakturisanje i knjigovodstvo sačekati dok se O-1, O-4, O-5 ne
+potvrde (kratak razgovor, ne veliki posao) — sve ostalo (O-6, O-7, O-8, dinamički izveštaji) po
+definiciji ne blokira ni Fazu 1 ni Fazu 4, samo mora biti na radaru pre produkcije/cutover-a.
+
+## 9. Predložena struktura projekta (repo layout)
+
+Nepromenjeno u odnosu na v1 — struktura projekta ne zavisi od šeme, samo od odluke da ostane bez
+Clean Architecture/CQRS slojeva (CLAUDE.md traži jednostavnost).
 
 ```
 SZ-APP/
 ├── CLAUDE.md
 ├── .gitignore
-├── docs/                              # (postojeće) project-brief, data-model, queries-sql,
-│                                       #  tehnicki-plan-faza1.md, schema-ddl-draft.sql
-├── legacy-source/                     # (gitignored) originalni .mdb + eksporti
+├── docs/
+├── legacy-source/                     # (gitignored)
 │
 ├── backend/
 │   ├── SzApp.sln
 │   └── src/
-│       ├── SzApp.Api/                 # ASP.NET Core Web API — kontroleri, auth (Identity),
-│       │                              #  Program.cs, DI registracija, appsettings
-│       │   ├── Controllers/
-│       │   │   ├── SkustinaController.cs
-│       │   │   ├── ObjektiController.cs
-│       │   │   ├── KupacController.cs
-│       │   │   ├── RacunController.cs
-│       │   │   ├── IzvodController.cs
-│       │   │   ├── GKController.cs
-│       │   │   ├── DobavljacController.cs
-│       │   │   ├── OpomenaController.cs
-│       │   │   └── ...
-│       │   ├── Program.cs
-│       │   └── appsettings.json
-│       │
-│       ├── SzApp.Data/                # EF Core: DbContext, entiteti (1:1 sa schema-ddl-draft.sql),
-│       │   │                          #  Migrations/, konfiguracija mapiranja (Fluent API)
-│       │   ├── SzAppDbContext.cs
-│       │   ├── Entities/
-│       │   │   ├── Skustina.cs
-│       │   │   ├── Objekat.cs
-│       │   │   ├── Kupac.cs
-│       │   │   ├── Racun.cs / RacunStavka.cs
-│       │   │   ├── Gk.cs / Nalog.cs
-│       │   │   └── ...
-│       │   ├── Configurations/        # IEntityTypeConfiguration<T> po entitetu
-│       │   └── Migrations/
-│       │
-│       ├── SzApp.Domain/              # Poslovna logika koja ne pripada kontroleru ni EF-u:
-│       │                              #  obračun kamate (KamatniList), PDV, generisanje GK naloga
-│       │                              #  iz izvoda/računa, validacije iz sekcije 5 ovog plana.
-│       │                              #  (Samo ako preraste kontrolere — ne praviti slojeve unapred
-│       │                              #  ako za konkretan modul nije potrebno.)
-│       │
-│       └── SzApp.Tests/               # xUnit — unit testovi za SzApp.Domain, integracioni testovi
-│                                       #  za API (WebApplicationFactory), i ETL sanity-check testovi
-│                                       #  izvedeni iz ERROR_* pravila (sekcija 5) nad migriranim
-│                                       #  podacima.
+│       ├── SzApp.Api/                 # ASP.NET Core Web API, auth (Identity), Program.cs
+│       ├── SzApp.Data/                # EF Core DbContext, entiteti (1:1 sa schema-ddl-draft.sql), Migrations/
+│       ├── SzApp.Domain/              # samo kad preraste kontrolere (kamata, PDV, GK generisanje, Post-nalog logika)
+│       └── SzApp.Tests/               # unit + integracioni + ETL sanity-check testovi
 │
 ├── etl/
-│   └── SzApp.Etl/                     # Poseban, samostalan alat za jednokratnu/ponovljivu
-│                                       #  migraciju podataka iz .mdb/CSV u SQL Server (cp1250
-│                                       #  dekodiranje, srpski decimalni format, d.m.yyyy datumi —
-│                                       #  vidi CLAUDE.md). Odvojen od SzApp.Api jer se pokreće
-│                                       #  ručno/retko, ne kao deo runtime aplikacije.
+│   └── SzApp.Etl/                     # migracija iz .mdb/CSV, LegacyId/TransferId mapiranje
 │
 └── frontend/
-    ├── package.json
     ├── src/
-    │   ├── features/                  # po poslovnom modulu, ne po tehničkom sloju:
-    │   │   ├── skupstine/
-    │   │   ├── objekti-kupci/
-    │   │   ├── fakturisanje/
-    │   │   ├── izvodi/
-    │   │   ├── knjigovodstvo/
-    │   │   ├── dobavljaci/
-    │   │   └── opomene/
-    │   ├── shared/                    # zajednički UI (tabele, forme, layout)
-    │   └── api/                       # generisan ili ručni klijent za SzApp.Api
+    │   ├── features/                  # po poslovnom modulu (partneri, jedinice, fakturisanje, izvodi, knjigovodstvo, dobavljaci, opomene)
+    │   ├── shared/
+    │   └── api/
     └── public/
 ```
 
-**Napomene:**
-
-- `SzApp.Domain` je ucrtan unapred, ali **ne treba ga praviti prazan** — prvi moduli (matični
-  podaci) verovatno nemaju dovoljno logike da opravdaju poseban sloj; logika ide u kontroler ili
-  servis unutar `SzApp.Api` dok se stvarno ne pokaže potreba da se izdvoji (npr. kad obračun
-  kamate ili generisanje GK naloga postane dovoljno složen i testiran nezavisno od HTTP sloja).
-- `SzApp.Etl` je namerno poseban projekat, ne deo `SzApp.Api` — migracija podataka je
-  jednokratan/redak zadatak sa svojim rizicima (enkodiranje, lokalizovani formati), ne treba da
-  bude deo runtime aplikacije niti da vuče njene zavisnosti (auth, kontroleri...).
-- Nazivi kontrolera/feature-folder-a u tabeli iznad su orijentacioni, prate domensko grupisanje iz
-  sekcije 2 — finalni raspored ide tek kad krene Faza 4 (implementacija po modulima) iz
-  `project-brief.md`.
-- Ovo takođe nije konačna odluka — javi ako želiš drugačiju podelu (npr. zaseban repo za
-  frontend, ili drugačije nazive projekata).
+**Napomena dodata u v2:** dinamički izveštajni sistem (`tblIzvestaj`/`tblAnaliza`-ekvivalent) će
+verovatno zahtevati sopstveni feature-folder na frontendu (`features/izvestaji/`) i poseban modul
+na backendu za bezbedno izvršavanje korisnički unetog SQL-a (whitelisting/read-only konekcija,
+zbog očiglednog rizika od SQL injekcije kad se SQL tekst čuva u tabeli i izvršava dinamički) —
+ovo je dizajn stavka za kasnije, ne menja layout sada.
