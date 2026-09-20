@@ -23,6 +23,8 @@ the database, not a gap in the export.
 
 -- That file uses encoding UTF-8
 
+
+-- ovo je bilo bitno na racunarima sad i nema smisla, widows user name, comp name ... 
 CREATE TABLE [AuditLog]
  (
 	[AuditLogId]			Long Integer, 
@@ -42,6 +44,8 @@ CREATE TABLE [AuditLog]
 	[Module]			Text (50)
 );
 
+
+-- Language is isto sto i LanguageCode
 CREATE TABLE [Dictionary]
  (
 	[Id]			Long Integer, 
@@ -59,12 +63,15 @@ CREATE TABLE [DictionaryLanguage]
 	[IsDefault]			Boolean NOT NULL
 );
 
+-- sto je ovo ovo je suvisno
 CREATE TABLE [DictionaryCyrillic]
  (
 	[Id]			Long Integer NOT NULL, 
 	[CyrillicText]			Text (255)
 );
 
+
+-- Sta je ovo
 CREATE TABLE [TableCatalog]
  (
 	[Id]			Long Integer, 
@@ -94,12 +101,21 @@ CREATE TABLE [Benefit]
 	[CancelledInvoiceId]			Long Integer
 );
 
+-- da li da ja brisem Supplier nema potrebe, 
+-- InvoiceMonth ovo je bolje InvoiceYYMM jer je unos marker 2609 - 4 cifre uvek
+-- CollectionPriority
+-- PostingCode
+-- LegacyTempPrevId - BRISI
+-- SequenceNumber
+-- PostedInvoiceAmount
+-- nNote / InvoiceDescription - zasto dva?
+
 CREATE TABLE [SupplierInvoice]
  (
 	[SupplierInvoiceId]			Long Integer, 
 	[CompanyId]			Long Integer, 
 	[InvoiceNumber]			Long Integer, 
-	[InvoiceName]			Text (255), 
+	[InvoiceCaption]			Text (255), 
 	[Note]			Text (255), 
 	[Supplier]			Text (50), 
 	[SupplierAccountPartnerAccountingId]			Long Integer, 
