@@ -25,60 +25,40 @@ the database, not a gap in the export.
 
 
 -- ovo je bilo bitno na racunarima sad i nema smisla, widows user name, comp name ... 
+-- ActionType - User, System cron,...
+-- EventAction former message
+-- ActionType CRUD - enum?
 CREATE TABLE [AuditLog]
  (
-	[AuditLogId]			Long Integer, 
-	[ComputerName]			Text (15), 
-	[WindowsUsername]			Text (50), 
+	[Id]			Long Integer, 
 	[StaffId]			Long Integer, 
-	[UserDisplayName]			Text (50), 
-	[Date]			DateTime, 
-	[FormName]			Text (60), 
-	[TableCode]			Text (50), 
+	[TimeStamp]			DateTime, 
 	[ItemId]			Long Integer, 
-	[ActionType]			Text (20), 
-	[ExtraMessage]			Text (255), 
-	[ErrorNumber]			Text (255), 
-	[Message]			Text (255), 
-	[ChangeMessage]			Memo/Hyperlink (255), 
-	[Module]			Text (50)
+	[ActionType]			Text (20),  
+	[EventAction]			Text (255), 
+	[ActionType]			Text (50)
 );
 
+-- Translations.LanguageCode FK - Languages.Code PK 
 
--- Language is isto sto i LanguageCode
-CREATE TABLE [Dictionary]
+CREATE TABLE [Translations]
  (
-	[Id]			Long Integer, 
-	[Message]			Text (255), 
-	[Language]			Text (50), 
-	[SortIndex]			Long Integer, 
-	[DialogId]			Long Integer
+	[Id]				Long Integer,
+	[LanguageCode]		Text (10), 
+	[ResourceKey]		text(100),
+	[ResourceId]		Long Integer,  
+	[Translation]		Text (max),
 );
 
-CREATE TABLE [DictionaryLanguage]
+CREATE TABLE [Languages]
  (
-	[LanguageCode]			Text (10) NOT NULL, 
-	[DictionaryName]			Text (50), 
-	[IsEnabled]			Boolean NOT NULL, 
+	[Code]			Text (10) NOT NULL, 
+	[Name]			Text (50), 
+	[IsActive]			Boolean NOT NULL, 
 	[IsDefault]			Boolean NOT NULL
+	[SortIndex]			Integer
 );
 
--- sto je ovo ovo je suvisno
-CREATE TABLE [DictionaryCyrillic]
- (
-	[Id]			Long Integer NOT NULL, 
-	[CyrillicText]			Text (255)
-);
-
-
--- Sta je ovo
-CREATE TABLE [TableCatalog]
- (
-	[Id]			Long Integer, 
-	[TableName]			Text (255), 
-	[Description]			Text (255), 
-	[ClearFlag]			Long Integer
-);
 
 CREATE TABLE [BenefitGroup]
  (
@@ -1619,301 +1599,6 @@ CREATE TABLE [ContactImport]
 	[LedgerEntryId]			Long Integer NOT NULL, 
 	[SupplierInvoiceId]			Long Integer, 
 	[PostingSubAccount]			Text (255)
-);
-
-
-```
-
-## aj_fn_cmn.mdb — 23 tables (shared AJ_ framework: Staff/login, Settings, translation dictionary)
-```sql
--- ----------------------------------------------------------
--- MDB Tools - A library for reading MS Access database files
--- Copyright (C) 2000-2011 Brian Bruns and others.
--- Files in libmdb are licensed under LGPL and the utilities under
--- the GPL, see COPYING.LIB and COPYING files respectively.
--- Check out http://mdbtools.sourceforge.net
--- ----------------------------------------------------------
-
--- That file uses encoding UTF-8
-
-CREATE TABLE [AuditLog]
- (
-	[AuditLogId]			Long Integer, 
-	[ComputerName]			Text (15), 
-	[WindowsUsername]			Text (50), 
-	[StaffId]			Long Integer, 
-	[UserDisplayName]			Text (50), 
-	[Date]			DateTime, 
-	[FormName]			Text (60), 
-	[TableCode]			Text (50), 
-	[ItemId]			Long Integer, 
-	[ActionType]			Text (20), 
-	[ExtraMessage]			Text (255), 
-	[ErrorNumber]			Text (255), 
-	[Message]			Text (255), 
-	[ChangeMessage]			Memo/Hyperlink (255), 
-	[Module]			Text (50)
-);
-
-CREATE TABLE [Dictionary]
- (
-	[Id]			Long Integer, 
-	[Message]			Text (255), 
-	[Language]			Text (50), 
-	[SortIndex]			Long Integer, 
-	[DialogId]			Long Integer, 
-	[Info]			Text (255)
-);
-
-CREATE TABLE [DictionaryLanguage]
- (
-	[LanguageCode]			Text (10), 
-	[DictionaryName]			Text (50), 
-	[IsEnabled]			Boolean NOT NULL, 
-	[IsDefault]			Boolean NOT NULL
-);
-
-CREATE TABLE [DictionaryCyrillic]
- (
-	[Id]			Long Integer, 
-	[CyrillicText]			Text (255)
-);
-
-CREATE TABLE [TextFunction]
- (
-	[Id]			Long Integer, 
-	[KeyName]			Text (255), 
-	[Description]			Memo/Hyperlink (255)
-);
-
-CREATE TABLE [HelperFunction]
- (
-	[Id]			Long Integer, 
-	[ModuleName]			Text (50), 
-	[FunctionName]			Text (50), 
-	[Example]			Memo/Hyperlink (255), 
-	[FullFunctionSignature]			Text (255), 
-	[Description]			Memo/Hyperlink (255), 
-	[LastUpdatedAt]			DateTime, 
-	[ThanksTo]			Text (255)
-);
-
-CREATE TABLE [VbaLibraryReference]
- (
-	[Id]			Long Integer, 
-	[ReferenceName]			Text (50), 
-	[PathDescription]			Text (50), 
-	[FileName]			Text (255), 
-	[PathX86]			Text (255), 
-	[PathX64]			Text (255), 
-	[Description]			Text (255), 
-	[Version]			Text (255), 
-	[Date]			DateTime
-);
-
-CREATE TABLE [Setting]
- (
-	[SettingId]			Long Integer, 
-	[SettingName]			Text (50), 
-	[SettingValue]			Text (50), 
-	[Description]			Text (255), 
-	[Category]			Text (50), 
-	[ModuleFormField]			Text (50), 
-	[DefaultValue]			Text (50), 
-	[FilterUserId]			Long Integer, 
-	[FilterComputerName]			Text (255), 
-	[FilterCustom1Num]			Long Integer, 
-	[FilterCustom2Num]			Long Integer, 
-	[FilterCustom3Num]			Long Integer, 
-	[FilterCustom1Text]			Text (255), 
-	[FilterCustom2Text]			Text (255), 
-	[FilterCustom3Text]			Text (255), 
-	[SettingValueLong]			Memo/Hyperlink (255)
-);
-
-CREATE TABLE [SettingStructure]
- (
-	[SettingId]			Long Integer, 
-	[SettingName]			Text (50), 
-	[SettingValue]			Text (50), 
-	[Description]			Text (255), 
-	[Category]			Text (50), 
-	[ModuleFormField]			Text (50), 
-	[DefaultValue]			Text (50), 
-	[FilterUserId]			Long Integer, 
-	[FilterComputerName]			Text (255), 
-	[FilterCustom1Num]			Long Integer, 
-	[FilterCustom2Num]			Long Integer, 
-	[FilterCustom3Num]			Long Integer, 
-	[FilterCustom1Text]			Text (255), 
-	[FilterCustom2Text]			Text (255), 
-	[FilterCustom3Text]			Text (255), 
-	[SettingValueLong]			Memo/Hyperlink (255)
-);
-
-CREATE TABLE [Staff]
- (
-	[StaffId]			Long Integer, 
-	[UserName]			Text (50), 
-	[StaffLogin]			Text (50), 
-	[Level]			Long Integer, 
-	[LastLoginAt]			Text (50), 
-	[PreferredLanguage]			Text (50), 
-	[AccessRestriction]			Text (255), 
-	[LastComputerName]			Text (255), 
-	[IncrementCode]			Text (6)
-);
-
-CREATE TABLE [StaffPermission]
- (
-	[StaffPermissionId]			Long Integer, 
-	[StaffId]			Long Integer, 
-	[KeyName]			Text (255), 
-	[FormName]			Text (255), 
-	[PermissionValue]			Long Integer, 
-	[IsDisabled]			Long Integer
-);
-
-CREATE TABLE [StaffStructure]
- (
-	[StaffId]			Long Integer, 
-	[UserName]			Text (50), 
-	[StaffLogin]			Text (50), 
-	[Level]			Long Integer, 
-	[LastLoginAt]			Text (50), 
-	[PreferredLanguage]			Text (50), 
-	[AccessRestriction]			Text (255), 
-	[LastComputerName]			Text (255)
-);
-
-CREATE TABLE [StaffTemp]
- (
-	[StaffId]			Long Integer NOT NULL, 
-	[UserName]			Text (50), 
-	[StaffLogin]			Text (50), 
-	[Level]			Long Integer, 
-	[LastLoginAt]			Text (50), 
-	[PreferredLanguage]			Text (50), 
-	[AccessRestriction]			Text (255), 
-	[LastComputerName]			Text (255)
-);
-
-CREATE TABLE [StaffTempStructure]
- (
-	[StaffId]			Long Integer, 
-	[UserName]			Text (50), 
-	[Level]			Long Integer, 
-	[PreferredLanguage]			Text (50), 
-	[AccessRestriction]			Text (255), 
-	[LastComputerName]			Text (255)
-);
-
-CREATE TABLE [SwitchboardMenuItem]
- (
-	[SwitchboardMenuItemId]			Long Integer, 
-	[ItemNumber]			Integer, 
-	[ItemText]			Text (255), 
-	[Command]			Integer, 
-	[Argument]			Text (255), 
-	[FormLevel]			Text (50)
-);
-
-CREATE TABLE [SwitchboardMenuItemStructure]
- (
-	[SwitchboardMenuItemId]			Long Integer, 
-	[ItemNumber]			Integer, 
-	[ItemText]			Text (255), 
-	[Command]			Integer, 
-	[Argument]			Text (255), 
-	[FormLevel]			Text (50)
-);
-
-CREATE TABLE [SqlFixTemplateExample]
- (
-	[SqlFixTemplateExampleId]			Long Integer, 
-	[ObjectName]			Text (50), 
-	[Sql]			Memo/Hyperlink (255), 
-	[ReportName]			Text (50), 
-	[ObjectType]			Text (50)
-);
-
-CREATE TABLE [StatReportDefinition]
- (
-	[StatReportDefinitionId]			Long Integer, 
-	[StatGroup]			Text (255), 
-	[StatName]			Text (255), 
-	[StatQueryName]			Text (255), 
-	[StatSql]			Memo/Hyperlink (255), 
-	[StatReportName]			Text (50), 
-	[StatWhereCaption]			Text (50), 
-	[StatWhereComboSql]			Memo/Hyperlink (255), 
-	[StatSqlName]			Text (50), 
-	[TextFilterCaption]			Text (50), 
-	[StatWhereCaption2]			Text (50), 
-	[StatWhereComboSql2]			Memo/Hyperlink (255), 
-	[TextFilterCaption2]			Text (50), 
-	[StaffLevel]			Text (255), 
-	[StaffUid]			Text (255)
-);
-
-CREATE TABLE [StatReportDefinitionStructure]
- (
-	[StatReportDefinitionId]			Long Integer, 
-	[StatGroup]			Text (255), 
-	[StatName]			Text (255), 
-	[StatQueryName]			Text (255), 
-	[StatSql]			Memo/Hyperlink (255), 
-	[StatReportName]			Text (50), 
-	[StatWhereCaption]			Text (50), 
-	[StatWhereComboSql]			Memo/Hyperlink (255), 
-	[StatSqlName]			Text (50), 
-	[TextFilterCaption]			Text (50), 
-	[StatWhereCaption2]			Text (50), 
-	[StatWhereComboSql2]			Memo/Hyperlink (255), 
-	[TextFilterCaption2]			Text (50), 
-	[StaffLevel]			Text (255), 
-	[StaffUid]			Text (255)
-);
-
-CREATE TABLE [WhereClauseTemplateStructure]
- (
-	[WhereClauseTemplateId]			Long Integer, 
-	[Title]			Text (50), 
-	[WhereExpression]			Memo/Hyperlink (255), 
-	[TargetFormName]			Text (50)
-);
-
-CREATE TABLE [UserLevel]
- (
-	[UserLevelId]			Long Integer NOT NULL, 
-	[Caption]			Text (255)
-);
-
-CREATE TABLE [VersionHistory]
- (
-	[VersionDate]			DateTime, 
-	[VersionNumber]			Text (50), 
-	[ShortDescription]			Memo/Hyperlink (255), 
-	[FullDescription]			Memo/Hyperlink (255)
-);
-
-CREATE TABLE [AuditLogStructure]
- (
-	[AuditLogId]			Long Integer, 
-	[ComputerName]			Text (15), 
-	[WindowsUsername]			Text (50), 
-	[StaffId]			Long Integer, 
-	[UserDisplayName]			Text (50), 
-	[Date]			DateTime, 
-	[FormName]			Text (60), 
-	[TableCode]			Text (50), 
-	[ItemId]			Long Integer, 
-	[ActionType]			Text (20), 
-	[ExtraMessage]			Text (255), 
-	[ErrorNumber]			Text (255), 
-	[Message]			Text (255), 
-	[ChangeMessage]			Memo/Hyperlink (255), 
-	[Module]			Text (50)
 );
 
 
