@@ -23,32 +23,41 @@ the database, not a gap in the export.
 
 -- That file uses encoding UTF-8
 
-
 -- ovo je bilo bitno na racunarima sad i nema smisla, widows user name, comp name ... 
 -- ActionType - User, System cron,...
--- EventAction former message
--- ActionType CRUD - enum?
+-- EventAction: message
+-- ActionTypeId CRUD  / ShortList.TableName: AuditActionType
+-- EventById CRUD  / ShortList.TableName: AuditEventType
+
+
 CREATE TABLE [AuditLog]
  (
-	[Id]			Long Integer, 
+	[Id]				Long Integer, 
 	[StaffId]			Long Integer, 
 	[TimeStamp]			DateTime, 
 	[ItemId]			Long Integer, 
-	[ActionType]			Text (20),  
-	[EventAction]			Text (255), 
-	[ActionType]			Text (50)
+	[ActionTypeId]		Long Integer,   -- Create, Read, Update, Delete...
+	[EventAction]		Text (255), 
+	[EventById]			Text (50) 		-- User, System, Cron...
 );
 
 -- Translations.LanguageCode FK - Languages.Code PK 
+-- ResourceKey npr: Common.Save ResourceId:null or 0 ==> Translation: Snimi
+-- ResourceId npr:  ResourceKey: Months  ResourceId:1 ==> Translation: Januar
+-- Za spicificne unos prevoda koji se menjaju po Company koristiti CompanyId - 0 je def, 
+-- ResourceKey npr: Common.Save ResourceId:0 CompanyId:0 ==> Translation:  Snimi  / def za sve
+-- ResourceKey npr: Common.Save ResourceId:0 CompanyId:101 ==> Translation:  Snimaj  / samo 101 ima poseban proveod
 
 CREATE TABLE [Translations]
  (
-	[Id]				Long Integer,
-	[LanguageCode]		Text (10), 
+	[Id]				Long Integer NOT NULL,
+	[LanguageCode]		Text (10) NOT NULL, 
 	[ResourceKey]		text(100),
-	[ResourceId]		Long Integer,  
+	[ResourceId]		Long Integer,
+	[CompanyId]			Long Integer,
 	[Translation]		Text (max),
 );
+-- Language Code: srLat, srCyr, en
 
 CREATE TABLE [Languages]
  (
@@ -59,156 +68,157 @@ CREATE TABLE [Languages]
 	[SortIndex]			Integer
 );
 
+-- Tabela BenefitGroup ima samo text za izveštaj ako je pod benefitom, prebaci u Translations / BRISEM
+-- ResourceKey npr: Benefit.ReportDescription 
+-- srLat /en: Na računu je primenjen popust na uslugu održavanja stanova i garažnih mesta. /A discount has been applied to the service of maintenance of apartments and garage spaces.
 
-CREATE TABLE [BenefitGroup]
- (
-	[BenefitGroupId]			Long Integer, 
-	[Name]			Text (255), 
-	[PrintLabel]			Text (255)
-);
+-- IsUsed MAREKER nakon izdavanja računa da li je iskorišćen benefit na računu za PeriodYYMM, nema potrebe za ovim poljem ako je InvoiceId unet iskorišćen je
+-- EntryDate datum unosa benefita, npr 11.1.2026 unose se benefiti - 6 redova za svaki mesec po jedan: 2602, 2603....
 
 CREATE TABLE [Benefit]
  (
-	[BenefitId]			Long Integer, 
-	[UnitId]			Long Integer, 
-	[PartnerAccountingId]			Long Integer, 
-	[PeriodYyMm]			Text (255), 
-	[IsUsed]			Long Integer, 
-	[EntryDate]			DateTime, 
-	[UsedDate]			DateTime, 
-	[InvoiceId]			Long Integer, 
-	[BenefitGroupId]			Long Integer, 
-	[CancelledInvoiceId]			Long Integer
+	[Id]					Long Integer, 
+	[ContractId]			Long Integer,  -- ContractId ima i UnitId i PartnerId, i dalje je FK na Contract.Id
+	[PeriodYYMM]			Integer, 
+	[EntryDate]				DateTime, 
+	[InvoiceId]				Long Integer, 
 );
 
--- da li da ja brisem Supplier nema potrebe, 
--- InvoiceMonth ovo je bolje InvoiceYYMM jer je unos marker 2609 - 4 cifre uvek
--- CollectionPriority
--- PostingCode
--- LegacyTempPrevId - BRISI
--- SequenceNumber
--- PostedInvoiceAmount
--- nNote / InvoiceDescription - zasto dva?
+-- InvoiceNo - redni broj u PeriodYYMM - tretira se kao Sortiranje na računu.
+-- PaymentPriority - sortiranje za rasknjižavanje kod naplate - obično je isto što i InvoiceNo
+-- InvoiceNameFunction_ naziv funkcije koja se primenjuje na Caption, Investiciono održavanje za #YYMM#
+-- Caption ide na štampu računa
+-- CodeName ide na knjiženje.... 2026-09-30 /AJSASOFT /EVIDENCIJA RAČUNA 2609 - OBAVEZNO ZA DOCUMENTTYPE 2
+-- PostedInvoiceAmount - KOLIKO JE KNJIŽENO - nakon generisanja računa, povratna informacija generisanih računa (0.12 EUR po srednjem kursu 117.1234 Din po kvadratu za stanove i lokale..... nema info koliko je to para dok god se ne generisu realni iznosi, zaokruženi po svakom računu)
+-- PreviousSupplierInvoiceId, NewSupplierInvoiceId - vezano za izdavanje računa u toku, avansi, konačni itd. Obično se ne koristi ali neka ostane.
+-- JournalEntryId - nakon knjiženja, broj naloga
+-- ClosesAccount kod DocumentTypeId:9 postoji specifična šema za zatvaranje naloga 
+-- DocumentTypeId  / ShortList.TableName: SupplierDocumentType
+
+
 
 CREATE TABLE [SupplierInvoice]
  (
-	[SupplierInvoiceId]			Long Integer, 
-	[CompanyId]			Long Integer, 
-	[InvoiceNumber]			Long Integer, 
-	[InvoiceCaption]			Text (255), 
-	[Note]			Text (255), 
-	[Supplier]			Text (50), 
-	[SupplierAccountPartnerAccountingId]			Long Integer, 
-	[CalculationTypeId]			Long Integer, 
-	[InvoiceMonth]			Text (50), 
-	[InvoiceAmountEur]			Double, 
-	[InvoiceAmountRsd]			Currency, 
-	[AmountByCoefficientEur]			Double, 
-	[AmountByCoefficientRsd]			Currency, 
-	[CollectionPriority]			Long Integer, 
-	[PostingCode]			Text (6), 
-	[LegacyTempPrevId]			Long Integer, 
-	[PostingAccount]			Text (255), 
-	[DocumentTypeId]			Long Integer, 
-	[ExtraordinaryInvoiceMarker]			Text (255), 
-	[InvoiceNameFunction]			Text (255), 
-	[SequenceNumber]			Text (50), 
-	[PostedInvoiceAmount]			Currency, 
-	[InvoiceDate]			DateTime, 
-	[PostingDate]			DateTime, 
+	[Id]							Long Integer, 
+	[CompanyId]						Long Integer, 
+	[InvoiceNo]						Long Integer, 
+	[CodeName]						Text (255),  -- RBR CODE: obavezan unos za DocumentTypeId: 2 
+	[Caption]						Text (255), 
+	[SupplierPartnerAccountId]		Long Integer,   -- Fk na PartnerAccount
+	[CalculationTypeId]				Long Integer,  -- FK to CalculationType.Id
+	[PeriodYYMM]					Integer, -- 2604
+	[InvoiceTotalCalculationAmountEur]		Decimal(18,4), 
+	[InvoiceTotalCalculationAmountRsd]		Decimal(18,4), 
+	[CalculationAmountByCoefficientEur]		Decimal(18,4), 
+	[CalculationAmountByCoefficientRsd]		Decimal(18,4), 
+	[PaymentPriority]					Long Integer, 
+	[SubAccountId]						Text (10),  -- FK to SubAccount.Id  -- podkonto knjiženja: 11302 - Upravljanje zgradom
+	[DocumentTypeId]					Long Integer, -- FK  ShortList.TableName: SupplierDocumentType 1 - Predviđeni troškovi, 2 - Izvršeni troškovi, ...
+	[ExtraordinaryInvoiceMarker]			Text (10),  -- MVR: marker vandrednih računa.. v01, o01
+	[InvoiceNameFunction]				Text (255), 	
+	[PostedInvoiceAmount]				Decimal(18,2),
+	[InvoiceDate]					DateTime, 
+	[TransactionDate]		DateTime,  -- isto kako i PostingDate
 	[PaymentDate]			DateTime, 
 	[InvoiceDescription]			Text (255), 
 	[PaymentReference]			Text (255), 
-	[PreviousSupplierInvoiceId]			Long Integer, 
+	[PreviousSupplierInvoiceId]		Long Integer,  
 	[NewSupplierInvoiceId]			Long Integer, 
-	[JournalEntryId]			Long Integer, 
-	[Vat]			Long Integer, 
-	[ClosesAccount]			Text (255)
+	[JournalEntryId]			Long Integer,  -- broj naloga
+	[ClosesAccount]			Text (10)
 );
 
+-- tip obracuna dobavljaca racuna
+-- UnitOfMeasureId / ShortList.TableName: UnitOfMeasure  / m2, kom,  / SEF poseduje celokupnu listu jedinica mera na racunu
+
+CREATE TABLE [CalculationType]
+ (
+	[Id]						Long Integer NOT NULL, 
+	[Name]						Text (100), 
+	[SupplierInvoiceAmount]		Text (255),  -- function to get total invoice
+	[Amount]					Text (255),  -- function to amaount per tenet invoice
+	[Quantity]					Text (255),  -- function what is quantity per tenet invoice
+	[UnitOfMeasureId]			Long Integer,  -- ShortList.TableName: UnitOfMeasure
+	[Note]						Text (255), 
+);
+
+-- lista na koji tip objekta se odnosi racun /tipovi objekata / stanovi, lokali, garaze... 
+-- UnitTypeId / ShortList: TableName: UnitType 
 CREATE TABLE [SupplierInvoiceUnitType]
  (
-	[Id]			Long Integer, 
-	[SupplierInvoiceId]			Long Integer, 
-	[UnitTypeId]			Long Integer
+	[Id]					Long Integer, 
+	[SupplierInvoiceId]		Long Integer, 
+	[UnitTypeId]			Long Integer -- FK ShortList.TableName: UnitType
 );
 
-CREATE TABLE [Attachment]
+-- DA - digitalna arhiva dokumenata
+-- CategoryId opciona gategorija na eArhiv
+-- DocumentTypeId / ShortList: TableName: DocumentType
+
+CREATE TABLE [Documents]
  (
-	[AttachmentId]			Long Integer, 
-	[DocumentTypeId]			Long Integer, 
-	[ReferenceItemId]			Long Integer, 
-	[FileNameSuffix]			Text (255), 
-	[FileName]			Text (255), 
-	[RelativePath]			Text (255), 
-	[DateAdded]			DateTime, 
-	[Description]			Text (255), 
-	[FileExtension]			Text (255), 
-	[SourceTable]			Text (255), 
-	[Registrar]			Text (4)
+	[Id]						Long Integer, 
+	[DocumentTypeId]			Long Integer,  -- ShortList: TableName: DocumentType
+	[SourceTable]				Text (255),  
+	[ReferenceId]				Long Integer, 
+	[FileName]					Text (255), 
+	[RelativePath]				Text (255), 
+	[Date]						DateTime, 
+	[Description]				Text (255), 
+	[FileNameSuffix]			Text (10), 
+	[FileExtension]				Text (10), 
+	[Registrar]					Text (4)
+	[RegistrarLocation]			Text (255), 
+	[IsEDocument]				Boolean,
+	[CategoryId]				Long Integer -- FK to DocumentCategory.Id
+	[TimeStamp]					Date
 );
 
+CREATE TABLE [DocumentCategory]
+ (
+	[Id]				Long Integer, 
+	[GroupName]			Text (255), 
+	[Name]				Text (255), 
+	[Code]				Text (10), 
+	[Description]		Text (255), 
+	[IsActive]			Boolean
+	[RetentionPeriodYY]	Integer
+);
+
+-- LedgerEntry.Parameters - ogoljen poziv na broj plaćanja sa računa
+-- Note se korisiti za opise na izveštajima kod specificnih transakcija
+-- Description ostavljeno za komentare 
+-- LineTypeId / tblShortList.TableName: LedgerLineType
+-- gk tabela
 CREATE TABLE [LedgerEntry]
  (
-	[LedgerEntryId]			Long Integer, 
-	[JournalEntryNumber]			Double, 
-	[Account]			Text (50), 
-	[Date]			DateTime, 
+	[Id]					Long Integer, 
+	[JournalEntryId]		Long Integer, 	-- FK to JournalEntry.Id
+	[Account]				Text (10),  --FK to ChartOfAccounts.Account
+	[PostingDate]			DateTime,  -- posting date, transaction date
+	[DueDate]				DateTime, 
 	[DebitAmount]			Double, 
 	[CreditAmount]			Double, 
-	[LineTypeId]			Double, 
+	[LineTypeId]			Double, 	--	FK to ShortList: TableName: LedgerLineType
 	[DocumentRef]			Text (50), 
-	[CompanyId]			Long Integer, 
-	[PartnerAccountingId]			Long Integer, 
-	[BankStatementLineId]			Long Integer, 
-	[Note]			Text (255), 
+	[CompanyId]				Long Integer, 
+	[PartnerAccountId]		Long Integer,  -- FK TO PartnerAccount.Id
+	[BankStatementLineId]	Long Integer, -- FK to BankStatementLine
+	[Note]					Text (255),  
 	[Parameters]			Text (25), 
-	[Description]			Text (255), 
-	[AccountCode]			Long Integer, 
-	[DueDate]			DateTime, 
-	[PostingCode]			Text (6), 
-	[SupplierInvoiceId]			Long Integer, 
-	[InvoiceId]			Long Integer, 
-	[Priority]			Long Integer, 
-	[PostingTypeCode]			Long Integer, 
-	[InboundInvoiceId]			Long Integer, 
-	[SubAccount]			Text (255), 
-	[AccountingDocumentId]			Long Integer
+	[Description]			Text (255),  
+	[SubAccountId]			Text (10),  -- FK to SubAccount.Id --  kontro troškova 
+	[SupplierInvoiceId]		Long Integer, -- FK to SupplierInvoice
+	[InvoiceId]				Long Integer, --	FK to invoice
+	[Priority]				Long Integer, 
 );
 
-CREATE TABLE [LedgerEntryTemp]
- (
-	[LedgerEntryId]			Long Integer, 
-	[JournalEntryNumber]			Double, 
-	[Account]			Text (50), 
-	[Date]			DateTime, 
-	[DebitAmount]			Double, 
-	[CreditAmount]			Double, 
-	[LineTypeId]			Double, 
-	[DocumentRef]			Text (50), 
-	[CompanyId]			Long Integer, 
-	[PartnerAccountingId]			Long Integer, 
-	[BankStatementLineId]			Long Integer, 
-	[Note]			Text (255), 
-	[Parameters]			Text (25), 
-	[Description]			Long Integer, 
-	[AccountCode]			Long Integer, 
-	[DueDate]			DateTime, 
-	[FromLedgerEntryId]			Long Integer, 
-	[PostingCode]			Text (6), 
-	[SupplierInvoiceId]			Long Integer, 
-	[InvoiceId]			Long Integer, 
-	[Priority]			Long Integer, 
-	[PostingTypeCode]			Long Integer, 
-	[InboundInvoiceId]			Long Integer, 
-	[SubAccount]			Text (255), 
-	[AccountingDocumentId]			Text (255)
-);
-
+-- necemo za sad koristiti ali neka ostane
 CREATE TABLE [FiscalYear]
  (
+	[Id]				Long Integer,
 	[CompanyId]			Long Integer NOT NULL, 
-	[Year]			Long Integer NOT NULL, 
+	[Year]				Long Integer NOT NULL, 
 	[StartDate]			DateTime, 
 	[EndDate]			DateTime, 
 	[IsArchived]			Long Integer, 
@@ -218,304 +228,315 @@ CREATE TABLE [FiscalYear]
 	[IsCurrent]			Long Integer
 );
 
-CREATE TABLE [ReminderBatch]
+
+-- OPOMENE
+-- NoticeTypeId - Samostalna opomene, Notifikacija na računu
+CREATE TABLE [NoticeBatch]
  (
-	[ReminderBatchId]			Long Integer, 
+	[Id]			Long Integer, 
+	[CompanyId]			Long Integer, 
 	[Title]			Text (50), 
 	[Date]			DateTime, 
 	[MinUnpaidInvoiceCount]			Long Integer, 
 	[DebtTolerance]			Long Integer, 
 	[DebtToleranceByMonth]			Long Integer, 
-	[ReminderTemplateId]			Long Integer, 
-	[ReminderTypeId]			Long Integer, 
-	[DebitPeriodDate]			DateTime, 
-	[CreditPeriodDate]			DateTime, 
-	[CompanyId]			Long Integer, 
+	[NoticeTemplateId]			Long Integer, 
+	[NoticeTypeId]			Long Integer, 
+	[UpToClaimDate]			DateTime, 
+	[UpToPaymentDate]			DateTime, 
 	[InvoiceBatchId]			Long Integer, 
-	[Label]			Text (255), 
-	[ReminderTemplateText]			Text (255), 
-	[RemittanceInfo]			Text (255)
+	[CustomCaptionOnOnSlip]			Text (255), 
 );
 
 CREATE TABLE [InvoiceBatch]
  (
-	[InvoiceBatchId]			Long Integer, 
-	[Code]			Text (50), 
-	[Label]			Text (50), 
-	[Month]			Text (50), 
-	[Year]			Text (50), 
-	[Place]			Text (50), 
-	[IssueDate]			DateTime, 
-	[ServiceDate]			Text (50), 
+	[Id]			Long Integer, 
+	[CompanyId]					Long Integer, 
+	[PeriodYYMM]	Integer, -- 2609
+	[Caption]		Text (50),  -- Septembar 2026
+	[Month]			Integer,  -- 9
+	[Year]			Integer,  -- 2026
+	[Place]			Text (50),  -- 	sedište kompanije uvek!
+	[IssueDate]					DateTime,   -- 05.10.2026
+	[ServiceDateFrom]			DateTime,  
+	[ServiceDateTo]				DateTime,  
 	[TransactionDate]			DateTime, 
-	[ValueDate]			DateTime, 
-	[ExchangeRateNbs]			Currency, 
-	[CompanyId]			Long Integer, 
-	[PostingJournalEntryId]			Long Integer, 
-	[SystemDate]			DateTime, 
-	[StaffId]			Long Integer, 
-	[ExtraordinaryInvoiceMarker]			Text (255), 
-	[InvoiceKind]			Text (255), 
-	[BalanceAsOfDate]			DateTime, 
-	[PreviousValueDate]			DateTime, 
-	[IsInterestCalculated]			Long Integer
+	[DueDate]					DateTime, 
+	[ExchangeRateNbs]			Decimal(18,4), 
+	[JournalEntryId]			Long Integer,  -- NALOG KNJIŽENJA
+	[EntryDate]					DateTime, 
+	[StaffId]					Long Integer, 
+	[ExtraordinaryInvoiceMarker]	Text (255),  -- MVR
+	[BalanceAsOfDate]			DateTime,  -- Datum preseka stanja
+	[PreviousValueDate]			DateTime,  --Prethodna valuta za obračun kamate
+	[IsInterestCalculated]		Long Integer -- Da li raditi obračun kamate
 );
 
 CREATE TABLE [BankStatement]
  (
-	[BankStatementId]			Long Integer, 
+	[Id]			Long Integer, 
+	[BankAccountId]			Long Integer,  -- preko ovaga imammo koja je companyId
 	[StatementNumber]			Long Integer, 
 	[StatementSuffix]			Text (50), 
-	[CompanyId]			Long Integer, 
 	[Date]			DateTime, 
 	[PreviousBalance]			Currency, 
 	[NewBalance]			Currency, 
 	[Debit]			Currency, 
 	[Credit]			Currency, 
-	[DebitJournalEntryId]			Long Integer, 
-	[CreditJournalEntryId]			Long Integer, 
+	[CountDebitEntry]			Long Integer, 
+	[CountCreditEntry]			Long Integer, 
 	[Note]			Text (50), 
 	[JournalEntryId]			Long Integer, 
-	[IsUnposted]			Boolean NOT NULL
+	[IsPosted]			Boolean NOT NULL
 );
 
 CREATE TABLE [BankStatementLine]
  (
 	[Id]			Long Integer, 
 	[BankStatementId]			Long Integer, 
-	[CompanyId]			Long Integer, 
 	[LineNumber]			Long Integer, 
-	[JournalEntryLineNumber]			Long Integer, 
 	[PayerRecipientName]			Text (255), 
 	[BankAccountNumber]			Text (50), 
-	[Origin]			Text (50), 
-	[ExecutionDate]			DateTime, 
-	[Debit]			Currency, 
-	[Credit]			Currency, 
-	[RemittanceInfo]			Text (255), 
+	[Debit]						Currency, 
+	[Credit]					Currency, 
+	[Info]			Text (255), 
 	[Code]			Long Integer, 
 	[PaymentReference]			Text (50), 
 	[PaymentReferenceOut]			Text (50), 
-	[PartnerAccountingId]			Long Integer, 
+	[PartnerAccountId]			Long Integer, 
+	[SubAccountId]			Text (10),  -- FK to SubAccount.Id -- kontro troškova
 	[IsPosted]			Boolean NOT NULL, 
 	[IsIgnored]			Boolean NOT NULL, 
-	[IsMatched]			Boolean NOT NULL
+	[IsMatched]			Boolean NOT NULL,
+	[BankRef]			Text (50) -- bank reference 
 );
 
-CREATE TABLE [AccountingDocument]
- (
-	[AttachmentId]			Long Integer, 
-	[CompanyId]			Long Integer, 
-	[AccountingDocumentIdRef]			Long Integer, 
-	[DocumentTypeId]			Long Integer, 
-	[Amount]			Currency, 
-	[PostingJournalEntryId]			Long Integer, 
-	[Date]			DateTime, 
-	[DocumentName]			Text (255), 
-	[DocumentDescription]			Text (255), 
-	[SubAccount]			Long Integer, 
-	[TypeGroupId]			Long Integer, 
-	[RefFromAccountingDocumentId]			Long Integer, 
-	[ReferenceCode]			Text (30)
-);
 
-CREATE TABLE [Account]
- (
-	[Account]			Long Integer NOT NULL, 
-	[Description]			Text (50), 
-	[PrintText]			Text (255)
-);
+-- KontniOkvir / KontniPlan
 
 CREATE TABLE [ChartOfAccounts]
  (
-	[Account]			Text (255) NOT NULL, 
-	[ShortName]			Text (255), 
-	[Name]			Text (255), 
-	[ParentAccount]			Text (255), 
-	[Level]			Long Integer, 
-	[Sign]			Text (255), 
-	[IsActive]			Long Integer
+	[Account]			Text (10) NOT NULL, 
+	[ShortName]			Text (50),  -- Za upotrebu u App kad treba kraći naziv, ako je null koristi Name
+	[Name]				Text (255), 
+	[ParentAccount]		Text (10), 
+	[Level]				Long Integer, 	-- Možda nepotrebno, broj karaktera u Account
+	[Sign]				Integer,  -- def 1 ili je-1 / rotacija za izveštaje
+	[IsActive]			Boolean, 	
+	[IsSinteticAccount]	Boolean,     
 );
 
+--
+CREATE TABLE [SubAccount]
+ (
+	[Id]					Text (10) NOT NULL,  -- PK
+	[Name]					Text (50),
+	[ParentSubAccountId]	Text (10), -- FK to Id 
+	[CostToSubAccountId]	Text (10), -- FK to Id
+	[InterestSubAccountId]	Text (10), -- FK to Id
+	[IsActive]				Boolean, 	--def TRUE
+	
+);
+
+
+-- PartnerAccount
+CREATE TABLE [PartnerAccount]
+ (
+	[Id]				Long Integer NOT NULL, 
+	[CompanyId]			Long Integer,  -- FK to Companies.Id, MOŽE BITI NULL ZA DOBAVLJAČE JER SE KORISTI U SVI KOMPANIJAMA
+	[Account]			Text (10) NOT NULL, --FK to ChartOfAccounts.Account
+	[PartnerId]			Long Integer NOT NULL,  -- FK to Partners.Id	 
+	[ContractId]		Long Integer,  -- FK to Contracts.Id  -- ako je dobavljač nema ugovora, ugovor je null
+	[AccountNumber]		Long Integer NOT NULL,  -- Generated UNIQU IN CompanyId / 2040 - 1001-5999 / 4350 - 9001 -...  -- OVO SE KORISTI ZA PRETRAGU
+);
+
+-- PartnerTypeId - ShortList: TableName: PartnerType / Pravno lice, ovlašćeno lice
 CREATE TABLE [Partner]
  (
-	[PartnerId]			Long Integer NOT NULL, 
-	[Name]			Text (100), 
-	[PostalCode]			Text (50), 
-	[Address]			Text (50), 
-	[RegistrationNumber]			Text (50), 
-	[TaxId]			Text (50), 
-	[ContractAddress]			Text (255), 
-	[Phone]			Text (50), 
-	[Email]			Text (100), 
-	[Note]			Text (255), 
-	[PrimaryBankAccountNumber]			Text (50), 
-	[Website]			Text (50), 
-	[CompanyId]			Long Integer, 
-	[CategoryLocationId]			Long Integer, 
-	[PrintName]			Text (255), 
-	[LegacyShortCode]			Text (50), 
-	[Account]			Text (50), 
-	[ExternalAccount]			Text (255), 
-	[PaymentSlipPrefix]			Text (255), 
-	[LegalRepresentative]			Text (255), 
-	[Type]			Long Integer, 
-	[AutoSubAccount]			Text (50), 
-	[GroupInvoiceTagId]			Long Integer, 
-	[SkipPrintInvoiceGroup]			Long Integer, 
-	[IsVatPayer]			Long Integer, 
-	[Jbjks]			Text (255), 
-	[PartnerCity]			Text (255), 
-	[CountryCode]			Text (255), 
-	[LegacyMasterId]			Long Integer, 
-	[DeliveryLocation]			Text (255), 
-	[DeliveryUnitTypeCode]			Long Integer, 
-	[PrintInvoiceMandatory]			Long Integer, 
-	[SendToPostOffice]			Long Integer, 
-	[Language]			Text (255), 
-	[ExtendedNote]			Memo/Hyperlink (255)
+	[Id]			Long Integer NOT NULL, 
+	[CompanyId]		Long Integer,  -- If IsNull used in all companies, svi dobavljači po def su Null
+	[ShortName]		Text (100),  -- use in App
+	[Name]			Text (255),  -- Apr full name for pravna lica
+	--za pravna lica
+	[RegistrationNumber]	Text (10),  -- MB: MATIČNI BROJ KOMPANIJE / 8 KARATERA
+	[TaxNumber]				Text (10), 	-- PIB: KOMPANIJA, STRANO LICE SA PIBom / 9 KARAKTERA
+	[Jbkjs]					Text (10),  -- JBKJS: PRAVNO LICE, Javni broj korisnika javnih sredstava / 5 karatera
+	[IsSefUser]				Boolean,    -- SEF, i ako im info pre slanja treba proveriti po pibu / jbkjs
+	[IsCrfUser]				Boolean,  	-- CRF ako ima PIB i SEF možda je CRF - ručni unos
+	[SkipAutoCheckSef]		Boolean, 	-- Lockovano da se proverava pre slanja, iskustveno GU
+	--za fitička lica
+	[IdCardNumber]	Text(10), -- Broj licne karte / 9 KARATERA
+	[Jmbg] 			Text(15), -- 13 karaktera
+	
+	[PartnerTypeId]			Long Integer,  -- FK ShortList: TableName: PartnerType 
+	[Language]			Text (10),  -- def srLat / settings
+	[Note]			Text (max),  -- mEMO	
 );
+
+-- AddressTypeId - ShortList: TableName: AddressType
+-- Neophodna podela Adress i PartnerAdress, jer se Adress korisiti i u Building Enerance
+CREATE TABLE [PartnerAddress] 
+(
+	[Id]			Long Integer NOT NULL, 
+	[PartnerId]		Long Integer,  
+	[AddressId]		Long Integer,  
+	[AddressTypeId]	Long Integer,  -- FK do shortlist
+	[IsDefault]		Boolean,  -- if more then 1 in same AddressTypeId
+	[TimeStamp]		DateTime,  -- last update date/time
+)
+-- ovde može i postalCode i City da ide u posebnu tabelu, pa onda i ContryCode
+CREATE TABLE [Address] 
+ (
+ 	[Id]			Long Integer NOT NULL, 
+ 	[Address]		Text (255), 
+ 	[PostalCode]	Long Integer, 
+ 	[City]			Text (255), 
+ 	[CountryCode]	Text (2),  -- def in Settings ..... RS
+);
+
+
 
 CREATE TABLE [ExchangeRate]
  (
-	[ExchangeRateId]			Long Integer, 
-	[Rate]			Currency, 
-	[RateDateFrom]			DateTime, 
-	[SchoolYearLegacy]			Long Integer, 
-	[ReferencePriceLegacy]			Long Integer, 
-	[EntryDateLegacy]			DateTime
+	[Id]				Long Integer, 
+	[Rate]				Decimal(19,4),  -- obavezno 4 decimale
+	[RateDateFrom]		DateTime, 
+	[TimeStamp]			DateTime
 );
 
-CREATE TABLE [PartnerEmail]
+CREATE TABLE [PartnerComms]
  (
-	[PartnerEmailId]			Long Integer, 
-	[PartnerId]			Long Integer, 
-	[Email]			Text (255), 
-	[SortOrder]			Long Integer, 
-	[LoginAppMaster]			Long Integer, 
-	[LoginAppView]			Long Integer, 
-	[SendInvoiceByEmail]			Long Integer
+	[Id]				Long Integer NOT NULL, 
+	[PartnerId]			Long Integer,  
+	[ChannelId]			Long Integer,   -- FK to ShortList.TableName: ChannelComms
+	[ValueNormalized]	Text (255),  -- samo cifre za telefon, email lower case, http 	
+	[Note] 				Text (255),  -- Dodatna napomena, ima osobe za pravna lica....
+	[IsActive]			Boolean,
+	[IsPrimary]			Boolean,
+	[SortIndex]			Integer,
+	[IsRegisterToInvoiceReceive]	Boolean,
 );
+
 
 CREATE TABLE [SentEmail]
  (
-	[SentEmailId]			Long Integer, 
-	[Subject]			Text (255), 
-	[ToAddress]			Text (255), 
+	[Id]			Long Integer, 
+	[Subject]		Text (255), 
+	[To]			Text (255), 
 	[Cc]			Text (255), 
 	[Bcc]			Text (255), 
-	[Body]			Memo/Hyperlink (255), 
-	[BodyHtml]			Memo/Hyperlink (255), 
-	[DateCreated]			DateTime, 
-	[DateSent]			DateTime, 
-	[Archive]			Boolean NOT NULL, 
-	[ErrorDescription]			Memo/Hyperlink (255), 
-	[ErrorStatus]			Text (255)
+	[BodyHtml]		Text (max),
+	[Created]		DateTime, 
+	[Sent]			DateTime, 
+	[Archive]		Boolean, 
+	[SendStatusId]		Text (255),  -- FK to ShortList.TableName: SendEmailStatus
+	[SendDescription]	Text (max),
+	
 );
 
 CREATE TABLE [SentEmailAttachment]
  (
-	[SentEmailAttachmentId]			Long Integer, 
-	[SentEmailId]			Long Integer, 
-	[AttachmentFilePath]			Text (255), 
-	[AttachmentFilePath2]			Text (255)
+	[Id]			Long Integer, 
+	[SentEmailId]	Long Integer, 
+	[FilePath]		Text (255), 
 );
 
+-- Nalog
 CREATE TABLE [JournalEntry]
  (
-	[LegacyJournalEntryNumber]			Double NOT NULL, 
-	[Date]			DateTime, 
-	[Balance]			Currency, 
-	[Note]			Text (255), 
-	[Reserved]			Text (50), 
+	[Id]					Long Integer, 
+	[CompanyId]				Long Integer, 
+	[PostingDate]			DateTime, 
+	[DueDate]				DateTime, 
+	[Balance]				Currency, 
+	[Note]					Text (255), 
 	[Description]			Text (50), 
-	[CompanyId]			Long Integer, 
-	[AdditionalNotes]			Text (255), 
-	[JournalEntryTypeId]			Long Integer
+	[JournalEntryTypeId]	Long Integer, -- FK to ShortList: TableName: LedgerLineType / ABSOLUTNO ISTO
+	[Currency] 				Text(3)	  -- on new get def value from settings(CurrencyDef) - RSD
+	[IsPosted]				Boolean	-- default false
+	[PostedDate]			DateTime	
+	[PostedUserId]			Long Integer, -- FK to Users/Staff
 );
 
-CREATE TABLE [CategoryLocation]
+CREATE TABLE [LocationCategory]
  (
-	[CategoryLocationId]			Long Integer NOT NULL, 
-	[Name]			Text (50)
+	[Id]			Long Integer NOT NULL, 
+	[Name]			Text (255)
+	[ParentId]      Long Integer, -- FK to ShortList: CategoryLocation.Id
+	[SortIndex]		Integer -- Sort index
 );
 
-CREATE TABLE [Note]
- (
-	[Id]			Long Integer, 
-	[Date]			Text (50), 
-	[UserName]			Text (50), 
-	[Text]			Memo/Hyperlink (255)
-);
 
 CREATE TABLE [Unit]
  (
-	[UnitId]			Long Integer, 
-	[CompanyId]			Long Integer, 
-	[Name]			Text (255), 
-	[PartnerId]			Long Integer NOT NULL, 
-	[UnitTypeId]			Long Integer, 
-	[Status]			Long Integer, 
-	[IoLegacy]			Double, 
-	[InvestmentMaintenanceReserve]			Double, 
-	[InvestmentMaintenanceTitle]			Text (50), 
-	[PreviousArea]			Double, 
-	[StatusChangeNote]			Text (50), 
-	[Coefficient]			Double, 
-	[Total]			Currency, 
-	[Entrance]			Text (50), 
-	[Category]			Text (5), 
-	[Address]			Text (50), 
-	[Note]			Text (255), 
-	[MailingName]			Text (50), 
-	[MailingAddress]			Text (50), 
-	[MailingPostalCode]			Text (50), 
-	[MailingTaxId]			Text (50), 
-	[LegacyPayerPartnerId]			Long Integer, 
-	[LegacyPayerPartnerId2]			Long Integer, 
-	[GarageSpotNumber]			Long Integer, 
-	[K1]			Double, 
-	[K2]			Double, 
-	[K3]			Double, 
-	[K4]			Double, 
+	[Id]				Long Integer NOT NULL, 
+	[CompanyId]			Long Integer NOT NULL,  
+	[Name]				Text (255), 
+	[ContractId]		Long Integer,  -- not assigned unit are Null
+	[UnitTypeId]		Long Integer,  -- FK to  ShortList: UnitType / Stan, Lokal, Poslovni prostor...
+	[BuildingEntranceId]	Long Integer, -- FK to BuildingEntrance .... ovde je i veza sa adresom
+	[Note]				Text (255),  -- interna napomena
+	[SortingNumber] 	Long Integer, -- Stanovi 1 - 999, Lokali 1000-9999, GM 10000 x nivo + redni broj
+	[K1]			Double,  -- KVADRATURA ZA OBRAČUN
+	[K2]			Double,  -- KOLIČINA ZA OBRAČUN / DEF 1 ali može biti umanjeno ili uvećano npr invalidsko p mesto 1.5
+	[K3]			Double,  -- slobodan K - NPR dvorišta prizmelje, fakturisanje za košenje
+	[K4]			Double,  --  -- || -- - tagovi za garažu, popust za penzionere samo za upravljanje....
 	[K5]			Double, 
-	[MailingLegacyCode]			Text (50), 
-	[Area]			Double, 
-	[ResidentCount]			Long Integer, 
-	[UnitTypeCode]			Long Integer, 
-	[LegacyOwnerPartnerId]			Long Integer, 
-	[LegacyTenantPartnerId]			Long Integer, 
-	[LegacyGroupInvoiceId]			Long Integer, 
-	[UnitTypeShortCode]			Text (255), 
-	[NetArea]			Double, 
-	[Terrace]			Double, 
-	[NetAreaWithTerrace]			Double, 
-	[HandOverDate]			DateTime, 
-	[FloorNumber]			Long Integer, 
-	[FloorText]			Text (255)
+	[FloorNumber]			Long Integer,  
 );
 
-CREATE TABLE [Reminder]
+
+
+CREATE TABLE [Contract]
  (
-	[ReminderId]			Long Integer, 
-	[ReminderBatchId]			Long Integer, 
-	[PartnerAccountingId]			Long Integer, 
-	[UnpaidInvoiceCount]			Long Integer, 
-	[Debt]			Double, 
+	[Id]				Long Integer, 
+	[AccountNumber]		Long Integer,  -- ZAMENA ZA PARTNER ACCOUNTING ID
+	[UnitId]			Long Integer,  -- FK to Units
+	[OwnerPartnerId]	Long Integer,  -- FK to Partners / 
+	[InvoicePartnerId]	Long Integer,  -- FK to Partners / def owner / ako je unet tenet onda korsinik bira izmedju dva
+	[TenetPartnerId]    Long Integer,  -- FK to Partners 
+	[ContractDate]		Date, -- datum ugovora ili datium primo predaje
+	[ContractEndDate] 	Date, -- datum kraja ugovora
+	[InvoiceStartDate]	Date, -- datum pocetka fakturisanja
+	[InvoiceEndDate]	Date, -- datum pocetka fakturisanja
+	[IsActive]			Boolean
+	[Note]				Text (Max) -- interna napomena
+
+	--INVOICE DATA
+	[InvoiceDeliveryLocation]		Text (10),    -- Text in front of units in Invoice.... npr BW-ETE za Beograd na vodi 
+	[InvoiceDeliveryUnitId]			Long Integer,  -- FK to Units....
+	[InvoiceLegacyMasterId]			Long Integer,  -- ID od grupnog računa ako se koristi
+	
+	-- defaultna vrednost je štampa računa
+	[IsPrintInvoiceMandatory]		Boolean,  -- obavezno štampanje zahtevano od korisnika
+	[IsPrintInvoiceToPostOffice]	Boolean,  -- da se šalje preko pošte
+	[IsPrintInvoiceSkiped]			Boolean,  -- zahtev da se ne štampa račun, kontrola da li ima elektronski račun, kontrola da IsPrintInvoiceMandatory mora biti false, IsPrintInvoiceToPostOffice false.
+
+	[ExportExternalAccount]			Text (255),  -- povezivanje sa spoljnim knjigovodstvenim agencijama
+);
+
+
+
+
+-- OPOMENA
+CREATE TABLE [Notice]
+ (
+	[Id]					Long Integer, 
+	[NoticeBatchId]			Long Integer,  -- FK to NoticeBatch.Id
+	[PartnerAccountId]		Long Integer,  -- FK to PartnerAccount.Id
+	[UnpaidInvoiceCount]	Long Integer, 
+	[Debt]					Decimal(18,2), 
 	[InvoiceText]			Text (255), 
-	[IsActive]			Long Integer, 
-	[LineItemSum]			Double, 
-	[PaymentReference]			Text (255), 
-	[Costs]			Long Integer, 
-	[Total]			Long Integer
+	[IsActive]				Long Integer, 
+	[PaymentReference]		Text (50), 
+	[AditionalCosts]		Long Integer,  -- Advokatski troškovi
+	[Total]					Long Integer, -- AditionalCosts + Debt
 );
 
-CREATE TABLE [ReminderLine]
+CREATE TABLE [NoticeLine]
  (
-	[ReminderLineId]			Long Integer, 
-	[ReminderId]			Long Integer, 
-	[ReminderBatchId]			Long Integer, 
-	[PartnerAccountingId]			Long Integer, 
+	[Id]			Long Integer, 
+	[NoticeId]			Long Integer,  -- FK to Notice.Id
 	[Parameters]			Text (25), 
 	[DocumentRef]			Text (255), 
 	[Debit]			Double, 
@@ -528,26 +549,10 @@ CREATE TABLE [ReminderLine]
 	[UnitAddress]			Text (255)
 );
 
-CREATE TABLE [ReminderTemplate]
- (
-	[ReminderTemplateId]			Long Integer, 
-	[ReminderTypeId]			Long Integer, 
-	[ReportName]			Text (255), 
-	[Title]			Text (255), 
-	[ReportField01]			Text (255), 
-	[ReportField02]			Text (255), 
-	[ReportField03]			Memo/Hyperlink (255), 
-	[ReportField04]			Memo/Hyperlink (255), 
-	[ReportField05]			Memo/Hyperlink (255), 
-	[ReportField06]			Memo/Hyperlink (255), 
-	[ReportField07]			Text (255), 
-	[ReportField08]			Text (255), 
-	[ReportField09]			Text (255)
-);
 
 CREATE TABLE [SelectionBasket]
  (
-	[SelectionBasketId]			Long Integer, 
+	[SelectionBasketId]	Long Integer, 
 	[TargetId]			Long Integer, 
 	[TypeIndex]			Long Integer
 );
@@ -555,23 +560,25 @@ CREATE TABLE [SelectionBasket]
 CREATE TABLE [Events]
  (
 	[EventId]			Long Integer, 
-	[DateOfRequest]			DateTime, 
-	[DateOfExecution]			DateTime, 
-	[PartnerId]			Long Integer, 
-	[UnitId]			Long Integer, 
-	[Description]			Text (255), 
-	[PreviousValue]			Text (255), 
-	[NewValue]			Text (255), 
-	[FieldsRelated]			Text (255), 
-	[RequestType]			Text (255), 
-	[RequestBy]			Text (255), 
-	[RequestThrough]			Text (255)
+	[DateOfRequest]		DateTime, 
+	[DateOfExecution]	DateTime, 
+	[ContractId]		Long Integer,  -- FK to Contract.Id
+	[PartnerId]			Long Integer,  -- FK to Partner.Id
+	[UnitId]			Long Integer,  -- FK to Unit.Id
+	[Description]		Text (255),  -- opis događaja
+	[PreviousValue]		Text (255),  -- vrednost pre promene
+	[NewValue]			Text (255),  -- vrednost posle promene
+	[FieldsRelated]		Text (255),  -- polja koja su vezana za događaj
+	[RequestTypeId]		Long Integer,  -- FK to ShortList: TableName: EventRequestType
+	[RequestBy]			Text (255),  -- ko je zahtevao / emial, tel....
+	[RequestThrough]	Text (255)  -- preko čega je zahtevao / email upravnika 
 );
+
 
 CREATE TABLE [Invoice]
  (
-	[InvoiceId]			Long Integer, 
-	[SequenceNumber]			Text (20), 
+	[Id]				Long Integer, 
+	[SequenceNumber]	Text (20), 
 	[InvoiceBatchId]			Long Integer, 
 	[IssueDate]			DateTime, 
 	[PlaceOfIssue]			Text (50), 
@@ -627,35 +634,25 @@ CREATE TABLE [Invoice]
 	[InvoiceTotal]			Double
 );
 
-CREATE TABLE [InboundInvoice]
- (
-	[InboundInvoiceId]			Long Integer, 
-	[PartnerId]			Long Integer, 
-	[CompanyId]			Long Integer, 
-	[InboundInvoiceNumber]			Text (255), 
-	[InvoiceDate]			DateTime, 
-	[PostingDate]			DateTime, 
-	[PaymentDate]			DateTime, 
-	[SubAccount]			Text (255), 
-	[InvoiceAmount]			Currency
-);
 
 CREATE TABLE [InvoiceUnit]
  (
+	[Id]				Long Integer,
 	[InvoiceId]			Long Integer, 
-	[UnitId]			Long Integer
+	[UnitId]			Long Integer -- mozda može da se koristi i contractId umesto ovoga
 );
+
+
 
 CREATE TABLE [InvoiceLine]
  (
-	[InvoiceLineId]			Long Integer, 
-	[InvoiceId]			Long Integer, 
-	[InvoiceBatchId]			Long Integer, 
-	[PartnerId]			Long Integer, 
-	[CompanyId]			Long Integer, 
-	[SupplierInvoiceId]			Long Integer, 
-	[Name]			Text (255), 
-	[CalculationTypeId]			Long Integer, 
+	[Id]							Long Integer,
+	[InvoiceId]						Long Integer, 
+	[InvoiceBatchId]				Long Integer, 
+	[PartnerId]						Long Integer, 
+	[CompanyId]						Long Integer, 
+	[SupplierInvoiceId]				Long Integer, 
+	[Name]						Text(255), 
 	[K1]			Double, 
 	[K2]			Double, 
 	[K3]			Double, 
@@ -670,82 +667,35 @@ CREATE TABLE [InvoiceLine]
 	[VatAmount]			Double, 
 	[TotalRsd]			Double, 
 	[SortOrder]			Long Integer, 
-	[SupplierAccountPartnerAccountingId]			Long Integer, 
+	
 	[InvoiceAmount]			Double, 
-	[K1xK2]			Double, 
+	[K1xK2]				Double, 
 	[K2xK3]			Double, 
 	[K2xK4]			Double, 
 	[K2xK5]			Double, 
-	[UnitOfMeasure]			Text (255), 
-	[UnitId]			Long Integer, 
+	[UnitOfMeasure]			Text (50), 
 	[QuantityAlt]			Double
-);
-
-CREATE TABLE [InvoiceLineBenefitArchive]
- (
-	[InvoiceLineId]			Long Integer NOT NULL, 
-	[InvoiceId]			Long Integer, 
-	[InvoiceBatchId]			Long Integer, 
-	[PartnerId]			Long Integer, 
-	[CompanyId]			Long Integer, 
-	[SupplierInvoiceId]			Long Integer, 
-	[Name]			Text (255), 
-	[CalculationTypeId]			Long Integer, 
-	[K1]			Double, 
-	[K2]			Double, 
-	[K3]			Double, 
-	[K4]			Double, 
-	[K5]			Double, 
-	[Quantity]			Double, 
-	[PriceEur]			Double, 
-	[ExchangeRateNbs]			Double, 
-	[Amount]			Double, 
-	[Sum]			Double, 
-	[VatRate]			Double, 
-	[VatAmount]			Double, 
-	[TotalRsd]			Double, 
-	[SortOrder]			Long Integer, 
-	[SupplierAccountPartnerAccountingId]			Long Integer, 
-	[InvoiceAmount]			Double, 
-	[K1xK2]			Double, 
-	[K2xK3]			Double, 
-	[K2xK4]			Double, 
-	[K2xK5]			Double, 
-	[UnitOfMeasure]			Text (255), 
-	[UnitId]			Long Integer
 );
 
 CREATE TABLE [Setting]
  (
-	[SettingId]			Long Integer, 
-	[SettingName]			Text (255), 
-	[SettingValue]			Text (255), 
-	[Description]			Text (255), 
-	[Category]			Text (50), 
-	[ModuleFormField]			Text (50), 
-	[DefaultValue]			Text (255), 
-	[FilterUserId]			Long Integer, 
-	[FilterComputerName]			Text (255), 
-	[FilterCustom1Num]			Long Integer, 
-	[FilterCustom2Num]			Long Integer, 
-	[FilterCustom3Num]			Long Integer, 
-	[FilterCustom1Text]			Text (255), 
-	[FilterCustom2Text]			Text (255), 
-	[FilterCustom3Text]			Text (255), 
-	[SettingValueLong]			Memo/Hyperlink (255)
+	[Id]			Long Integer, 
+	[CompanyId]		Long Integer, 
+	[Name]			Text (255), 
+	[Key]			Text (50), 
+	[Value]			Text (255), 
+	[Description]	Text (255), 
+	[Category]		Text (50), 
+	[ValueMax]		Text (Max)
 );
 
-CREATE TABLE [EmailSetting]
- (
-	[EmailSettingId]			Long Integer NOT NULL, 
-	[SettingName]			Text (255), 
-	[SettingValue]			Memo/Hyperlink (255), 
-	[Category]			Text (255), 
-	[Description]			Text (255), 
-	[CompanyId]			Long Integer
-);
 
-CREATE TABLE [EPaymentOrderSettingGroup]
+CREATE TABLE [ImportMapping]
+(
+
+)
+
+CREATE TABLE [ImportMappingGroup]
  (
 	[SortIndex]			Long Integer NOT NULL, 
 	[Category]			Text (50), 
@@ -769,22 +719,26 @@ CREATE TABLE [FormGridSetting]
 
 CREATE TABLE [Company]
  (
-	[CompanyId]			Long Integer NOT NULL, 
-	[Name]			Text (255), 
-	[Building]			Text (50), 
-	[Address]			Text (50), 
-	[Municipality]			Text (255), 
-	[PostalCode]			Text (50), 
-	[RepresentativeId]			Long Integer, 
-	[TaxId]			Long Integer, 
+	[Id]				Long Integer NOT NULL, 
+	[PartnerId]			Long Integer NOT NULL, -- FK Partner.Id
+	[ManagerId]			Long Integer, -- FK Partner.Id
+	[ShortName]			Text (50), 
+	[PrintName]			Text (50), 
+	[RelativeFolderName] 	Text (50), 
+
+
 	[PrimaryBankAccountNumber]			Text (50), 
-	[RegistrationNumber]			Text (50), 
+	
+	
 	[Note]			Text (255), 
+	
 	[SortOrder]			Long Integer, 
-	[PrintName]			Text (255), 
-	[Folder]			Text (50), 
-	[PaymentSlipTypeId]			Long Integer, 
+	
+	
+	
+	
 	[CategoryLocationId]			Long Integer, 
+	
 	[Account]			Long Integer, 
 	[CompanyStatusId]			Long Integer, 
 	[ExternalAccount]			Text (255), 
@@ -827,30 +781,15 @@ CREATE TABLE [StaffPermission]
 	[IsDisabled]			Long Integer
 );
 
-CREATE TABLE [StaffTemp]
- (
-	[StaffId]			Long Integer, 
-	[UserName]			Text (50), 
-	[Level]			Text (50), 
-	[PreferredLanguage]			Text (50), 
-	[AccessRestriction]			Text (255), 
-	[LastComputerName]			Text (255)
-);
 
-CREATE TABLE [CompanyBuilding]
- (
-	[Id]			Long Integer NOT NULL, 
-	[CompanyId]			Long Integer, 
-	[Unit]			Text (255)
-);
 
 CREATE TABLE [BuildingEntrance]
  (
-	[BuildingEntranceId]			Long Integer NOT NULL, 
+	[Id]			Long Integer NOT NULL, 
 	[CompanyId]			Long Integer, 
-	[Entrance]			Text (255), 
-	[Building]			Text (255), 
-	[Address]			Text (255), 
+	[BuildingName]		Text (255), 
+	[EntranceName]		Text (255), 
+	[AdressId]			Long Integer, -- FK to Adress
 	[Label]			Text (255), 
 	[Description]			Text (255), 
 	[SortOrder]			Long Integer
@@ -865,16 +804,6 @@ CREATE TABLE [ContactImport]
 	[Email]			Text (255)
 );
 
-CREATE TABLE [CodeList]
- (
-	[SortIndex]			Long Integer NOT NULL, 
-	[Category]			Text (255) NOT NULL, 
-	[Caption]			Text (255), 
-	[ShortName]			Text (255), 
-	[Description]			Text (255), 
-	[SortOrder]			Long Integer, 
-	[GroupCode]			Long Integer
-);
 
 CREATE TABLE [StatReportDefinition]
  (
@@ -897,15 +826,17 @@ CREATE TABLE [WhereClauseTemplate]
 	[TargetFormName]			Text (50)
 );
 
+
+-- ok
 CREATE TABLE [BankAccount]
  (
 	[BankAccountId]			Long Integer, 
-	[PrimaryBankAccountNumber]			Text (255), 
-	[IsActive]			Long Integer, 
-	[SortOrder]			Long Integer, 
-	[PartnerId]			Long Integer, 
-	[CompanyId]			Long Integer, 
-	[ManagerId]			Long Integer
+	[AccountNumber]			Text (50), 
+	[IsActive]				Long Integer, 
+	[PartnerId]				Long Integer, 
+	[CompanyId]				Long Integer, 
+	[SortIndex]				Long Integer,
+	[Currency]				Text (3), -- on new get def value from settings(CurrencyDef) - RSD
 );
 
 CREATE TABLE [AdditionalTextType]
@@ -931,17 +862,6 @@ CREATE TABLE [UnitType]
 	[IgAccount]			Long Integer
 );
 
-CREATE TABLE [CalculationType]
- (
-	[CalculationTypeId]			Long Integer NOT NULL, 
-	[Name]			Text (100), 
-	[SupplierInvoiceAmountLabel]			Text (100), 
-	[Note]			Text (255), 
-	[AmountLabel]			Text (255), 
-	[QuantityLabel]			Text (255), 
-	[UnitOfMeasure]			Text (255), 
-	[UnitOfMeasureIndex]			Long Integer
-);
 
 CREATE TABLE [PartnerCategory]
  (
@@ -991,17 +911,9 @@ CREATE TABLE [PartnerBankAccount]
 	[PartnerId]			Long Integer
 );
 
-CREATE TABLE [VersionHistory]
- (
-	[VersionDate]			DateTime, 
-	[VersionNumber]			Text (50), 
-	[ShortDescription]			Text (255), 
-	[FullDescription]			Memo/Hyperlink (255)
-);
-
 CREATE TABLE [PaymentOrder]
  (
-	[PaymentOrderId]			Long Integer, 
+	[Id]			Long Integer, 
 	[TemplateTitle]			Text (50), 
 	[PayerName]			Text (255), 
 	[PaymentPurpose]			Text (255), 
@@ -1070,15 +982,6 @@ CREATE TABLE [InterestStatement]
 	[InvoiceBatchId]			Long Integer
 );
 
-CREATE TABLE [InvoiceLineCostCache]
- (
-	[InvoiceLineId]			Long Integer, 
-	[InvoiceId]			Long Integer, 
-	[InvoiceBatchId]			Long Integer, 
-	[PartnerId]			Long Integer, 
-	[CompanyId]			Long Integer, 
-	[Total]			Currency
-);
 
 CREATE TABLE [EPaymentOrderSetting]
  (
@@ -1095,15 +998,6 @@ CREATE TABLE [EPaymentOrderSetting]
 	[RowNumber]			Long Integer
 );
 
-CREATE TABLE [SwitchboardMenuItem]
- (
-	[SwitchboardMenuItemId]			Long Integer NOT NULL, 
-	[ItemNumber]			Integer NOT NULL, 
-	[ItemText]			Text (255), 
-	[Command]			Integer, 
-	[Argument]			Text (255), 
-	[FormLevel]			Text (50)
-);
 
 CREATE TABLE [BankStatementPostingTemplate]
  (
@@ -1118,77 +1012,25 @@ CREATE TABLE [BankStatementPostingTemplate]
 	[SetAccount]			Text (50)
 );
 
-CREATE TABLE [Contract]
+
+-- insted of 30 short table, use one for multy purpose
+-- Id:AutoNumber; TableName: AddressType; Caption: Sedište; IndexValue: 1
+-- Id:AutoNumber; TableName: AddressType; Caption: Prebivalište; IndexValue: 2
+-- povezivanje se vrši sa Id PK
+
+CREATE TABLE [ShortList]
  (
-	[LegacyRowId]			Long Integer, 
-	[Company municipality]			Text (255), 
-	[Company legacy id]			Double, 
-	[Seller (Company)]			Text (255), 
-	[Company address]			Text (255), 
-	[Company tax id]			Double, 
-	[Postal code]			Text (255), 
-	[Company bank account]			Text (255), 
-	[Company registration number]			Double, 
-	[Invoice number]			Text (255), 
-	[Place of invoice issue]			Text (255), 
-	[Invoice issue date]			Text (255), 
-	[Unit number]			Text (255), 
-	[Service date]			Text (255), 
-	[Unit]			Text (255), 
-	[Partner]			Text (255), 
-	[Field16Legacy]			Text (255), 
-	[Partner address]			Text (255), 
-	[Registration number]			Double, 
-	[Tax id name]			Text (255), 
-	[Tax id]			Text (255), 
-	[Quantity in sqm]			Double, 
-	[Unit of measure]			Text (255), 
-	[Calculation unit coefficient]			Double, 
-	[Monthly building fund per unit (Dec 2019 - Feb 2822019)]			Double, 
-	[Control value]			Double, 
-	[Coefficient]			Double, 
-	[Common area insurance]			Double, 
-	[Monthly management fee]			Double, 
-	[Regular monthly passenger elevator service]			Double, 
-	[Regular monthly car elevator service]			Double, 
-	[Extraordinary car elevator service]			Double, 
-	[Building hygiene maintenance with caretaker]			Double, 
-	[Garage hygiene maintenance]			Double, 
-	[Building hygiene maintenance]			Double, 
-	[Technical maintenance]			Double, 
-	[Extraordinary service]			Double, 
-	[Field37Legacy]			Double, 
-	[Total]			Double, 
-	[Balance carried forward as of]			Text (255), 
-	[Balance carried forward amount (Maxi manager)]			Text (255), 
-	[Id]			Text (255), 
-	[Balance carried forward as of 2018-12-31 (Company)]			Text (255), 
-	[Total debt for 2018]			Text (255), 
-	[Payment deadline]			Text (255), 
-	[Model and payment reference]			Text (255), 
-	[Payment purpose]			Text (255), 
-	[Value date]			Text (255), 
-	[Please settle the debt relating to the period up to (note]			Text (255), 
-	[Payment reference for debt as of 2018-12-31]			Text (255), 
-	[Note]			Text (255), 
-	[Field51Legacy]			Text (255), 
-	[PartnerName]			Text (255)
+	[Id]				Long Integer NOT NULL, 
+	[TableName]			Text (255) NOT NULL, 
+	[Caption]			Text (255) NOT NULL, 
+	[ShortName]			Text (50),
+	[Description]		Text (255),
+	[IndexValue]		Long Integer NOT NULL, 
+	[IndexSort]			Long Integer NOT NULL, 
+	[IndexKey]			Text (50),   -- use for geting function or settings by key for each table value
+	[TranslationId]		Long Integer -- insteed of Caption if TranslationId > 0 then use Translation
 );
 
-
-```
-
-## SZAPP.mdb — 27 local/helper tables (front-end, temp/LedgerEntry-backup/switchboard tables)
-```sql
--- ----------------------------------------------------------
--- MDB Tools - A library for reading MS Access database files
--- Copyright (C) 2000-2011 Brian Bruns and others.
--- Files in libmdb are licensed under LGPL and the utilities under
--- the GPL, see COPYING.LIB and COPYING files respectively.
--- Check out http://mdbtools.sourceforge.net
--- ----------------------------------------------------------
-
--- That file uses encoding UTF-8
 
 CREATE TABLE [BenefitUsageUpdate]
  (
@@ -1197,66 +1039,6 @@ CREATE TABLE [BenefitUsageUpdate]
 	[UnitId]			Text (255), 
 	[PeriodYyMm]			Long Integer, 
 	[MonthCount]			Long Integer
-);
-
-CREATE TABLE [LedgerEntryBackupPrk]
- (
-	[LedgerEntryId]			Long Integer, 
-	[JournalEntryNumber]			Double, 
-	[Account]			Text (50), 
-	[Date]			DateTime, 
-	[DebitAmount]			Double, 
-	[CreditAmount]			Double, 
-	[LineTypeId]			Double, 
-	[DocumentRef]			Text (50), 
-	[CompanyId]			Long Integer, 
-	[PartnerAccountingId]			Long Integer, 
-	[BankStatementLineId]			Long Integer, 
-	[Note]			Text (255), 
-	[Parameters]			Text (25), 
-	[Description]			Text (255), 
-	[AccountCode]			Long Integer, 
-	[DueDate]			DateTime, 
-	[PostingCode]			Text (6), 
-	[SupplierInvoiceId]			Long Integer, 
-	[InvoiceId]			Long Integer, 
-	[Priority]			Long Integer, 
-	[PostingTypeCode]			Long Integer, 
-	[InboundInvoiceId]			Long Integer, 
-	[SubAccount]			Text (255)
-);
-
-CREATE TABLE [LedgerEntryTemp]
- (
-	[LedgerEntryId]			Long Integer, 
-	[JournalEntryNumber]			Double, 
-	[Account]			Text (50), 
-	[Date]			DateTime, 
-	[CreditAmount]			Double, 
-	[DebitAmount]			Double, 
-	[LineTypeId]			Double, 
-	[DocumentRef]			Text (50), 
-	[CompanyId]			Long Integer, 
-	[PartnerAccountingId]			Long Integer, 
-	[BankStatementLineId]			Long Integer, 
-	[Note]			Text (255), 
-	[Parameters]			Text (25), 
-	[Description]			Text (255), 
-	[AccountCode]			Long Integer, 
-	[DueDate]			DateTime, 
-	[FromLedgerEntryId]			Long Integer, 
-	[PostingCode]			Text (6), 
-	[SupplierInvoiceId]			Long Integer, 
-	[InvoiceId]			Long Integer, 
-	[Priority]			Long Integer, 
-	[PostingTypeCode]			Long Integer, 
-	[InboundInvoiceId]			Long Integer, 
-	[SubAccount]			Text (255)
-);
-
-CREATE TABLE [BenefitImport]
- (
-	[BenefitImportRow]			Text (255) NOT NULL
 );
 
 CREATE TABLE [UnitAreaImport]
@@ -1270,78 +1052,8 @@ CREATE TABLE [UnitAreaImport]
 	[PercentageTotal]			Double
 );
 
-CREATE TABLE [LedgerEntry_Backup_20250531_BeforeManagementSplit]
- (
-	[LedgerEntryId]			Long Integer NOT NULL, 
-	[JournalEntryNumber]			Double, 
-	[Account]			Text (50), 
-	[Date]			DateTime, 
-	[DebitAmount]			Double, 
-	[CreditAmount]			Double, 
-	[LineTypeId]			Double, 
-	[DocumentRef]			Text (50), 
-	[CompanyId]			Long Integer, 
-	[PartnerAccountingId]			Long Integer, 
-	[BankStatementLineId]			Long Integer, 
-	[Note]			Text (255), 
-	[Parameters]			Text (25), 
-	[Description]			Text (255), 
-	[AccountCode]			Long Integer, 
-	[DueDate]			DateTime, 
-	[PostingCode]			Text (6), 
-	[SupplierInvoiceId]			Long Integer, 
-	[InvoiceId]			Long Integer, 
-	[Priority]			Long Integer, 
-	[PostingTypeCode]			Long Integer, 
-	[InboundInvoiceId]			Long Integer, 
-	[SubAccount]			Text (255), 
-	[AccountingDocumentId]			Long Integer
-);
 
-CREATE TABLE [ReminderTemplateField]
- (
-	[ReminderTemplateFieldId]			Long Integer, 
-	[ReminderTemplateId]			Long Integer, 
-	[KeyName]			Text (255), 
-	[KeyIndex]			Long Integer, 
-	[TemplateText]			Text (255)
-);
 
-CREATE TABLE [PasteErrorLog]
- (
-	[SupplierInvoiceId]			Long Integer, 
-	[CollectionPriority]			Long Integer, 
-	[CompanyId]			Long Integer, 
-	[InvoiceNumber]			Long Integer, 
-	[PostingAccount]			Text (255), 
-	[InvoiceName]			Text (255), 
-	[Note]			Text (255), 
-	[Supplier]			Text (255), 
-	[SupplierAccountPartnerAccountingId]			Long Integer, 
-	[CalculationTypeId]			Long Integer, 
-	[InvoiceMonth]			Text (255), 
-	[InvoiceAmountEur]			Double, 
-	[InvoiceAmountRsd]			Currency, 
-	[AmountByCoefficientEur]			Double, 
-	[AmountByCoefficientRsd]			Currency, 
-	[PostingCode]			Text (255), 
-	[LegacyTempPrevId]			Long Integer, 
-	[DocumentTypeId]			Long Integer, 
-	[ExtraordinaryInvoiceMarker]			Text (255), 
-	[InvoiceNameFunction]			Text (255), 
-	[SequenceNumber]			Text (255), 
-	[PostedInvoiceAmount]			Currency, 
-	[InvoiceDate]			DateTime, 
-	[PostingDate]			DateTime, 
-	[PaymentDate]			DateTime, 
-	[InvoiceDescription]			Text (255), 
-	[PaymentReference]			Text (255), 
-	[PreviousSupplierInvoiceId]			Long Integer, 
-	[NewSupplierInvoiceId]			Long Integer, 
-	[JournalEntryId]			Long Integer, 
-	[Vat]			Long Integer, 
-	[ClosesAccount]			Text (255)
-);
 
 CREATE TABLE [BalanceCarryForward]
  (
@@ -1356,12 +1068,7 @@ CREATE TABLE [BalanceCarryForward]
 	[CompanyId]			Long Integer
 );
 
-CREATE TABLE [SelectionBasket]
- (
-	[SelectionBasketId]			Long Integer, 
-	[TargetId]			Long Integer, 
-	[TypeIndex]			Long Integer
-);
+
 
 CREATE TABLE [PostingScheme]
  (
@@ -1387,33 +1094,7 @@ CREATE TABLE [PostingScheme]
 	[SourceSqlValue]			Text (255)
 );
 
-CREATE TABLE [StaffTemp]
- (
-	[StaffId]			Long Integer, 
-	[UserName]			Text (50), 
-	[Level]			Text (50), 
-	[PreferredLanguage]			Text (50), 
-	[AccessRestriction]			Text (50), 
-	[LastComputerName]			Text (255)
-);
 
-CREATE TABLE [InterestRate]
- (
-	[Id]			Long Integer, 
-	[Date]			DateTime, 
-	[Rate]			Currency, 
-	[Period]			Text (50)
-);
-
-CREATE TABLE [SwitchboardMenuItem]
- (
-	[SwitchboardMenuItemId]			Long Integer, 
-	[ItemNumber]			Integer, 
-	[ItemText]			Text (255), 
-	[Command]			Integer, 
-	[Argument]			Text (255), 
-	[FormLevel]			Text (255)
-);
 
 CREATE TABLE [AnalysisReportDefinition]
  (
@@ -1495,19 +1176,6 @@ CREATE TABLE [CodeListCatalogDetail]
 	[SortOrder]			Long Integer
 );
 
-CREATE TABLE [StatReportDefinitionBackup]
- (
-	[StatReportDefinitionId]			Long Integer, 
-	[StatGroup]			Text (255), 
-	[StatName]			Text (255), 
-	[StatQueryName]			Text (255), 
-	[StatSql]			Memo/Hyperlink (255), 
-	[StatReportName]			Text (50), 
-	[StatWhereCaption]			Text (50), 
-	[StatWhereComboSql]			Memo/Hyperlink (255), 
-	[StatSqlName]			Text (50)
-);
-
 CREATE TABLE [WhereClauseTemplate]
  (
 	[WhereClauseTemplateId]			Long Integer, 
@@ -1516,90 +1184,6 @@ CREATE TABLE [WhereClauseTemplate]
 	[TargetFormName]			Text (50)
 );
 
-CREATE TABLE [ScratchSum]
- (
-	[Id]			Long Integer, 
-	[Sum]			Currency
-);
-
-CREATE TABLE [StatusType]
- (
-	[StatusTypeId]			Long Integer NOT NULL, 
-	[Status]			Text (255), 
-	[LimitTable]			Text (255), 
-	[Description]			Text (255)
-);
-
-CREATE TABLE [VersionHistory]
- (
-	[VersionDate]			DateTime, 
-	[VersionNumber]			Text (50), 
-	[ShortDescription]			Text (255), 
-	[FullDescription]			Memo/Hyperlink (255)
-);
-
-CREATE TABLE [LedgerEntry_Backup_20250531_ManagementSplit]
- (
-	[LedgerEntryId]			Long Integer NOT NULL, 
-	[JournalEntryNumber]			Double, 
-	[Account]			Text (50), 
-	[Date]			DateTime, 
-	[DebitAmount]			Double, 
-	[CreditAmount]			Double, 
-	[LineTypeId]			Double, 
-	[DocumentRef]			Text (50), 
-	[CompanyId]			Long Integer, 
-	[PartnerAccountingId]			Long Integer, 
-	[BankStatementLineId]			Long Integer, 
-	[Note]			Text (255), 
-	[Parameters]			Text (25), 
-	[Description]			Text (255), 
-	[AccountCode]			Long Integer, 
-	[DueDate]			DateTime, 
-	[PostingCode]			Text (6), 
-	[SupplierInvoiceId]			Long Integer, 
-	[InvoiceId]			Long Integer, 
-	[Priority]			Long Integer, 
-	[PostingTypeCode]			Long Integer, 
-	[InboundInvoiceId]			Long Integer, 
-	[SubAccount]			Text (255), 
-	[AccountingDocumentId]			Long Integer
-);
-
-CREATE TABLE [LedgerEntrySnapshot]
- (
-	[LedgerEntryId]			Long Integer, 
-	[JournalEntryNumber]			Double, 
-	[Account]			Text (50), 
-	[Date]			DateTime, 
-	[DebitAmount]			Double, 
-	[CreditAmount]			Double, 
-	[LineTypeId]			Double, 
-	[DocumentRef]			Text (50), 
-	[CompanyId]			Long Integer, 
-	[PartnerAccountingId]			Long Integer, 
-	[BankStatementLineId]			Long Integer, 
-	[Note]			Text (255), 
-	[Parameters]			Text (25), 
-	[Description]			Text (255), 
-	[AccountCode]			Long Integer, 
-	[DueDate]			DateTime, 
-	[PostingCode]			Text (6), 
-	[SupplierInvoiceId]			Long Integer, 
-	[InvoiceId]			Long Integer, 
-	[Priority]			Long Integer, 
-	[PostingTypeCode]			Long Integer, 
-	[InboundInvoiceId]			Long Integer, 
-	[SubAccount]			Text (255), 
-	[AccountingDocumentId]			Long Integer
-);
-
-CREATE TABLE [ContactImport]
- (
-	[LedgerEntryId]			Long Integer NOT NULL, 
-	[SupplierInvoiceId]			Long Integer, 
-	[PostingSubAccount]			Text (255)
-);
 
 
 ```
