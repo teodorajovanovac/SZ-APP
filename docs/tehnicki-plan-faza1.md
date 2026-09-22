@@ -1,5 +1,21 @@
 # Tehnički plan — Faza 1: ciljana SQL Server šema (v2 — usaglašeno sa šefom)
 
+> **NAPOMENA (ažurirano posle šefovog `docs/data-model.md`):** Šef je u međuvremenu sam napisao i
+> ažurirao [`docs/data-model.md`](data-model.md) — to je sada **merodavan izvor** za oblik ciljane
+> šeme, ispred ovog dokumenta. [`docs/schema-ddl-draft.sql`](schema-ddl-draft.sql) je prepravljen na
+> **v4** da prati `data-model.md` red po red (SQL Server prevod, po pravilima mapiranja tipova iz
+> sekcije 1 ispod, koja i dalje važe). Ovaj fajl (v2) ostaje kao **istorijat odluka i obrazloženja**
+> (zašto je nešto preimenovano, poslovna pravila iza pojedinih kolona) — i dalje je koristan za
+> kontekst, ali gde god se imena tabela/kolona ovde razlikuju od `data-model.md`, **`data-model.md`
+> pobeđuje**. Konkretno, `PartnerAccounting` iz ovog dokumenta je u `data-model.md` postao
+> `PartnerAccount`; `Opomena`-linija (koja ovde nije još ni preimenovana) je u `data-model.md`
+> postala `Notice`/`NoticeBatch`/`NoticeLine`. Pitanja A-1 do A-4 i sekcija "C" iz
+> [`docs/preostala-pitanja.md`](preostala-pitanja.md) su **rešena** i ugrađena u v4 — sekcija 4 ispod
+> je ažurirana da to odražava. `data-model.md` je potvrđen kao **konačan i kompletan** izvor istine
+> — sve što iz starijih nacrta nema par tamo je namerno izbačeno, ne propust. Sekcija **D** u
+> `preostala-pitanja.md` je zatvorena; sadrži samo par sitnih implementacionih napomena, ne pitanja
+> za šefa.
+
 Ovo je **v2** ovog dokumenta. Sve stavke iz v1 su prošle kroz pregled — komentari su ostavljeni
 direktno u v1 (sad zamenjen ovim fajlom, ali odgovori su prepisani ovde) i u
 [`pitanjaZaContext.md`](../pitanjaZaContext.md) (koren repozitorijuma). **Oba fajla su pročitana
@@ -7,7 +23,7 @@ u celosti i sve odluke iz njih su unete ovde.** `pitanjaZaContext.md` ostaje izv
 tačne formulacije odgovora; ovaj dokument je sređena, primenjena verzija.
 
 **Pun DDL nacrt** koji prati ovaj model nalazi se u
-[`docs/schema-ddl-draft.sql`](schema-ddl-draft.sql) (takođe ažuriran na v2).
+[`docs/schema-ddl-draft.sql`](schema-ddl-draft.sql) (sada v4, usaglašen sa `docs/data-model.md`).
 
 ## 0. Šta se promenilo u odnosu na v1 — pregled
 
@@ -392,33 +408,44 @@ se ova tabela stvarno napuni produkcionim kredencijalima.**
 
 ## 4. Preostala otvorena pitanja (nisu rešena ni u v1 ni u razmeni komentara)
 
+> **Ažurirano:** O-1, O-2, O-4 i O-5 su **rešeni** šefovim komentarima u
+> [`docs/preostala-pitanja.md`](preostala-pitanja.md) (sekcije A i C) i ugrađeni u
+> [`docs/schema-ddl-draft.sql`](schema-ddl-draft.sql) v4. Detalji ispod su ostavljeni radi istorijata
+> (šta je bilo nejasno i zašto), ali se više ne tretiraju kao blokada. O-3, O-6, O-7, O-8 **ostaju
+> otvoreni** kao i pre — `data-model.md` ih ne rešava. Vidi i novu sekciju **D** u
+> `preostala-pitanja.md` za pitanja koja je tek `data-model.md` otvorio.
+
 Ranija lista od 11 pitanja iz v1 je **u potpunosti rešena** (odgovori uneti kroz ceo dokument
 iznad, izvor `pitanjaZaContext.md`). Ostaju sledeća, novootvorena ili delimično rešena pitanja
 pre nego što se pusti finalni DDL i počne implementacija:
 
-- **O-1 (zaokruživanje).** Metod zaokruživanja (standardno vs. bankarsko/kombinovano) nije
-  konačno odlučen — šef izražava sumnju u standardno, ali nije potvrdio zamenu. Treba odluka pre
-  implementacije obračuna računa i kamate, jer utiče na testove/tolerancije.
-- **O-2 (`Partner.GrupniRacunGrupaId`).** Da li ta vrednost referencira postojeći `Partner` zapis
-  (npr. "master" primalac grupnog računa) ili je čisto proizvoljna grupna oznaka bez FK cilja?
-  Utiče na to da li kolona dobija `FOREIGN KEY` ili ostaje običan `INT`/`NVARCHAR` tag.
-- **O-3 (`Events` workflow).** Tačan skup statusa i koraka odobravanja (ko sme da odobri šta,
-  da li ima više nivoa odobravanja) nije specificiran — predložen minimalan model
-  (`StatusId`/`ApprovedByStaffId`/`ApprovedDate`) čeka potvrdu.
-- **O-4 (`Contract.PartnerAccountingId` vs `PartnerId`).** Pretpostavljeno `PartnerAccountingId`
-  radi doslednosti sa ostatkom šeme — nije eksplicitno potvrđeno od šefa.
-- **O-5 (šifarnici za `Company.UplatnicaTip`/`SkStatus`/`TipSubjekta`).** Flagovano kao
-  nedostajući FK/šifarnik u pregledu problema, nije razrešeno koje tačno vrednosti/šifarnik
-  koristiti — kandidat da idu kroz `tblShortList` umesto posebnih tabela, ali nije potvrđeno.
-- **O-6 (permisije/role).** Namerno odloženo od strane šefa za Fazu 4/5 — **ne blokira Fazu 1**,
-  ali mora biti rešeno pre nego što se uvede pravi multi-role auth.
-- **O-7 (skladištenje fajlova).** Gde `Files.RelPathName` fizički živi (server, blob storage) —
-  implementaciona odluka, ne blokira šemu, ali blokira funkcionalno korišćenje modula priloga.
-- **O-8 (indeksi, UNIQUE i CHECK ograničenja).** Šef je flagovao da nedostaju: UNIQUE za broj
-  računa/izvoda/PIB/bankovni račun, indeksi na FK i česta polja pretrage, CHECK pravila za
-  duguje/potražuje, procente, stope, negativne iznose, statuse. Ovo je **namerno odloženo za
-  finalni DDL prolaz** (posle Faze 4 modula), ne za ovaj nacrt — previše je specifično da se radi
-  napamet bez profilisanja stvarnih podataka, ali **mora biti odrađeno pre produkcije**.
+- **O-1 (zaokruživanje) — REŠENO.** Standardno zaokruživanje, bez posebnog "konta zaokruživanja"
+  (šef: "nema šta tu da se bira... ne postoji nikakva razlika u iznosima koju bi trebalo posebno
+  knjižiti"). Isto važi i za obračun kamate.
+- **O-2 (`Partner.GrupniRacunGrupaId`) — REŠENO, zamenjeno novim dizajnom.** Šefov raniji odgovor
+  je bio da oznaka ide na `PartnerAccounting`(`PartnerAccount`). U `data-model.md` te kolone nema
+  ni na `Partner` ni na `PartnerAccount` — korisnica je potvrdila da `data-model.md` važi kao
+  konačan, pa se grupisanje sad radi isključivo kroz `Invoice.InvoiceParentId`/
+  `InvoiceLegacyMasterId`, bez posebne oznake na partneru. O-2 je time zatvoreno, ne otvoreno.
+- **O-3 (`Events` workflow).** I dalje otvoreno — `data-model.md`-ova `Events` tabela nema
+  `StatusId`/`ApprovedByStaffId`/`ApprovedDate` kolone predložene ovde. Tačan skup statusa i koraka
+  odobravanja i dalje čeka potvrdu.
+- **O-4 (`Contract.PartnerAccountingId` vs `PartnerId`) — REŠENO, primenjeno drugačije nego što je
+  ranije rečeno.** Šef je ranije rekao da `Contract` treba da pokazuje na `PartnerAccounting`; u
+  `data-model.md` to je implementirano kao `Contract.AccountNumber` (poslovni broj, ne surogat FK),
+  a `Contract` uz to sad ima i tri direktna `Partner` FK-a (Owner/Invoice/Tenant) umesto
+  `RoleId`-šeme sa više redova. Korisnica je potvrdila da je ovo prihvaćeno kao finalno — vidi
+  `preostala-pitanja.md` sekciju D za implementacione napomene (ne pitanja).
+- **O-5 (šifarnici za `Company.UplatnicaTip`/`SkStatus`/`TipSubjekta`) — bespredmetno.** Te tri
+  kolone uopšte više ne postoje u `data-model.md`-ovoj `Company` tabeli — namerno izbačene,
+  potvrđeno.
+- **O-6 (permisije/role).** I dalje namerno odloženo za Fazu 4/5 — **ne blokira Fazu 1**.
+  `data-model.md` uvodi `StaffAccess.StaffRole` kao običan `INT`, u istom duhu (fleksibilno, bez
+  finalnog modela).
+- **O-7 (skladištenje fajlova).** I dalje otvoreno — `data-model.md`-ova `Documents.RelativePath`
+  (bivši `Files.RelPathName`) i dalje ne kaže gde fajlovi fizički žive.
+- **O-8 (indeksi, UNIQUE i CHECK ograničenja).** I dalje namerno odloženo za finalni DDL prolaz
+  posle profilisanja stvarnih podataka — nepromenjeno.
 
 ## 5. Isključene tabele (ažurirano)
 

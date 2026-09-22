@@ -5,8 +5,17 @@ sasvim jasno**. Ranija lista od 11 pitanja iz v1 `tehnicki-plan-faza1.md` je u p
 (odgovori su u `pitanjaZaContext.md` i uneti u v2) i **ovde se ne ponavlja**. Svaka stavka niže
 ima referencu na tačno mesto u kodu/dokumentu gde je flagovana, da se lako pronađe.
 
-Podeljeno u dve grupe: **A — blokira implementaciju** konkretnog modula, i **B — ne blokira**,
-može se rešiti usput ili kasnije.
+**Status posle šefovog ažuriranja `docs/data-model.md`:** sve stavke A-1, A-2, A-3 i cela sekcija C
+niže su **rešene** — odgovori (šefovi "Komentar" blokovi) su ugrađeni direktno u
+`docs/schema-ddl-draft.sql` v4. A-4 postaje bespredmetno (polja `UplatnicaTip`/`SkStatus`/
+`TipSubjekta` više uopšte ne postoje u novoj `Company` tabeli). **Sekcija D** je zatvorena —
+korisnica je potvrdila da je `docs/data-model.md` konačan izvor istine i da sve što nedostaje u
+odnosu na starije nacrte je namerno izbačeno, ne propust; ostalo je samo par sitnih predloga za
+razmatranje, ne pitanja za šefa.
+
+Podeljeno u grupe: **A — blokira implementaciju** konkretnog modula, **B — ne blokira**, može se
+rešiti usput ili kasnije, **C — manje nejasnoće** (rešeno), i **D — zatvoreno** (`data-model.md`
+prihvaćen kao konačan, par sitnih predloga ostavljeno na kraju).
 
 ## A. Blokira implementaciju
 
@@ -141,4 +150,37 @@ Struktura treba da bude Id, Rate (4 digits), Date, IdEntryType (iz tblShortList 
 
 | Format broja računa `CompanyId-PartnerAccountingId-GGMM` | Primer `101-1234-1121` — nije 100% jasno da li je "1121" GGMM ili MMGG (mesec-godina obrnuto) | `pitanjaZaContext.md`, pitanje o numeraciji |
 >**Komentar** GGMM tj YYMM je godina i mesec. . Septembar 2026 je 2609
+
+## D. `docs/data-model.md` je svetinja — status posle korisničinog odgovora (2026-09-22)
+
+`docs/data-model.md` je **konačan i potpun** izvor istine za ciljanu šemu. Pravilo: ako nešto iz
+v3 nacrta nema svoj par u `data-model.md`, to znači da je šef to **namerno izbacio odatle** — ne
+tretira se kao propust niti kao otvoreno pitanje za šefa.
+
+- **D-1 (73 vs. 56 tabela) — REŠENO.** "73 tabele" u zaglavlju je zastareo tekst, nije stvarna
+  brojka. `data-model.md` ima 56 tabela i to je kompletno.
+- **D-2 (tabele iz v3 kojih nema u `data-model.md`) — REŠENO, izbačene namerno.**
+  `UnitBillingAllocation`, `StaffCompany` (pokriveno sa `StaffAccess`), `SubAccountDefaultSupplier`,
+  `PenaltyInterestStaging`/`ZK` (komentar u samom `data-model.md` kaže "POTPUNO ISTA TABELA KAO GK
+  LEDGER" — namerno spojeno, radna faza kamate ide kroz `LedgerEntry` na neproknjiženom
+  `JournalEntry`-u, bez posebne staging tabele), `BenefitGroup`, `BenefitUsageUpdate`,
+  `EPaymentOrderSetting(Group)`, `PartnerBankAccount`, `StaffPermission`, `EmailSetting` — sve
+  namerno izbačeno/spojeno, nema pitanja.
+- **D-3 do D-9 (Contract dizajn, `Invoice.PartnerId`, grupni računi, `LineTypeId`, dinamički
+  izveštaji, mejl podešavanja) — prihvaćeno kao finalno**, `data-model.md` je merodavan. Nema više
+  ovde ništa što čeka šefov odgovor.
+
+### Rešeno u `schema-ddl-draft.sql` v4 (nije se čekalo na šefa, korisnica dala slobodu da se reši)
+
+- **`NoticeBatch.NoticeTemplateId`** — dodata minimalna `dbo.NoticeTemplate` tabela (Id/Name/Body/
+  IsActive) direktno u `schema-ddl-draft.sql`, samo da FK ima gde da pokaže. **Nije u
+  `data-model.md`** — pomenuti šefu kad bude zgodno, u slučaju da on već ima drugačiji oblik u
+  glavi (npr. bivši `OpomenaSabloni` sa više polja za štampu).
+- **`Contract`** — dodato eksplicitno pravilo (komentar na tabeli): promena vlasnika/zakupca/
+  primaoca računa uvek pravi NOVI red (stari se zatvara preko `ContractEndDate`), nikad se ne
+  update-uje postojeći red in-place. Ovim se istorija ne gubi, a šema se nije menjala.
+- **`Contract.AccountNumber`** — ostaje kako jeste (poslovni ključ ka `PartnerAccount`, ne surogat
+  FK) — potvrđeno da je u redu, bez izmene.
+- **`LedgerEntry.LineTypeId`** — ostaje `INT` u `schema-ddl-draft.sql` (tipfeler je samo u
+  `data-model.md`, koji se ne dira).
 

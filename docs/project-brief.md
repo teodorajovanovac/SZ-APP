@@ -55,6 +55,11 @@ Tri Access baze (JET4/.mdb format, ne noviji .accdb) plus njihovi eksporti:
   JOIN/GROUP BY/HAVING klauzulama, verifikovano na uzorku. Ovo je merodavan izvor za
   logiku upita; ne treba ponovo pokušavati da se SQL rekonstruiše iz
   `queries/*.txt` design-formata ili iz mdbtools-a (oba gube JOIN uslove i HAVING/GROUP BY).
+- `docs/schema-ddl-draft.sql` je nacrt **ciljane** SQL Server šeme (v4) — SQL Server prevod
+  `docs/data-model.md`-a, tabela po tabelu. `docs/data-model.md` je merodavan izvor za oblik ciljane
+  šeme (šef ga direktno piše/ažurira); `schema-ddl-draft.sql` ga samo prevodi u SQL Server DDL.
+  `docs/preostala-pitanja.md` prati šta je od poslovne logike još otvoreno/nepotvrđeno — pre nego
+  što se nešto iz šeme implementira, proveri da li je tamo već flagovano kao otvoreno pitanje.
 
 ## 3. Ključni nalazi (već potvrđeno, ne treba ponovo proveravati)
 
