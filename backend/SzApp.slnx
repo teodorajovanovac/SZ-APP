@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/SzApp.Api/SzApp.Api.csproj" />
+    <Project Path="src/SzApp.Contracts/SzApp.Contracts.csproj" />
+    <Project Path="src/SzApp.Data/SzApp.Data.csproj" />
+    <Project Path="src/SzApp.Domain/SzApp.Domain.csproj" />
+    <Project Path="src/SzApp.Etl/SzApp.Etl.csproj" />
+    <Project Path="src/SzApp.Worker/SzApp.Worker.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/SzApp.IntegrationTests/SzApp.IntegrationTests.csproj" />
+    <Project Path="tests/SzApp.UnitTests/SzApp.UnitTests.csproj" />
+  </Folder>
+</Solution>

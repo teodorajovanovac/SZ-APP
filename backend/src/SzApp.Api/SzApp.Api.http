@@ -1,0 +1,14 @@
+@SzApp_Api_HostAddress = https://localhost:7001
+
+GET {{SzApp_Api_HostAddress}}/health/live
+Accept: application/json
+
+###
+
+GET {{SzApp_Api_HostAddress}}/openapi/v1.json
+Accept: application/json
+
+###
+
+GET {{SzApp_Api_HostAddress}}/api/v1/auth/antiforgery
+Accept: application/json

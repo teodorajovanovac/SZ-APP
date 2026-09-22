@@ -1,1 +1,12 @@
 legacy-source/
+.env
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+TestResults/
+coverage/
+**/test-results/
+**/playwright-report/
+*.user
+*.suo
