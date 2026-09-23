@@ -36,33 +36,45 @@ Možemo prema tome da radimo posebno sortiranje i da eventualno definisemo po im
 
     Početna
 
+Podaci SZ
     Ugovori * ovo je mixovani prikaz: Contract > Partner + Contract > Unit  + Unit > ShortList.ShortName (TableName:UnitType) + Contract > Partner > Company (mada vidim da je isto i Contract > Unit > Company)
     i dodati jos i PartnerAccount i PartnerComms za pretragu i ... > Company > Partner > PartnerAccount
 
-        CompanyId, PartnerAccount.AccountNumber, Company.ShortName, BuildingEntity.Name, Partner.Name, Unit.Name, 
+        Company.CompanyId, PartnerAccount.AccountNumber, Company.ShortName, BuildingEntity.Name, Partner.Name, Unit.Name, 
         Unit.UnitTypeId > ShortList.ShortName (TableName:UnitType), 
 
         * pretraga prva 2 polja posebna pretraga samo za njih, posel jedno veliko polje za sve uključujući sprevana polja: email, telefon. Posle pretrage opcija da prikazuje/pretražuje aktivne ili neaktivne ugovore.
 
         * Klik na kolone otvaraju podatke: 
         ** Company.CompanyId    otvara KontoKartica - za vrednost AccountNumber iz PartnerAccount ali od CompanyId
-        ** Company.ShortName    
+        ** PartnerAccount.AccountNumber  otvara KontoKartica Partner
+        ** Company.ShortName    otvara podatke od kompanije
+        ** BuildingEntity.Name  otvara podatke od ulaza
+        ** Partner.Name         otvara podatke o Partneru
+        ** Unit.Name            otvara podatke o jedinci
+        ** Unit.UnitTypeId > ShortList.ShortName (TableName:UnitType)  - ništa
 
-    Šifarnici 
-        Partneri, Jedinice, Cenovnici ... (Posebni delovi)
+Šifarnici 
+    Partneri
+    Posebni delovi
 
-    Ulazni računi
-    Izlazni računi
-    Opomene
-    
+Fakturisanje
+    Ulazni računi * ulazak u listu računa obziram da je grupisanje po markeru YYMM
+    Izlazni računi * ulazak u grupe raČuna
+    Opomene * ulazak u grupe opomena
+
+Finansije
+    Izvodi
+    Nalozi
+    Kartice
+
     Izveštaji
 
-    Izvodi
-
-Knjigovodstvo
-    Nalozi
-
-
+Sistem
+    Uvoz podataka
+    Korisnici
+    Moje kompanije
+    Administracija
 ### Import
 Neka nam napravi primere za import CSV koju mogu otvoriti u excelu da znamo sta očekuje.
 
