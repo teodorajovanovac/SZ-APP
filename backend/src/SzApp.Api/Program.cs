@@ -50,7 +50,7 @@ builder.Services
 
 builder.Services.ConfigureApplicationCookie(options =>
 {
-    options.Cookie.Name = "__Host-szapp-auth";
+    options.Cookie.Name = builder.Environment.IsDevelopment() ? "szapp-auth" : "__Host-szapp-auth";
     options.Cookie.HttpOnly = true;
     options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
         ? CookieSecurePolicy.SameAsRequest
@@ -74,7 +74,7 @@ builder.Services.ConfigureApplicationCookie(options =>
 builder.Services.AddAntiforgery(options =>
 {
     options.HeaderName = "X-CSRF-TOKEN";
-    options.Cookie.Name = "__Host-szapp-csrf";
+    options.Cookie.Name = builder.Environment.IsDevelopment() ? "szapp-csrf" : "__Host-szapp-csrf";
     options.Cookie.HttpOnly = true;
     options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
         ? CookieSecurePolicy.SameAsRequest
