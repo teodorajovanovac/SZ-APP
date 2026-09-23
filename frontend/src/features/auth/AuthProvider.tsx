@@ -38,7 +38,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
         user: meQuery.data ?? null,
         isLoading: meQuery.isLoading,
         isLoginPending: loginMutation.isPending,
-        error: loginMutation.error ?? meQuery.error,
+        // Only a failed login attempt is a user-facing error. The initial /auth/me probe
+        // returns 401 for every signed-out visitor — surfacing that would greet them with
+        // a red "Unauthorized" alert before they typed anything.
+        error: loginMutation.error,
         login,
         logout,
       }}
