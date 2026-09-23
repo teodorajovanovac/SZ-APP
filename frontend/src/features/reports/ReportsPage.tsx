@@ -16,7 +16,7 @@ export function ReportsPage() {
   const runReport = useRunReport(activeCompany.id)
   const exportReport = useExportReport(activeCompany.id)
   const parameters = () => { try { setError(undefined); return parseReportParameters(rawParameters) } catch (e) { setError(e instanceof Error ? e.message : 'Neispravni parametri.'); throw e } }
-  return <Stack spacing={3}><Typography variant="h4">Analize i izveštaji</Typography>
+  return <Stack spacing={3}><Typography component="h1" variant="h1">Analize i izveštaji</Typography>
     {(analyses.isError || reports.isError || error) && <Alert severity="error">{error ?? 'Definicije izveštaja nisu dostupne.'}</Alert>}
     <TextField label="Parametri (JSON)" value={rawParameters} onChange={e => setRawParameters(e.target.value)} multiline minRows={2}/>
     <Typography variant="h5">Analize</Typography>

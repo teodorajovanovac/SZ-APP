@@ -44,7 +44,7 @@ export function PartnerList({ companyId, onSelect }: PartnerListProps) {
 
   return (
     <Stack spacing={2}>
-      <Typography variant="h5" component="h2">Partneri</Typography>
+      <Typography component="h1" variant="h1">Partneri</Typography>
       <TextField
         label="Pretraga po nazivu ili PIB-u"
         value={search}

@@ -40,7 +40,7 @@ export function AddressList({ companyId, onSelect }: AddressListProps) {
 
   return (
     <Stack spacing={2}>
-      <Typography variant="h5" component="h2">Adrese</Typography>
+      <Typography component="h1" variant="h1">Adrese</Typography>
       <Alert severity="info">Globalni adresar je dostupan samo Root korisniku dok se ne poveže tenant ownership.</Alert>
       <TextField label="Pretraga adresa" value={search} onChange={(event) => setSearch(event.target.value)} size="small" />
       {result.isError && <Alert severity="error">Adrese nisu mogle da se učitaju.</Alert>}

@@ -38,7 +38,7 @@ export function StaffAccessList({ companyId, onSelect }: StaffAccessListProps) {
 
   return (
     <Stack spacing={2}>
-      <Typography variant="h5" component="h2">Pristup zaposlenih</Typography>
+      <Typography component="h1" variant="h1">Pristup zaposlenih</Typography>
       <TextField label="Pretraga po email adresi" value={search} onChange={(event) => setSearch(event.target.value)} size="small" />
       {result.isError && <Alert severity="error">Pristupi nisu mogli da se učitaju.</Alert>}
       <ServerDataTable
