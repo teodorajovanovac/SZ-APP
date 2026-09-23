@@ -1,4 +1,5 @@
 using System.Data;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using SzApp.Contracts.LedgerBanking;
 using SzApp.Data;
@@ -101,7 +102,18 @@ public sealed class BankStatementService(
         }
 
         dbContext.Set<BankStatement>().Add(statement);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (exception.InnerException is SqlException { Number: 2601 or 2627 })
+        {
+            // The unconditional unique index on (CompanyId, BankAccountId, StatementNumber,
+            // StatementSuffix, Date) is the real dedup guard for concurrent imports racing
+            // past the plain read above - translate the violation into a clear message
+            // instead of letting it surface as an opaque conflict.
+            throw new DbUpdateException("Ovaj izvod je već uvezen.", exception.InnerException);
+        }
         return MapStatement(statement);
     }
 
@@ -117,6 +129,11 @@ public sealed class BankStatementService(
         EnsureStatementMutable(line.BankStatement);
         EnsureExpectedVersion(Convert.FromBase64String(request.RowVersion), line.RowVersion);
         await EnsurePostingAccountAsync(request.CounterAccount, cancellationToken);
+        if (request.PartnerAccountId.HasValue && !await dbContext.Set<PartnerAccount>().AnyAsync(
+                x => x.Id == request.PartnerAccountId && x.CompanyId == companyId, cancellationToken))
+        {
+            throw new DomainRuleException("statement.partner-account-not-found", "Konto partnera ne pripada aktivnoj kompaniji.");
+        }
 
         line.PartnerAccountId = request.PartnerAccountId;
         line.SubAccountId = NullIfWhiteSpace(request.SubAccountId);

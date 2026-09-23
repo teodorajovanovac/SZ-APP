@@ -423,6 +423,8 @@ public sealed class BillingService(
     {
         if (!await db.Set<InvoiceBatch>().AnyAsync(x => x.Id == request.InvoiceBatchId && x.CompanyId == companyId, ct))
             throw new DomainRuleException("billing.batch-not-found", "Serija računa ne postoji.");
+        if (!await db.Set<PartnerAccount>().AnyAsync(x => x.Id == request.PartnerAccountId && x.CompanyId == companyId, ct))
+            throw new DomainRuleException("billing.partner-account-not-found", "Konto partnera ne pripada aktivnoj kompaniji.");
         var calculation = await CalculateInterestAsync(new CalculateInterestRequest(request.Principal, request.From, request.To), ct);
         var entities = calculation.Lines.Select(line => new InterestStatement
         {
