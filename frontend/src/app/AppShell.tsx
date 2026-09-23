@@ -115,13 +115,9 @@ export function AppShell() {
 
   const drawer = (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-      {/* Desktop: the fixed AppBar covers this strip, so it is a pure spacer.
-          Mobile: the drawer floats over the page and needs its own brand header. */}
-      <Toolbar sx={{ gap: 1.25, bgcolor: { xs: 'primary.main', lg: 'transparent' }, color: { xs: 'common.white', lg: 'inherit' } }}>
-        <Typography variant="h6" component="p" sx={{ display: { xs: 'block', lg: 'none' } }}>
-          {t('appName')}
-        </Typography>
-      </Toolbar>
+      {/* The fixed AppBar sits above the drawer at every width, so this strip is a
+          pure spacer — the app name already lives in the header. */}
+      <Toolbar sx={{ flexShrink: 0 }} />
       {!isDesktop && (
         <>
           <Stack spacing={1.5} sx={{ px: 2, pt: 2, pb: 1 }}>
