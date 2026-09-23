@@ -7,7 +7,11 @@ public sealed record CsvRow(
     int RowNumber,
     string RawText,
     IReadOnlyDictionary<string, string> Values,
-    string RowHash);
+    string RowHash,
+    // ponytail (#5): set when the row's column count didn't match the header (a structural shape
+    // error) — Values is empty/unusable for such a row. Null means the row parsed cleanly (Values
+    // may still fail per-field validation later in GenericRowValidator, a separate concern).
+    string? StructuralError = null);
 
 public sealed record CsvDocument(
     IReadOnlyList<string> Headers,
@@ -62,8 +66,19 @@ public sealed class LegacyCsvParser
             var record = records[index];
             if (record.Fields.Count != headers.Length)
             {
-                throw new InvalidDataException(
-                    $"Red {record.StartLine} ima {record.Fields.Count} kolona; očekivano je {headers.Length}.");
+                // ponytail (#5): a bad column count used to throw and abort the WHOLE file before any
+                // row reached quarantine — unlike value-format errors, which correctly quarantine
+                // per-row (see GenericRowValidator in EtlPipelineService). Quarantine this row instead
+                // and keep parsing the rest of the file; EtlPipelineService.ValidateAndStageAsync turns
+                // a non-null StructuralError into a QuarantineRecord.
+                var empty = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                rows.Add(new CsvRow(
+                    record.StartLine,
+                    record.RawText,
+                    empty,
+                    ComputeHash(headers, empty),
+                    $"Red {record.StartLine} ima {record.Fields.Count} kolona; očekivano je {headers.Length}."));
+                continue;
             }
 
             var values = headers.Zip(record.Fields, (header, value) => (header, value))

@@ -5,7 +5,6 @@ using Microsoft.EntityFrameworkCore;
 using SzApp.Data;
 using SzApp.Data.Entities;
 using SzApp.Data.Entities.EtlExtended;
-using SzApp.Data.Entities.LedgerBanking;
 using SzApp.Domain;
 using SzApp.Etl.Csv;
 using SzApp.Etl.Parsing;
@@ -46,6 +45,24 @@ public sealed class EtlPipelineService(
 
             foreach (var row in document.Rows)
             {
+                // ponytail (#5): a structural (column-count) error means Values is empty/unusable —
+                // quarantine straight away and skip staging, instead of parsing the whole file
+                // failing (see LegacyCsvParser).
+                if (row.StructuralError is not null)
+                {
+                    dbContext.QuarantineRecords.Add(new QuarantineRecord
+                    {
+                        EtlRunId = runId,
+                        SourceTable = context.SourceTable,
+                        SourceKey = null,
+                        RawJson = row.RawText,
+                        ErrorCode = "etl.malformed-row",
+                        ErrorMessage = row.StructuralError,
+                        CreatedAt = now
+                    });
+                    continue;
+                }
+
                 var raw = new RawStagingRow
                 {
                     EtlRunId = runId,
@@ -104,7 +121,20 @@ public sealed class EtlPipelineService(
             return;
         }
 
-        if (context.Stage != EtlPipelineStage.Staged)
+        // ponytail (#4): a crash mid-run used to leave the run stuck forever — ExecuteAsync only
+        // accepted Stage == Staged. Now Importing/Reconciling (crashed after we flipped the stage,
+        // before we finished) are treated as a resume. Failed is only resumable once we've confirmed
+        // staging actually produced rows (RawStagingRow exists for this run) — otherwise a run that
+        // failed *inside* ValidateAndStageAsync, before anything was persisted, would be silently
+        // "completed" with zero rows. Resuming is safe without a spanning transaction because row
+        // inserts are guarded by the GLOBAL LegacyKeyMap dedupe check below (#3): replaying
+        // already-imported/materialized rows is a no-op, not a duplicate-key crash. This is the
+        // less-risky option vs. wrapping the whole multi-minute import in one DB transaction (would
+        // hold locks for the whole run and still needs the same idempotency guarantee anyway).
+        var isResumable = context.Stage is EtlPipelineStage.Importing or EtlPipelineStage.Reconciling ||
+            (context.Stage == EtlPipelineStage.Failed &&
+             await dbContext.Set<RawStagingRow>().AnyAsync(x => x.EtlRunId == runId, cancellationToken));
+        if (context.Stage != EtlPipelineStage.Staged && !isResumable)
         {
             throw new DomainRuleException("etl.not-staged", "Import mora biti validiran i smešten u staging pre izvršavanja.");
         }
@@ -125,10 +155,17 @@ public sealed class EtlPipelineService(
                 .Where(x => x.EtlRunId == runId)
                 .OrderBy(x => x.SourceRowNumber)
                 .ToArrayAsync(cancellationToken);
+            // ponytail (#3): GLOBAL dedupe, not scoped to this EtlRunId. The unique index backing
+            // LegacyKeyMap is (SourceTable, SourceKey, TargetTable) with no EtlRunId — re-importing
+            // an updated file (new run, same source rows) must skip rows already mapped by an
+            // earlier run, not just rows mapped earlier in *this* run, or the second SaveChangesAsync
+            // throws a unique-constraint violation and the whole run is marked Failed for what should
+            // be a normal "0 new rows" no-op re-import.
             var mappedKeys = await dbContext.LegacyKeyMaps.AsNoTracking()
-                .Where(x => x.EtlRunId == runId)
+                .Where(x => x.SourceTable == context.SourceTable)
                 .Select(x => x.SourceKey)
                 .ToHashSetAsync(cancellationToken);
+            var materializable = MasterDataMaterializer.IsSupported(context.SourceTable);
 
             foreach (var row in rows.Where(x => !quarantinedKeys.Contains(x.SourceKey ?? string.Empty)))
             {
@@ -138,13 +175,39 @@ public sealed class EtlPipelineService(
                     continue;
                 }
 
+                string targetTable;
+                string targetKey;
+                if (materializable)
+                {
+                    var values = new Dictionary<string, string>(
+                        JsonSerializer.Deserialize<Dictionary<string, string>>(row.ValuesJson) ?? [],
+                        StringComparer.OrdinalIgnoreCase);
+                    var newId = await MasterDataMaterializer.TryMaterializeAsync(dbContext, context.SourceTable, values, cancellationToken);
+                    if (newId is { } id)
+                    {
+                        targetTable = context.SourceTable;
+                        targetKey = id.ToString(CultureInfo.InvariantCulture);
+                    }
+                    else
+                    {
+                        // required FK not resolved yet (dependency table not imported) — leave staging-only
+                        targetTable = $"staging:{context.SourceTable}";
+                        targetKey = row.Id.ToString(CultureInfo.InvariantCulture);
+                    }
+                }
+                else
+                {
+                    targetTable = $"staging:{context.SourceTable}";
+                    targetKey = row.Id.ToString(CultureInfo.InvariantCulture);
+                }
+
                 dbContext.LegacyKeyMaps.Add(new LegacyKeyMap
                 {
                     EtlRunId = runId,
                     SourceTable = context.SourceTable,
                     SourceKey = sourceKey,
-                    TargetTable = $"staging:{context.SourceTable}",
-                    TargetKey = row.Id.ToString(CultureInfo.InvariantCulture)
+                    TargetTable = targetTable,
+                    TargetKey = targetKey
                 });
                 AddRelationships(runId, context.SourceTable, sourceKey, row.ValuesJson);
             }
@@ -196,13 +259,31 @@ public sealed class EtlPipelineService(
         }
     }
 
+    // ponytail (#6): used to treat ANY column ending in "Id" as an FK and guess its target table by
+    // string-stripping the suffix (e.g. "InvoiceDeliveryUnitId" -> hardcoded "Unit", others ->
+    // whatever's left after chopping "Id") — that's exactly the "don't invent FK relationships"
+    // rule this project's CLAUDE.md warns about, and it's wrong for plenty of real columns (e.g.
+    // "PartnerTypeId" isn't a table named "PartnerType", it's a ShortList lookup). Now it only
+    // records a relationship for columns already reviewed and listed explicitly in
+    // LegacyImportTopology's DeferredRelationships — a small, explicit, reviewable allowlist (see
+    // docs/data-model.md's own "-- FK to X.Id" comments, which is where that list was seeded from).
     private void AddRelationships(Guid runId, string sourceTable, string sourceKey, string valuesJson)
     {
+        var allowlisted = LegacyImportTopology.Find(sourceTable)?.DeferredRelationships;
+        if (allowlisted is null || allowlisted.Count == 0)
+        {
+            return;
+        }
+
         var values = JsonSerializer.Deserialize<Dictionary<string, string>>(valuesJson)
             ?? new Dictionary<string, string>();
-        foreach (var (field, value) in values.Where(x => x.Key.EndsWith("Id", StringComparison.OrdinalIgnoreCase) &&
-                                                         !string.Equals(x.Key, "Id", StringComparison.OrdinalIgnoreCase)))
+        foreach (var relationship in allowlisted)
         {
+            if (!values.TryGetValue(relationship.Name, out var value))
+            {
+                continue;
+            }
+
             var targetKey = SerbianLegacyValueParser.ZeroToNull(value);
             if (targetKey is null)
             {
@@ -214,8 +295,8 @@ public sealed class EtlPipelineService(
                 EtlRunId = runId,
                 SourceTable = sourceTable,
                 SourceKey = sourceKey,
-                RelationshipName = field,
-                TargetSourceTable = ResolveTargetTable(field),
+                RelationshipName = relationship.Name,
+                TargetSourceTable = relationship.TargetTable,
                 TargetSourceKey = targetKey
             });
         }
@@ -254,36 +335,40 @@ public sealed class EtlPipelineService(
             .CountAsync(x => x.EtlRunId == run.Id && !x.IsResolved, cancellationToken);
         AddReconciliation(run.Id, ReconciliationMetric.OrphanCount, context.SourceTable, 0m, orphanCount, now);
 
-        var rawRows = await dbContext.Set<RawStagingRow>().AsNoTracking()
-            .Where(x => x.EtlRunId == run.Id)
-            .Select(x => x.ValuesJson)
-            .ToArrayAsync(cancellationToken);
+        // ponytail (#2): Invoice/LedgerEntry/BankStatement have zero materialization logic (they
+        // stay staging-only — see MasterDataMaterializer's class comment for why). Comparing a real
+        // CSV total against dbContext.Invoices/.LedgerEntries/BankStatement — which are permanently
+        // empty for these source tables today — would always "mismatch" and made reconciliation
+        // structurally unable to pass. Short-circuit with an honest "not applicable" result instead
+        // of a false failure; flip this back to a real comparison once those tables get a
+        // materializer.
         if (context.SourceTable.Equals("Invoice", StringComparison.OrdinalIgnoreCase))
         {
-            var expected = SumJsonField(rawRows, "InvoiceTotal");
-            var actual = await dbContext.Invoices.Where(x => x.CompanyId == context.CompanyId)
-                .SumAsync(x => x.InvoiceTotal, cancellationToken);
-            AddReconciliation(run.Id, ReconciliationMetric.InvoiceTotal, "Invoice", expected, actual, now);
+            AddNotApplicableReconciliation(run.Id, ReconciliationMetric.InvoiceTotal, "Invoice", now);
         }
         else if (context.SourceTable.Equals("LedgerEntry", StringComparison.OrdinalIgnoreCase))
         {
-            var expected = SumJsonField(rawRows, "DebitAmount") - SumJsonField(rawRows, "CreditAmount");
-            var actual = await dbContext.LedgerEntries.Where(x => x.CompanyId == context.CompanyId)
-                .SumAsync(x => x.DebitAmount - x.CreditAmount, cancellationToken);
-            AddReconciliation(run.Id, ReconciliationMetric.TrialBalance, "LedgerEntry", expected, actual, now);
+            AddNotApplicableReconciliation(run.Id, ReconciliationMetric.TrialBalance, "LedgerEntry", now);
         }
         else if (context.SourceTable.Equals("BankStatement", StringComparison.OrdinalIgnoreCase))
         {
-            var expectedDebit = SumJsonField(rawRows, "Debit");
-            var expectedCredit = SumJsonField(rawRows, "Credit");
-            var actualDebit = await dbContext.Set<BankStatement>().Where(x => x.CompanyId == context.CompanyId)
-                .SumAsync(x => x.Debit, cancellationToken);
-            var actualCredit = await dbContext.Set<BankStatement>().Where(x => x.CompanyId == context.CompanyId)
-                .SumAsync(x => x.Credit, cancellationToken);
-            AddReconciliation(run.Id, ReconciliationMetric.BankDebit, "BankStatement", expectedDebit, actualDebit, now);
-            AddReconciliation(run.Id, ReconciliationMetric.BankCredit, "BankStatement", expectedCredit, actualCredit, now);
+            AddNotApplicableReconciliation(run.Id, ReconciliationMetric.BankDebit, "BankStatement", now);
+            AddNotApplicableReconciliation(run.Id, ReconciliationMetric.BankCredit, "BankStatement", now);
         }
     }
+
+    private void AddNotApplicableReconciliation(Guid runId, ReconciliationMetric metric, string scope, DateTimeOffset checkedAt) =>
+        dbContext.Set<ReconciliationRecord>().Add(new ReconciliationRecord
+        {
+            EtlRunId = runId,
+            Metric = metric,
+            Scope = scope,
+            ExpectedValue = 0m,
+            ActualValue = 0m,
+            IsMatch = null,
+            Details = $"Nije primenjivo — {scope} još nema materijalizaciju u realnu tabelu (staging-only import).",
+            CheckedAt = checkedAt
+        });
 
     private void AddBlockedParityAssessments(Guid runId)
     {
@@ -321,39 +406,12 @@ public sealed class EtlPipelineService(
             CheckedAt = checkedAt
         });
 
-    private static decimal SumJsonField(IEnumerable<string> rows, string field)
-    {
-        decimal total = 0m;
-        foreach (var json in rows)
-        {
-            var values = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
-            if (values?.TryGetValue(field, out var raw) == true && !string.IsNullOrWhiteSpace(raw))
-            {
-                total += SerbianLegacyValueParser.ParseDecimal(raw);
-            }
-        }
-
-        return total;
-    }
-
     private async Task<(EtlRun Run, EtlRunContext Context)> GetRunAsync(Guid runId, CancellationToken cancellationToken)
     {
         var run = await dbContext.EtlRuns.SingleOrDefaultAsync(x => x.Id == runId, cancellationToken)
             ?? throw new KeyNotFoundException("ETL run nije pronađen.");
         var context = await dbContext.Set<EtlRunContext>().SingleAsync(x => x.EtlRunId == runId, cancellationToken);
         return (run, context);
-    }
-
-    private static string ResolveTargetTable(string relationshipName)
-    {
-        var withoutId = relationshipName[..^2];
-        return withoutId switch
-        {
-            "OwnerPartner" or "InvoicePartner" or "TenantPartner" or "Manager" => "Partner",
-            "InvoiceDeliveryUnit" => "Unit",
-            "JournalEntry" => "JournalEntry",
-            _ => withoutId
-        };
     }
 }
 

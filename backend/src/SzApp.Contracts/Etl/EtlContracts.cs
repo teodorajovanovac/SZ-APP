@@ -20,7 +20,7 @@ public sealed record ReconciliationItemResponse(
     string Scope,
     decimal ExpectedValue,
     decimal ActualValue,
-    bool IsMatch,
+    bool? IsMatch, // null = not applicable (target table has no materialization yet)
     string? Details);
 
 public sealed record ParityAssessmentResponse(

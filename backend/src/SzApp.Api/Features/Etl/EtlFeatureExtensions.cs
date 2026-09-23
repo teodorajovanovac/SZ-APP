@@ -18,8 +18,18 @@ public sealed class EtlStorageOptions
 
 public sealed record EtlRunResponse(
     Guid Id, string SourceSystem, string SourceFile, string SourceTable, string Stage,
-    string Status, int SourceRows, int ImportedRows, int QuarantinedRows,
-    DateTimeOffset StartedAt, DateTimeOffset? CompletedAt, string? Error);
+    string Status,
+    int SourceRows,
+    // ponytail (#2): honestly reframed — every processed row gets a LegacyKeyMap entry (so this
+    // count is never "fake"), but for most source tables that entry only points at a staging row,
+    // not a real domain table. See MaterializationStatus to know which one happened.
+    int ImportedRows,
+    int QuarantinedRows,
+    DateTimeOffset StartedAt, DateTimeOffset? CompletedAt, string? Error,
+    // "materialized" = ImportedRows reached a real domain table (Address/Partner/Company/
+    // BuildingEntrance/Unit); "staging-only" = rows only exist in etl.RawStagingRow /
+    // etl.LegacyKeyMap, not yet in a live table.
+    string MaterializationStatus);
 
 public static class EtlFeatureExtensions
 {
@@ -136,7 +146,8 @@ public static class EtlFeatureExtensions
 
     private static EtlRunResponse ToResponse(EtlRun run, EtlRunContext context) => new(
         run.Id, run.SourceSystem, run.SourceFile, context.SourceTable, context.Stage.ToString(), run.Status.ToString(),
-        run.SourceRowCount, run.ImportedRowCount, run.QuarantinedRowCount, run.StartedAt, run.CompletedAt, run.Error);
+        run.SourceRowCount, run.ImportedRowCount, run.QuarantinedRowCount, run.StartedAt, run.CompletedAt, run.Error,
+        MasterDataMaterializer.IsSupported(context.SourceTable) ? "materialized" : "staging-only");
 
     private sealed class EtlProjection
     {
