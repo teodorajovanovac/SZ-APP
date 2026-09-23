@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\SzApp.Domain\SzApp.Domain.csproj" />
+    <ProjectReference Include="..\..\src\SzApp.Worker\SzApp.Worker.csproj" />
   </ItemGroup>
 
 </Project>
