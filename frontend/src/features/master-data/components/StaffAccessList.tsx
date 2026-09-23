@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Alert, Stack, TextField, Typography } from '@mui/material'
+import { Alert, Button, Stack, TextField, Typography } from '@mui/material'
 import type { ColumnDef, PaginationState, SortingState } from '@tanstack/react-table'
 import { ServerDataTable } from '../../../shared/components/ServerDataTable'
 import { useStaffAccess } from '../useMasterData'
@@ -26,9 +26,9 @@ export function StaffAccessList({ companyId, onSelect }: StaffAccessListProps) {
         accessorKey: 'staffEmail',
         header: 'Korisnik',
         cell: ({ row, getValue }) => (
-          <button type="button" className="MuiButtonBase-root" onClick={() => onSelect?.(row.original)}>
+          <Button variant="text" size="small" onClick={() => onSelect?.(row.original)}>
             {String(getValue())}
-          </button>
+          </Button>
         ),
       },
       { accessorKey: 'staffRole', header: 'Uloga', enableSorting: false },
@@ -50,6 +50,7 @@ export function StaffAccessList({ companyId, onSelect }: StaffAccessListProps) {
         sorting={sorting}
         onPaginationChange={setPagination}
         onSortingChange={setSorting}
+        isLoading={result.isLoading}
         getRowId={(row) => String(row.id)}
       />
     </Stack>

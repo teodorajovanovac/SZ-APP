@@ -1,13 +1,6 @@
 import type { BankStatementSummary, JournalEntrySummary } from './types'
 
-export function formatMoney(value: number, currency = 'RSD') {
-  return new Intl.NumberFormat('sr-Latn-RS', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value)
-}
+export { formatMoney } from '../../shared/format/money'
 
 export function canPostJournal(journal: JournalEntrySummary) {
   return !journal.isPosted

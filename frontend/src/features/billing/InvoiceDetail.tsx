@@ -2,6 +2,7 @@ import { Alert, Chip, Paper, Stack, Typography } from '@mui/material'
 import { useQuery } from '@tanstack/react-query'
 import { apiRequest } from '../../api/generated/client'
 import { getErrorMessage } from '../../api/problemDetails'
+import { formatMoney } from '../../shared/format/money'
 import type { InvoiceSummary } from './types'
 
 export function InvoiceDetail({ companyId, invoiceId }: { companyId: number; invoiceId: number }) {
@@ -22,7 +23,7 @@ export function InvoiceDetail({ companyId, invoiceId }: { companyId: number; inv
         <Typography>{invoice.partnerName}</Typography>
         <Typography color="text.secondary">{invoice.address}, {invoice.postalCode} {invoice.city}</Typography>
         <Typography>Rok plaćanja: {invoice.dueDate}</Typography>
-        <Typography fontWeight={700}>Ukupno: {invoice.invoiceTotal.toFixed(2)} {invoice.currency}</Typography>
+        <Typography fontWeight={700}>Ukupno: {formatMoney(invoice.invoiceTotal, invoice.currency)}</Typography>
       </Stack>
     </Paper>
   )

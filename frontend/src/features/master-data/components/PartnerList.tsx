@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Alert, CircularProgress, Stack, TextField, Typography } from '@mui/material'
+import { Alert, Button, Stack, TextField, Typography } from '@mui/material'
 import type { ColumnDef, PaginationState, SortingState } from '@tanstack/react-table'
 import { ServerDataTable } from '../../../shared/components/ServerDataTable'
 import { usePartners } from '../useMasterData'
@@ -29,9 +29,9 @@ export function PartnerList({ companyId, onSelect }: PartnerListProps) {
         accessorKey: 'shortName',
         header: 'Kratak naziv',
         cell: ({ row, getValue }) => (
-          <button type="button" className="MuiButtonBase-root" onClick={() => onSelect?.(row.original)}>
+          <Button variant="text" size="small" onClick={() => onSelect?.(row.original)}>
             {String(getValue())}
-          </button>
+          </Button>
         ),
       },
       { accessorKey: 'name', header: 'Pun naziv' },
@@ -54,7 +54,6 @@ export function PartnerList({ companyId, onSelect }: PartnerListProps) {
         }}
         size="small"
       />
-      {partners.isLoading && <CircularProgress aria-label="Učitavanje partnera" />}
       {partners.isError && <Alert severity="error">Partneri nisu mogli da se učitaju.</Alert>}
       <ServerDataTable
         ariaLabel="Partneri"
@@ -65,6 +64,7 @@ export function PartnerList({ companyId, onSelect }: PartnerListProps) {
         sorting={sorting}
         onPaginationChange={setPagination}
         onSortingChange={setSorting}
+        isLoading={partners.isLoading}
         getRowId={(row) => String(row.id)}
       />
     </Stack>

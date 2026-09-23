@@ -9,7 +9,7 @@ import { ledgerBankingApi } from './ledgerBankingApi'
 import { canPostJournal, canPostStatement, formatMoney } from './ledgerBankingFormat'
 import type { BankStatementSummary, JournalEntrySummary } from './types'
 
-export function LedgerBankingPage() {
+export function LedgerBankingPage({ canPost }: { canPost: boolean }) {
   const [tab, setTab] = useState(0)
   const { activeCompany } = useActiveCompany()
 
@@ -20,12 +20,16 @@ export function LedgerBankingPage() {
         <Tab label="Nalozi" />
         <Tab label="Bankarski izvodi" />
       </Tabs>
-      {tab === 0 ? <JournalPanel companyId={activeCompany.id} /> : <StatementPanel companyId={activeCompany.id} />}
+      {tab === 0 ? (
+        <JournalPanel companyId={activeCompany.id} canPost={canPost} />
+      ) : (
+        <StatementPanel companyId={activeCompany.id} canPost={canPost} />
+      )}
     </Stack>
   )
 }
 
-function JournalPanel({ companyId }: { companyId: number }) {
+function JournalPanel({ companyId, canPost }: { companyId: number; canPost: boolean }) {
   const queryClient = useQueryClient()
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 25 })
   const [sorting, setSorting] = useState<SortingState>([])
@@ -55,18 +59,19 @@ function JournalPanel({ companyId }: { companyId: number }) {
       {
         id: 'actions',
         header: 'Akcije',
-        cell: ({ row }) => (
-          <Button
-            size="small"
-            disabled={mutation.isPending}
-            onClick={() => mutation.mutate({ journal: row.original, reverse: row.original.isPosted })}
-          >
-            {canPostJournal(row.original) ? 'Knjiži' : 'Storniraj'}
-          </Button>
-        ),
+        cell: ({ row }) =>
+          canPost ? (
+            <Button
+              size="small"
+              disabled={mutation.isPending}
+              onClick={() => mutation.mutate({ journal: row.original, reverse: row.original.isPosted })}
+            >
+              {canPostJournal(row.original) ? 'Knjiži' : 'Storniraj'}
+            </Button>
+          ) : null,
       },
     ],
-    [mutation],
+    [mutation, canPost],
   )
 
   return (
@@ -81,13 +86,14 @@ function JournalPanel({ companyId }: { companyId: number }) {
         sorting={sorting}
         onPaginationChange={setPagination}
         onSortingChange={setSorting}
+        isLoading={journals.isLoading}
         getRowId={(row) => String(row.id)}
       />
     </Box>
   )
 }
 
-function StatementPanel({ companyId }: { companyId: number }) {
+function StatementPanel({ companyId, canPost }: { companyId: number; canPost: boolean }) {
   const queryClient = useQueryClient()
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 25 })
   const [sorting, setSorting] = useState<SortingState>([])
@@ -111,18 +117,19 @@ function StatementPanel({ companyId }: { companyId: number }) {
       {
         id: 'actions',
         header: 'Akcije',
-        cell: ({ row }) => (
-          <Button
-            size="small"
-            disabled={!canPostStatement(row.original) || post.isPending}
-            onClick={() => post.mutate(row.original)}
-          >
-            Knjiži
-          </Button>
-        ),
+        cell: ({ row }) =>
+          canPost ? (
+            <Button
+              size="small"
+              disabled={!canPostStatement(row.original) || post.isPending}
+              onClick={() => post.mutate(row.original)}
+            >
+              Knjiži
+            </Button>
+          ) : null,
       },
     ],
-    [post],
+    [post, canPost],
   )
 
   return (
@@ -137,6 +144,7 @@ function StatementPanel({ companyId }: { companyId: number }) {
         sorting={sorting}
         onPaginationChange={setPagination}
         onSortingChange={setSorting}
+        isLoading={statements.isLoading}
         getRowId={(row) => String(row.id)}
       />
     </Box>

@@ -2,6 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { Alert, Button, Stack, TextField } from '@mui/material'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
+import { getErrorMessage } from '../../../api/problemDetails'
 import { useSavePartner } from '../useMasterData'
 import type { Partner, SavePartner } from '../types'
 
@@ -57,7 +58,7 @@ export function PartnerForm({ companyId, partner, onSaved, onCancel }: PartnerFo
 
   return (
     <Stack component="form" spacing={2} onSubmit={handleSubmit(submit)} noValidate>
-      {save.isError && <Alert severity="error">Partner nije sačuvan. Proverite podatke i pokušajte ponovo.</Alert>}
+      {save.isError && <Alert severity="error">{getErrorMessage(save.error, 'Partner nije sačuvan. Proverite podatke i pokušajte ponovo.')}</Alert>}
       <TextField label="Kratak naziv" required {...register('shortName')} error={!!errors.shortName} helperText={errors.shortName?.message} />
       <TextField label="Pun naziv" required {...register('name')} error={!!errors.name} helperText={errors.name?.message} />
       <TextField label="Matični broj" {...register('registrationNumber')} error={!!errors.registrationNumber} helperText={errors.registrationNumber?.message} />
