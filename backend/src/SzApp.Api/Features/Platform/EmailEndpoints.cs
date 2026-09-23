@@ -57,25 +57,38 @@ internal static class EmailEndpoints
         return Results.Created($"/api/v1/companies/{companyId}/emails/{item.Id}", ToResponse(item));
     }
 
+    // Message type shared with SzApp.Worker's EmailOutboxMessageHandler.MessageType — kept as a literal
+    // here (not a cross-project constant) since the two projects don't otherwise reference each other.
+    private const string EmailOutboxMessageType = "platform.email.send";
+
     private static async Task<IResult> QueueAsync(int companyId, long emailId, ClaimsPrincipal principal, SzAppDbContext db, TimeProvider timeProvider, CancellationToken ct)
     {
         if (!await PlatformEndpointHelpers.CanWriteAsync(principal, companyId, db, ct)) return Results.Forbid();
         var item = await db.Set<SentEmail>().SingleOrDefaultAsync(x => x.Id == emailId && x.CompanyId == companyId, ct);
         if (item is null) return Results.NotFound();
         if (item.Status is EmailSendStatus.Sent or EmailSendStatus.Sending) return Results.Conflict(new { message = "Email je već poslat ili se trenutno šalje." });
-        var outboxExists = await db.OutboxMessages.AnyAsync(x => x.DedupeKey == $"email:{emailId}" && x.ProcessedAt == null, ct);
-        if (!outboxExists)
+        var dedupeKey = $"email:{emailId}";
+        // DedupeKey has a unique index, so an old, exhausted (AttemptCount >= 10) but still-unprocessed
+        // row for this email would silently block inserting a fresh one — reset it in place instead.
+        var existing = await db.OutboxMessages.SingleOrDefaultAsync(x => x.DedupeKey == dedupeKey && x.ProcessedAt == null, ct);
+        if (existing is null)
         {
             db.OutboxMessages.Add(new OutboxMessage
             {
                 Id = Guid.NewGuid(),
                 CompanyId = companyId,
                 OccurredAt = timeProvider.GetUtcNow(),
-                Type = SentEmailOutboxHandler.Type,
-                DedupeKey = $"email:{emailId}",
+                Type = EmailOutboxMessageType,
+                DedupeKey = dedupeKey,
                 PayloadJson = JsonSerializer.Serialize(new SendEmailOutboxPayload(emailId)),
                 CorrelationId = Guid.NewGuid().ToString("N")
             });
+        }
+        else
+        {
+            existing.AttemptCount = 0;
+            existing.LastError = null;
+            existing.OccurredAt = timeProvider.GetUtcNow();
         }
         item.Status = EmailSendStatus.Queued; item.SendDescription = null; item.NextAttemptAt = timeProvider.GetUtcNow();
         await db.SaveChangesAsync(ct);

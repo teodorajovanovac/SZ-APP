@@ -22,6 +22,7 @@
     <ProjectReference Include="..\..\src\SzApp.Domain\SzApp.Domain.csproj" />
     <ProjectReference Include="..\..\src\SzApp.Api\SzApp.Api.csproj" />
     <ProjectReference Include="..\..\src\SzApp.Etl\SzApp.Etl.csproj" />
+    <ProjectReference Include="..\..\src\SzApp.Worker\SzApp.Worker.csproj" />
   </ItemGroup>
 
 </Project>
