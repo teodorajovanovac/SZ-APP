@@ -84,7 +84,8 @@ public sealed class ReconciliationRecord
     public string Scope { get; set; } = string.Empty;
     public decimal ExpectedValue { get; set; }
     public decimal ActualValue { get; set; }
-    public bool IsMatch { get; set; }
+    // null = not applicable (target table has no materialization yet — see EtlPipelineService.ReconcileAsync)
+    public bool? IsMatch { get; set; }
     public string? Details { get; set; }
     public DateTimeOffset CheckedAt { get; set; }
     public EtlRun EtlRun { get; set; } = null!;

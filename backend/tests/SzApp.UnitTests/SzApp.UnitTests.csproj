@@ -21,6 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\SzApp.Domain\SzApp.Domain.csproj" />
     <ProjectReference Include="..\..\src\SzApp.Api\SzApp.Api.csproj" />
+    <ProjectReference Include="..\..\src\SzApp.Etl\SzApp.Etl.csproj" />
   </ItemGroup>
 
 </Project>
