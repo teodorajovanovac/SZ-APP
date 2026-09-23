@@ -21,6 +21,7 @@ public interface IJournalPostingService
 public sealed class JournalPostingService(
     SzAppDbContext dbContext,
     LedgerMutationScope mutationScope,
+    IShortListValidator shortLists,
     TimeProvider timeProvider) : IJournalPostingService
 {
     public async Task<JournalEntryResponse> CreateDraftAsync(
@@ -30,6 +31,7 @@ public sealed class JournalPostingService(
     {
         ValidateDraftRequest(request);
         await EnsurePostingAccountsAsync(request.Lines.Select(x => x.Account), cancellationToken);
+        await shortLists.EnsureTypeAsync(request.JournalEntryTypeId, "LedgerLineType", cancellationToken);
 
         var journal = new JournalEntry
         {

@@ -59,6 +59,7 @@ public static class MasterDataFeatureExtensions
     private static async Task<IResult> CreateCompanyAsync(
         CreateCompanyRequest request,
         SzAppDbContext dbContext,
+        IShortListValidator shortLists,
         HttpContext httpContext,
         CancellationToken cancellationToken)
     {
@@ -80,6 +81,8 @@ public static class MasterDataFeatureExtensions
         {
             return Unprocessable("Upravnik mora biti postojeći globalni partner.");
         }
+        await shortLists.EnsureTypeAsync(request.CompanyTypeId, "CompanyType", cancellationToken);
+        await shortLists.EnsureTypeAsync(request.VatTypeId, "VatType", cancellationToken);
 
         var company = new Company();
         Apply(company, request);
@@ -112,6 +115,7 @@ public static class MasterDataFeatureExtensions
         ClaimsPrincipal principal,
         IMasterDataPermissionService permission,
         SzAppDbContext dbContext,
+        IShortListValidator shortLists,
         HttpContext httpContext,
         CancellationToken cancellationToken)
     {
@@ -141,6 +145,8 @@ public static class MasterDataFeatureExtensions
         {
             return Unprocessable("Partner i upravnik moraju biti globalni ili pripadati istoj kompaniji.");
         }
+        await shortLists.EnsureTypeAsync(request.CompanyTypeId, "CompanyType", cancellationToken);
+        await shortLists.EnsureTypeAsync(request.VatTypeId, "VatType", cancellationToken);
 
         ETagCodec.TryDecode(request.RowVersion, out var rowVersion);
         dbContext.Entry(company).Property(item => item.RowVersion).OriginalValue = rowVersion;
@@ -256,6 +262,7 @@ public static class MasterDataFeatureExtensions
         ClaimsPrincipal principal,
         IMasterDataPermissionService permission,
         SzAppDbContext dbContext,
+        IShortListValidator shortLists,
         CancellationToken cancellationToken)
     {
         if (!await permission.CanWriteAsync(principal, companyId, cancellationToken))
@@ -267,6 +274,7 @@ public static class MasterDataFeatureExtensions
         {
             return Results.ValidationProblem(errors);
         }
+        await shortLists.EnsureTypeAsync(request.PartnerTypeId, "PartnerType", cancellationToken);
 
         var partner = new Partner { CompanyId = companyId };
         Apply(partner, request);
@@ -282,6 +290,7 @@ public static class MasterDataFeatureExtensions
         ClaimsPrincipal principal,
         IMasterDataPermissionService permission,
         SzAppDbContext dbContext,
+        IShortListValidator shortLists,
         CancellationToken cancellationToken)
     {
         if (!await permission.CanWriteAsync(principal, companyId, cancellationToken))
@@ -293,6 +302,7 @@ public static class MasterDataFeatureExtensions
         {
             return Results.ValidationProblem(errors);
         }
+        await shortLists.EnsureTypeAsync(request.PartnerTypeId, "PartnerType", cancellationToken);
 
         var partner = await dbContext.Partners.SingleOrDefaultAsync(
             item => item.Id == partnerId && item.CompanyId == companyId,
