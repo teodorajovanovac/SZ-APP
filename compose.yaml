@@ -12,7 +12,7 @@ services:
     volumes:
       - sql-data:/var/opt/mssql
     healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P '$$MSSQL_SA_PASSWORD' -C -Q 'SELECT 1' || exit 1"]
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q 'SELECT 1' || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 20
@@ -32,6 +32,8 @@ services:
       Reports__ReadOnlyConnectionString: ${SZAPP_REPORTS_CONNECTION_STRING:-}
       BootstrapAdmin__Email: ${BootstrapAdmin__Email:-}
       BootstrapAdmin__Password: ${BootstrapAdmin__Password:-}
+      BootstrapDemoData: ${BootstrapDemoData:-false}
+      Security__RequireHttps: ${SZAPP_REQUIRE_HTTPS:-false}
       Authentication__CookieName: ${SZAPP_COOKIE_NAME:-szapp.session}
     ports:
       - "8081:8080"

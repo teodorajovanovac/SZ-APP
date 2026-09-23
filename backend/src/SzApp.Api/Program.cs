@@ -21,6 +21,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 var connectionString = builder.Configuration.GetConnectionString("SzApp")
     ?? throw new InvalidOperationException("Connection string 'SzApp' is required.");
+var requireHttps = builder.Configuration.GetValue("Security:RequireHttps", !builder.Environment.IsDevelopment());
 
 builder.Services.AddDbContext<SzAppDbContext>(options =>
     options.UseSqlServer(connectionString, sql => sql.EnableRetryOnFailure()));
@@ -50,11 +51,9 @@ builder.Services
 
 builder.Services.ConfigureApplicationCookie(options =>
 {
-    options.Cookie.Name = "__Host-szapp-auth";
+    options.Cookie.Name = requireHttps ? "__Host-szapp-auth" : "szapp-auth";
     options.Cookie.HttpOnly = true;
-    options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
-        ? CookieSecurePolicy.SameAsRequest
-        : CookieSecurePolicy.Always;
+    options.Cookie.SecurePolicy = requireHttps ? CookieSecurePolicy.Always : CookieSecurePolicy.SameAsRequest;
     options.Cookie.SameSite = SameSiteMode.Strict;
     options.Cookie.Path = "/";
     options.SlidingExpiration = true;
@@ -74,11 +73,9 @@ builder.Services.ConfigureApplicationCookie(options =>
 builder.Services.AddAntiforgery(options =>
 {
     options.HeaderName = "X-CSRF-TOKEN";
-    options.Cookie.Name = "__Host-szapp-csrf";
+    options.Cookie.Name = requireHttps ? "__Host-szapp-csrf" : "szapp-csrf";
     options.Cookie.HttpOnly = true;
-    options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
-        ? CookieSecurePolicy.SameAsRequest
-        : CookieSecurePolicy.Always;
+    options.Cookie.SecurePolicy = requireHttps ? CookieSecurePolicy.Always : CookieSecurePolicy.SameAsRequest;
     options.Cookie.SameSite = SameSiteMode.Strict;
     options.Cookie.Path = "/";
 });
@@ -125,7 +122,10 @@ app.Use(async (context, next) =>
 });
 
 app.UseExceptionHandler();
-app.UseHttpsRedirection();
+if (requireHttps)
+{
+    app.UseHttpsRedirection();
+}
 app.UseAuthentication();
 app.Use(async (context, next) =>
 {
@@ -301,6 +301,35 @@ static async Task InitializeDatabaseAsync(IServiceProvider services)
         }
         if (!await userManager.IsInRoleAsync(user, SecurityConstants.RootRole))
             await userManager.AddToRoleAsync(user, SecurityConstants.RootRole);
+    }
+
+    if (configuration.GetValue<bool>("BootstrapDemoData") && !await dbContext.Companies.AnyAsync())
+    {
+        var organization = new Partner { ShortName = "SZ Primer", Name = "Stambena zajednica Primer", RegistrationNumber = "12345678", TaxNumber = "109876543" };
+        var owner = new Partner { ShortName = "Petrović Marko", Name = "Marko Petrović", Language = "sr-Latn" };
+        dbContext.AddRange(organization, owner);
+        await dbContext.SaveChangesAsync();
+
+        var company = new Company { PartnerId = organization.Id, ShortName = "SZ Primer", PrintName = "Stambena zajednica Primer", RelativeFolderName = "sz-primer" };
+        dbContext.Add(company);
+        await dbContext.SaveChangesAsync();
+        organization.CompanyId = company.Id;
+        owner.CompanyId = company.Id;
+
+        var address = new Address { StreetAddress = "Bulevar primera 1", PostalCode = "11000", City = "Beograd", CountryCode = "RS" };
+        dbContext.Add(address);
+        await dbContext.SaveChangesAsync();
+        var entrance = new BuildingEntrance { CompanyId = company.Id, BuildingName = "SZ Primer", EntranceName = "Ulaz A", BuildingLabel = "A", AddressId = address.Id, SortIndex = 1 };
+        dbContext.Add(entrance);
+        await dbContext.SaveChangesAsync();
+        var unit = new Unit { CompanyId = company.Id, Name = "Stan 12", BuildingEntranceId = entrance.Id, SortingNumber = 12, K1 = 64.50m, K2 = 1m, FloorNumber = 3 };
+        dbContext.Add(unit);
+        await dbContext.SaveChangesAsync();
+        var contract = new Contract { CompanyId = company.Id, UnitId = unit.Id, AccountNumber = 100012, OwnerPartnerId = owner.Id, InvoicePartnerId = owner.Id, ContractDate = new DateOnly(2026, 1, 1), InvoiceStartDate = new DateOnly(2026, 1, 1), IsActive = true, IsPrintInvoiceMandatory = true };
+        dbContext.Add(contract);
+        await dbContext.SaveChangesAsync();
+        unit.ContractId = contract.Id;
+        await dbContext.SaveChangesAsync();
     }
 }
 
