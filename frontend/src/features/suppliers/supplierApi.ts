@@ -37,12 +37,11 @@ export function useSupplierInvoices(companyId: number, page = 1, pageSize = 25) 
 export function useCreateSupplierInvoice(companyId: number) {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: async (request: CreateSupplierInvoice) => {
-      const token = await apiRequest<{ token: string; headerName: string }>('/api/v1/auth/antiforgery')
-      return apiRequest<SupplierInvoice>(`/api/v1/companies/${companyId}/supplier-invoices`, {
-        method: 'POST', body: JSON.stringify(request), headers: { [token.headerName]: token.token },
-      })
-    },
+    // apiRequest attaches the antiforgery header automatically for unsafe methods.
+    mutationFn: (request: CreateSupplierInvoice) =>
+      apiRequest<SupplierInvoice>(`/api/v1/companies/${companyId}/supplier-invoices`, {
+        method: 'POST', body: JSON.stringify(request),
+      }),
     onSuccess: () => client.invalidateQueries({ queryKey: ['companies', companyId, 'supplier-invoices'] }),
   })
 }

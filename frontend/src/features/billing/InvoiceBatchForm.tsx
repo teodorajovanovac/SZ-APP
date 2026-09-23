@@ -6,7 +6,14 @@ import { getErrorMessage } from '../../api/problemDetails'
 import { useCreateInvoiceBatch } from './billingApi'
 
 const schema = z.object({
-  periodYYMM: z.number().int().min(1001).max(9912),
+  periodYYMM: z
+    .number()
+    .int()
+    .min(1001)
+    .max(9912)
+    .refine((value) => { const month = value % 100; return month >= 1 && month <= 12 }, {
+      message: 'Mesec (poslednje dve cifre) mora biti između 01 i 12.',
+    }),
   caption: z.string().trim().min(1).max(50),
   place: z.string().trim().min(1).max(50),
   issueDate: z.string().min(1),

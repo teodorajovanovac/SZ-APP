@@ -23,6 +23,9 @@ export function StaffAccessForm({ companyId, access, onSaved }: StaffAccessFormP
   return (
     <Stack component="form" spacing={2} onSubmit={submit}>
       {save.isError && <Alert severity="error">{getErrorMessage(save.error, 'Pristup nije sačuvan.')}</Alert>}
+      {/* ponytail: raw numeric ID — no staff-directory list endpoint is exposed yet to back
+          an Autocomplete (useStaffAccess lists existing grants, not the staff pool). Wire
+          one up once a /staff or similar lookup endpoint exists. */}
       <TextField label="ID zaposlenog" type="number" required value={staffId} disabled={!!access} onChange={(event) => setStaffId(event.target.value)} inputProps={{ min: 1 }} />
       <TextField select label="Uloga" value={staffRole} onChange={(event) => setStaffRole(event.target.value as StaffRole)}>
         <MenuItem value="Upravnik">Upravnik</MenuItem>

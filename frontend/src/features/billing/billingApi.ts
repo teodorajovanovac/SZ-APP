@@ -2,17 +2,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiRequest } from '../../api/generated/client'
 import type { BillingPage, CreateInvoiceBatch, InvoiceBatch, InvoiceBatchPreview, InvoiceGenerationRequest, InvoiceSummary } from './types'
 
-interface AntiforgeryToken { token: string; headerName: string }
-
+// apiRequest attaches the antiforgery header automatically for unsafe methods; only
+// the idempotency key needs adding here.
 async function mutate<T>(path: string, body?: unknown, idempotent = false): Promise<T> {
-  const token = await apiRequest<AntiforgeryToken>('/api/v1/auth/antiforgery')
   return apiRequest<T>(path, {
     method: 'POST',
     body: body === undefined ? undefined : JSON.stringify(body),
-    headers: {
-      [token.headerName]: token.token,
-      ...(idempotent ? { 'Idempotency-Key': crypto.randomUUID() } : {}),
-    },
+    headers: idempotent ? { 'Idempotency-Key': crypto.randomUUID() } : undefined,
   })
 }
 

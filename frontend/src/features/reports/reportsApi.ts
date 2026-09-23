@@ -2,13 +2,16 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { ApiProblemError, apiRequest, type ProblemDetails } from '../../api/generated/client'
 import type { AnalysisDefinition, AnalysisRun, ReportDefinition, ReportParameters, ReportRun } from './types'
 
+// apiRequest attaches the antiforgery header automatically for unsafe methods.
+async function run<T>(path: string, parameters: ReportParameters) {
+  return apiRequest<T>(path, { method: 'POST', body: JSON.stringify({ parameters }) })
+}
+
+// download() can't go through apiRequest (it needs the raw Response for Blob, not
+// parsed JSON), so it's the one caller that still has to fetch its own CSRF token.
 async function csrfHeaders() {
   const token = await apiRequest<{ token: string; headerName: string }>('/api/v1/auth/antiforgery')
   return { [token.headerName]: token.token, 'Content-Type': 'application/json', Accept: 'application/json' }
-}
-
-async function run<T>(path: string, parameters: ReportParameters) {
-  return apiRequest<T>(path, { method: 'POST', headers: await csrfHeaders(), body: JSON.stringify({ parameters }) })
 }
 
 async function download(path: string, parameters: ReportParameters): Promise<Blob> {

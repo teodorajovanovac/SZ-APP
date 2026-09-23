@@ -16,11 +16,10 @@ export interface Notice {
   rowVersion: string
 }
 
-async function noticeCommand(companyId: number, noticeId: number, command: 'render' | 'send') {
-  const token = await apiRequest<{ token: string; headerName: string }>('/api/v1/auth/antiforgery')
+// apiRequest attaches the antiforgery header automatically for unsafe methods.
+function noticeCommand(companyId: number, noticeId: number, command: 'render' | 'send') {
   return apiRequest<Notice>(`/api/v1/companies/${companyId}/notices/${noticeId}/${command}`, {
     method: 'POST',
-    headers: { [token.headerName]: token.token },
   })
 }
 

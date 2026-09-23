@@ -7,19 +7,12 @@ import type {
   PostingResult,
 } from './types'
 
-interface AntiforgeryToken {
-  token: string
-  headerName: string
-}
-
+// apiRequest attaches the antiforgery header automatically for unsafe methods; only
+// the idempotency key needs adding here.
 async function mutationRequest<T>(path: string, method: 'POST' | 'PUT', body: unknown): Promise<T> {
-  const csrf = await apiRequest<AntiforgeryToken>('/api/v1/auth/antiforgery')
   return apiRequest<T>(path, {
     method,
-    headers: {
-      [csrf.headerName]: csrf.token,
-      'Idempotency-Key': crypto.randomUUID(),
-    },
+    headers: { 'Idempotency-Key': crypto.randomUUID() },
     body: JSON.stringify(body),
   })
 }
