@@ -18,7 +18,11 @@ public interface ISafeReportQueryRunner
 
 public sealed class SafeReportQueryRunner(IOptions<ReportsOptions> options) : ISafeReportQueryRunner
 {
-    private readonly ReportsOptions _options = ValidateOptions(options.Value);
+    private ReportsOptions? _options;
+
+    // ponytail: lazy validation so listing endpoints (which never call RunAsync) don't
+    // eagerly fail when Reports:ReadOnlyConnectionString is unconfigured.
+    private ReportsOptions EnsureValidated() => _options ??= ValidateOptions(options.Value);
 
     public async Task<TabularReportData> RunAsync(
         string sql,
@@ -26,6 +30,7 @@ public sealed class SafeReportQueryRunner(IOptions<ReportsOptions> options) : IS
         IReadOnlyDictionary<string, JsonElement>? parameters,
         CancellationToken cancellationToken)
     {
+        var _options = EnsureValidated();
         var validated = ReportQueryPolicy.Validate(sql);
         var supplied = new Dictionary<string, JsonElement>(parameters ?? new Dictionary<string, JsonElement>(), StringComparer.OrdinalIgnoreCase);
         if (supplied.ContainsKey("CompanyId"))
@@ -74,7 +79,7 @@ public sealed class SafeReportQueryRunner(IOptions<ReportsOptions> options) : IS
     {
         DBNull => null,
         byte[] bytes => Convert.ToBase64String(bytes),
-        string text when text.Length > _options.MaximumCellCharacters => text[.._options.MaximumCellCharacters],
+        string text when text.Length > _options!.MaximumCellCharacters => text[.._options.MaximumCellCharacters],
         DateTimeOffset or DateTime or DateOnly or TimeOnly or Guid or bool or byte or short or int or long or float or double or decimal or string => value,
         _ => Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture)
     };

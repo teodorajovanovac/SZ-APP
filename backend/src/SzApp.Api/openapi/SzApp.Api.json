@@ -170,7 +170,6 @@
           {
             "name": "Page",
             "in": "query",
-            "required": true,
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -183,7 +182,6 @@
           {
             "name": "PageSize",
             "in": "query",
-            "required": true,
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -210,7 +208,6 @@
           {
             "name": "Descending",
             "in": "query",
-            "required": true,
             "schema": {
               "type": "boolean"
             }
@@ -382,7 +379,6 @@
           {
             "name": "Page",
             "in": "query",
-            "required": true,
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -395,7 +391,6 @@
           {
             "name": "PageSize",
             "in": "query",
-            "required": true,
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -422,7 +417,6 @@
           {
             "name": "Descending",
             "in": "query",
-            "required": true,
             "schema": {
               "type": "boolean"
             }
@@ -594,7 +588,6 @@
           {
             "name": "Page",
             "in": "query",
-            "required": true,
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -607,7 +600,6 @@
           {
             "name": "PageSize",
             "in": "query",
-            "required": true,
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -634,7 +626,6 @@
           {
             "name": "Descending",
             "in": "query",
-            "required": true,
             "schema": {
               "type": "boolean"
             }
@@ -806,7 +797,6 @@
           {
             "name": "Page",
             "in": "query",
-            "required": true,
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -819,7 +809,6 @@
           {
             "name": "PageSize",
             "in": "query",
-            "required": true,
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -846,7 +835,6 @@
           {
             "name": "Descending",
             "in": "query",
-            "required": true,
             "schema": {
               "type": "boolean"
             }
@@ -1018,7 +1006,6 @@
           {
             "name": "Page",
             "in": "query",
-            "required": true,
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -1031,7 +1018,6 @@
           {
             "name": "PageSize",
             "in": "query",
-            "required": true,
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -1058,7 +1044,6 @@
           {
             "name": "Descending",
             "in": "query",
-            "required": true,
             "schema": {
               "type": "boolean"
             }
@@ -1342,7 +1327,6 @@
           {
             "name": "Page",
             "in": "query",
-            "required": true,
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -1355,7 +1339,6 @@
           {
             "name": "PageSize",
             "in": "query",
-            "required": true,
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -1382,7 +1365,6 @@
           {
             "name": "Descending",
             "in": "query",
-            "required": true,
             "schema": {
               "type": "boolean"
             }
@@ -1554,7 +1536,6 @@
           {
             "name": "Page",
             "in": "query",
-            "required": true,
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -1567,7 +1548,6 @@
           {
             "name": "PageSize",
             "in": "query",
-            "required": true,
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -1594,7 +1574,6 @@
           {
             "name": "Descending",
             "in": "query",
-            "required": true,
             "schema": {
               "type": "boolean"
             }

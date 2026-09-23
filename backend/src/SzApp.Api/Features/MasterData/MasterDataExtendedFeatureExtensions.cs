@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using SzApp.Contracts.MasterData;
 using SzApp.Data;
 using SzApp.Data.Entities;
+using SzApp.Domain;
 
 namespace SzApp.Api.Features.MasterData;
 
@@ -54,7 +55,7 @@ public static class MasterDataExtendedFeatureExtensions
                 (item.EntranceName != null && item.EntranceName.Contains(query.NormalizedSearch)) ||
                 (item.BuildingLabel != null && item.BuildingLabel.Contains(query.NormalizedSearch)));
         }
-        source = query.Descending
+        source = query.NormalizedDescending
             ? source.OrderByDescending(item => item.SortIndex).ThenByDescending(item => item.Id)
             : source.OrderBy(item => item.SortIndex).ThenBy(item => item.Id);
         var total = await source.CountAsync(cancellationToken);
@@ -147,7 +148,7 @@ public static class MasterDataExtendedFeatureExtensions
         var source = db.Set<Unit>().AsNoTracking().Where(item => item.CompanyId == companyId);
         if (query.NormalizedSearch.Length > 0)
             source = source.Where(item => item.Name != null && item.Name.Contains(query.NormalizedSearch));
-        source = query.Descending
+        source = query.NormalizedDescending
             ? source.OrderByDescending(item => item.SortingNumber).ThenByDescending(item => item.Id)
             : source.OrderBy(item => item.SortingNumber).ThenBy(item => item.Id);
         var total = await source.CountAsync(cancellationToken);
@@ -303,11 +304,13 @@ public static class MasterDataExtendedFeatureExtensions
             if (!ETagCodec.TryDecode(request.CurrentContractRowVersion, out var rowVersion)) return InvalidRowVersion();
             db.Entry(current).Property(item => item.RowVersion).OriginalValue = rowVersion;
         }
-        var overlapsFuture = await db.Set<Contract>().AsNoTracking().AnyAsync(
-            item => item.CompanyId == companyId && item.UnitId == unitId &&
-                    (current == null || item.Id != current.Id) &&
-                    (item.ContractEndDate == null || item.ContractEndDate >= request.EffectiveFrom),
-            cancellationToken);
+        var activeContracts = await db.Set<Contract>().AsNoTracking()
+            .Where(item => item.CompanyId == companyId && item.UnitId == unitId && item.IsActive &&
+                           (current == null || item.Id != current.Id))
+            .Select(item => new { item.ContractDate, item.ContractEndDate })
+            .ToArrayAsync(cancellationToken);
+        var overlapsFuture = activeContracts.Any(item =>
+            ContractPeriodPolicy.Overlaps(request.EffectiveFrom, null, item.ContractDate, item.ContractEndDate));
         if (overlapsFuture) return Unprocessable("Period novog ugovora preklapa se sa postojećom istorijom.");
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
@@ -362,7 +365,7 @@ public static class MasterDataExtendedFeatureExtensions
         var source = db.Set<PartnerAccount>().AsNoTracking().Where(item => item.CompanyId == companyId);
         if (query.NormalizedSearch.Length > 0)
             source = source.Where(item => item.Account.Contains(query.NormalizedSearch) || item.AccountNumber.ToString().Contains(query.NormalizedSearch));
-        source = query.Descending
+        source = query.NormalizedDescending
             ? source.OrderByDescending(item => item.AccountNumber).ThenByDescending(item => item.Id)
             : source.OrderBy(item => item.AccountNumber).ThenBy(item => item.Id);
         var total = await source.CountAsync(cancellationToken);
@@ -469,7 +472,7 @@ public static class MasterDataExtendedFeatureExtensions
         var source = db.Set<BankAccount>().AsNoTracking().Where(item => item.CompanyId == companyId);
         if (query.NormalizedSearch.Length > 0)
             source = source.Where(item => item.AccountNumber != null && item.AccountNumber.Contains(query.NormalizedSearch));
-        source = query.Descending
+        source = query.NormalizedDescending
             ? source.OrderByDescending(item => item.SortIndex).ThenByDescending(item => item.Id)
             : source.OrderBy(item => item.SortIndex).ThenBy(item => item.Id);
         var total = await source.CountAsync(cancellationToken);

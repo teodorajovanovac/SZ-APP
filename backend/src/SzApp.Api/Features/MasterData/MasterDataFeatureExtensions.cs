@@ -217,7 +217,7 @@ public static class MasterDataFeatureExtensions
                 item.TaxNumber != null && EF.Functions.Like(item.TaxNumber, search, "\\"));
         }
 
-        partners = (query.SortBy?.ToLowerInvariant(), query.Descending) switch
+        partners = (query.SortBy?.ToLowerInvariant(), query.NormalizedDescending) switch
         {
             ("name", true) => partners.OrderByDescending(item => item.Name).ThenByDescending(item => item.Id),
             ("name", false) => partners.OrderBy(item => item.Name).ThenBy(item => item.Id),
@@ -358,7 +358,7 @@ public static class MasterDataFeatureExtensions
                 EF.Functions.Like(item.City, search, "\\") ||
                 item.PostalCode != null && EF.Functions.Like(item.PostalCode, search, "\\"));
         }
-        addresses = query.Descending
+        addresses = query.NormalizedDescending
             ? addresses.OrderByDescending(item => item.City).ThenByDescending(item => item.StreetAddress)
             : addresses.OrderBy(item => item.City).ThenBy(item => item.StreetAddress);
 
@@ -487,7 +487,7 @@ public static class MasterDataFeatureExtensions
             var search = $"%{EscapeLike(query.NormalizedSearch)}%";
             access = access.Where(item => item.Staff.Email != null && EF.Functions.Like(item.Staff.Email, search, "\\"));
         }
-        access = query.Descending
+        access = query.NormalizedDescending
             ? access.OrderByDescending(item => item.Staff.Email).ThenByDescending(item => item.Id)
             : access.OrderBy(item => item.Staff.Email).ThenBy(item => item.Id);
 
