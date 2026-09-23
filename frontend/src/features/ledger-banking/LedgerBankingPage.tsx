@@ -17,6 +17,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ColumnDef, PaginationState, SortingState } from '@tanstack/react-table'
 import { useTranslation } from 'react-i18next'
+import { useLocation } from 'react-router-dom'
 import { ApiProblemError } from '../../api/generated/client'
 import { useActiveCompany } from '../companies/useActiveCompany'
 import { ServerDataTable } from '../../shared/components/ServerDataTable'
@@ -33,7 +34,12 @@ const statementStatusColor: Record<BankStatementSummary['status'], 'default' | '
 
 export function LedgerBankingPage({ canPost }: { canPost: boolean }) {
   const { t } = useTranslation()
-  const [tab, setTab] = useState(0)
+  const { pathname } = useLocation()
+  // Both /ledger and /banking render this page (same element, so no remount on
+  // navigation): default to the tab the sidebar link points at, until the user picks one.
+  const [picked, setPicked] = useState<{ path: string; value: number } | null>(null)
+  const tab = picked?.path === pathname ? picked.value : pathname.startsWith('/banking') ? 1 : 0
+  const setTab = (value: number) => setPicked({ path: pathname, value })
   const { activeCompany } = useActiveCompany()
 
   return (
