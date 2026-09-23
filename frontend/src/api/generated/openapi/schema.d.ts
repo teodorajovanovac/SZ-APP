@@ -197,12 +197,12 @@ export interface paths {
         };
         get: {
             parameters: {
-                query: {
-                    Page: number | string;
-                    PageSize: number | string;
+                query?: {
+                    Page?: number | string;
+                    PageSize?: number | string;
                     Search?: string;
                     SortBy?: string;
-                    Descending: boolean;
+                    Descending?: boolean;
                 };
                 header?: never;
                 path: {
@@ -341,12 +341,12 @@ export interface paths {
         };
         get: {
             parameters: {
-                query: {
-                    Page: number | string;
-                    PageSize: number | string;
+                query?: {
+                    Page?: number | string;
+                    PageSize?: number | string;
                     Search?: string;
                     SortBy?: string;
-                    Descending: boolean;
+                    Descending?: boolean;
                 };
                 header?: never;
                 path: {
@@ -485,12 +485,12 @@ export interface paths {
         };
         get: {
             parameters: {
-                query: {
-                    Page: number | string;
-                    PageSize: number | string;
+                query?: {
+                    Page?: number | string;
+                    PageSize?: number | string;
                     Search?: string;
                     SortBy?: string;
-                    Descending: boolean;
+                    Descending?: boolean;
                 };
                 header?: never;
                 path: {
@@ -629,12 +629,12 @@ export interface paths {
         };
         get: {
             parameters: {
-                query: {
-                    Page: number | string;
-                    PageSize: number | string;
+                query?: {
+                    Page?: number | string;
+                    PageSize?: number | string;
                     Search?: string;
                     SortBy?: string;
-                    Descending: boolean;
+                    Descending?: boolean;
                 };
                 header?: never;
                 path: {
@@ -773,12 +773,12 @@ export interface paths {
         };
         get: {
             parameters: {
-                query: {
-                    Page: number | string;
-                    PageSize: number | string;
+                query?: {
+                    Page?: number | string;
+                    PageSize?: number | string;
                     Search?: string;
                     SortBy?: string;
-                    Descending: boolean;
+                    Descending?: boolean;
                 };
                 header?: never;
                 path: {
@@ -1029,12 +1029,12 @@ export interface paths {
         };
         get: {
             parameters: {
-                query: {
-                    Page: number | string;
-                    PageSize: number | string;
+                query?: {
+                    Page?: number | string;
+                    PageSize?: number | string;
                     Search?: string;
                     SortBy?: string;
-                    Descending: boolean;
+                    Descending?: boolean;
                 };
                 header?: never;
                 path: {
@@ -1173,12 +1173,12 @@ export interface paths {
         };
         get: {
             parameters: {
-                query: {
-                    Page: number | string;
-                    PageSize: number | string;
+                query?: {
+                    Page?: number | string;
+                    PageSize?: number | string;
                     Search?: string;
                     SortBy?: string;
-                    Descending: boolean;
+                    Descending?: boolean;
                 };
                 header?: never;
                 path: {
