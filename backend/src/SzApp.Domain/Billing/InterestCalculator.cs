@@ -26,8 +26,12 @@ public static class InterestCalculator
                 var segmentEnd = period.To < yearEnd ? period.To : yearEnd;
                 var days = segmentEnd.DayNumber - cursor.DayNumber + 1;
                 var daysInYear = DateTime.IsLeapYear(cursor.Year) ? 366m : 365m;
-                var coefficient = FinanceRounding.Calculation(days / daysInYear * period.AnnualRate / 100m);
-                var interest = FinanceRounding.Money(principal * coefficient);
+                var fraction = days / daysInYear * period.AnnualRate / 100m;
+                // Interest is computed from the full-precision fraction, not the rounded
+                // display coefficient below — rounding first before multiplying by principal
+                // introduced material over/undercharges (see InterestCalculatorGoldenTests).
+                var interest = FinanceRounding.Money(principal * fraction);
+                var coefficient = FinanceRounding.Calculation(fraction);
                 results.Add(new InterestPeriodResult(cursor, segmentEnd, days, period.AnnualRate, coefficient, interest));
                 cursor = segmentEnd.AddDays(1);
             }

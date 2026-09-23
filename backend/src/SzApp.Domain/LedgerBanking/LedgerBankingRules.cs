@@ -28,11 +28,11 @@ public static class LedgerBankingRules
             throw new DomainRuleException("journal.invalid-line", "Svaka stavka mora imati pozitivan iznos na tačno jednoj strani.");
         }
 
-        var debit = FinanceRounding.Money(entries.Sum(x => x.Debit));
-        var credit = FinanceRounding.Money(entries.Sum(x => x.Credit));
+        var debit = FinanceRounding.Calculation(entries.Sum(x => x.Debit));
+        var credit = FinanceRounding.Calculation(entries.Sum(x => x.Credit));
         if (debit != credit)
         {
-            throw new DomainRuleException("journal.unbalanced", $"Nalog nije uravnotežen: duguje {debit:0.00}, potražuje {credit:0.00}.");
+            throw new DomainRuleException("journal.unbalanced", $"Nalog nije uravnotežen: duguje {debit:0.0000}, potražuje {credit:0.0000}.");
         }
 
         return debit;

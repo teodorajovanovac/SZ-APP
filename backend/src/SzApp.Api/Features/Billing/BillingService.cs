@@ -1,3 +1,4 @@
+using System.Data;
 using Microsoft.EntityFrameworkCore;
 using SzApp.Contracts.Billing;
 using SzApp.Data;
@@ -176,8 +177,12 @@ public sealed class BillingService(
         return CreatePreview(batchId, request);
     }
 
-    public async Task<InvoiceBatchGenerationResponse> GenerateBatchAsync(int companyId, int batchId, InvoiceGenerationRequest request, CancellationToken ct)
+    public Task<InvoiceBatchGenerationResponse> GenerateBatchAsync(int companyId, int batchId, InvoiceGenerationRequest request, CancellationToken ct) =>
+        ExecuteSerializableAsync(() => GenerateBatchCoreAsync(companyId, batchId, request, ct), ct);
+
+    private async Task<InvoiceBatchGenerationResponse> GenerateBatchCoreAsync(int companyId, int batchId, InvoiceGenerationRequest request, CancellationToken ct)
     {
+        await LockInvoiceBatchAsync(batchId, ct);
         var batch = await GetBatchAsync(companyId, batchId, true, ct);
         var preview = CreatePreview(batchId, request);
         if (batch.Status != BillingBatchStatus.Draft)
@@ -192,7 +197,6 @@ public sealed class BillingService(
             return new(batchId, true, preview.Fingerprint, existingIds);
         }
 
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var invoiceIds = new List<int>();
         foreach (var seed in request.Invoices.OrderBy(x => x.SortIndex).ThenBy(x => x.SequenceNumber, StringComparer.Ordinal))
         {
@@ -282,7 +286,6 @@ public sealed class BillingService(
         batch.GeneratedAt = timeProvider.GetUtcNow();
         batch.Status = BillingBatchStatus.Generated;
         await db.SaveChangesAsync(ct);
-        await transaction.CommitAsync(ct);
         return new(batchId, false, preview.Fingerprint, invoiceIds);
     }
 
@@ -420,6 +423,8 @@ public sealed class BillingService(
     {
         if (!await db.Set<InvoiceBatch>().AnyAsync(x => x.Id == request.InvoiceBatchId && x.CompanyId == companyId, ct))
             throw new DomainRuleException("billing.batch-not-found", "Serija računa ne postoji.");
+        if (!await db.Set<PartnerAccount>().AnyAsync(x => x.Id == request.PartnerAccountId && x.CompanyId == companyId, ct))
+            throw new DomainRuleException("billing.partner-account-not-found", "Konto partnera ne pripada aktivnoj kompaniji.");
         var calculation = await CalculateInterestAsync(new CalculateInterestRequest(request.Principal, request.From, request.To), ct);
         var entities = calculation.Lines.Select(line => new InterestStatement
         {
@@ -480,8 +485,12 @@ public sealed class BillingService(
         return new(entity.Id, entity.Title, entity.Date, entity.NoticeTemplateId, entity.NoticeTypeId, Convert.ToBase64String(entity.RowVersion));
     }
 
-    public async Task<NoticeGenerationResponse> GenerateNoticesAsync(int companyId, int batchId, GenerateNoticesRequest request, CancellationToken ct)
+    public Task<NoticeGenerationResponse> GenerateNoticesAsync(int companyId, int batchId, GenerateNoticesRequest request, CancellationToken ct) =>
+        ExecuteSerializableAsync(() => GenerateNoticesCoreAsync(companyId, batchId, request, ct), ct);
+
+    private async Task<NoticeGenerationResponse> GenerateNoticesCoreAsync(int companyId, int batchId, GenerateNoticesRequest request, CancellationToken ct)
     {
+        await LockNoticeBatchAsync(batchId, ct);
         var batch = await db.Set<NoticeBatch>().Include(x => x.Notices).SingleOrDefaultAsync(x => x.Id == batchId && x.CompanyId == companyId, ct)
             ?? throw new DomainRuleException("notice.batch-not-found", "Serija opomena ne postoji.");
         var normalized = request.Notices.OrderBy(x => x.PartnerAccountId).ToArray();
@@ -635,6 +644,32 @@ public sealed class BillingService(
         if (!tracked) query = query.AsNoTracking();
         return await query.SingleOrDefaultAsync(ct) ?? throw new DomainRuleException("billing.batch-not-found", "Serija računa ne postoji.");
     }
+
+    // Same pattern as JournalPostingService/BankStatementService: a Serializable
+    // transaction plus an explicit UPDLOCK/HOLDLOCK read makes the status/fingerprint
+    // check-then-generate sequence atomic, so two concurrent calls can't both observe
+    // Draft/no-fingerprint and both generate invoices or notices.
+    private async Task<T> ExecuteSerializableAsync<T>(Func<Task<T>> operation, CancellationToken ct)
+    {
+        var strategy = db.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+            var result = await operation();
+            await transaction.CommitAsync(ct);
+            return result;
+        });
+    }
+
+    private Task LockInvoiceBatchAsync(int batchId, CancellationToken ct) =>
+        db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT 1 FROM [billing].[InvoiceBatch] WITH (UPDLOCK, HOLDLOCK) WHERE [Id] = {batchId}",
+            ct);
+
+    private Task LockNoticeBatchAsync(int batchId, CancellationToken ct) =>
+        db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT 1 FROM [billing].[NoticeBatch] WITH (UPDLOCK, HOLDLOCK) WHERE [Id] = {batchId}",
+            ct);
 
     private async Task<Notice> GetNoticeAsync(int companyId, int noticeId, CancellationToken ct) =>
         await db.Set<Notice>().SingleOrDefaultAsync(x => x.Id == noticeId && x.CompanyId == companyId, ct)

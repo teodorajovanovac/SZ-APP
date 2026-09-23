@@ -23,8 +23,8 @@ public sealed class FinanceRoundingTests
     }
 
     [Fact]
-    public void ConvertCurrency_RoundsOnlyAtCalculationPrecision()
+    public void Calculation_RoundsCurrencyConversionAtFourDecimals()
     {
-        Assert.Equal(11725.3545m, InvoiceCalculator.ConvertCurrency(100.123m, 117.1095m));
+        Assert.Equal(11725.3545m, FinanceRounding.Calculation(100.123m * 117.1095m));
     }
 }

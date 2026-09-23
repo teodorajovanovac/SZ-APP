@@ -6,15 +6,28 @@ namespace SzApp.UnitTests.LedgerBanking;
 public sealed class LedgerBankingRulesTests
 {
     [Fact]
-    public void ValidateJournal_BalancesAtTwoDecimals()
+    public void ValidateJournal_BalancesAtFourDecimals()
     {
         var result = LedgerBankingRules.ValidateJournal([
-            new PostingAmounts(50.004m, 0m),
-            new PostingAmounts(49.996m, 0m),
+            new PostingAmounts(50.0040m, 0m),
+            new PostingAmounts(49.9960m, 0m),
             new PostingAmounts(0m, 100m)
         ]);
 
         Assert.Equal(100m, result);
+    }
+
+    [Fact]
+    public void ValidateJournal_RejectsLinesBalancedAtTwoDecimalsButNotFour()
+    {
+        // Rounds to 50.00 + 50.00 = 100.00 at money precision, but the true 4-decimal
+        // sums (50.0049 vs 49.9950) are 0.0099 apart - must be rejected, not posted.
+        var exception = Assert.Throws<DomainRuleException>(() => LedgerBankingRules.ValidateJournal([
+            new PostingAmounts(50.0049m, 0m),
+            new PostingAmounts(0m, 49.9950m)
+        ]));
+
+        Assert.Equal("journal.unbalanced", exception.Code);
     }
 
     [Fact]

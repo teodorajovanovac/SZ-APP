@@ -59,6 +59,7 @@ public static class MasterDataFeatureExtensions
     private static async Task<IResult> CreateCompanyAsync(
         CreateCompanyRequest request,
         SzAppDbContext dbContext,
+        IShortListValidator shortLists,
         HttpContext httpContext,
         CancellationToken cancellationToken)
     {
@@ -80,6 +81,8 @@ public static class MasterDataFeatureExtensions
         {
             return Unprocessable("Upravnik mora biti postojeći globalni partner.");
         }
+        await shortLists.EnsureTypeAsync(request.CompanyTypeId, "CompanyType", cancellationToken);
+        await shortLists.EnsureTypeAsync(request.VatTypeId, "VatType", cancellationToken);
 
         var company = new Company();
         Apply(company, request);
@@ -112,6 +115,7 @@ public static class MasterDataFeatureExtensions
         ClaimsPrincipal principal,
         IMasterDataPermissionService permission,
         SzAppDbContext dbContext,
+        IShortListValidator shortLists,
         HttpContext httpContext,
         CancellationToken cancellationToken)
     {
@@ -141,6 +145,8 @@ public static class MasterDataFeatureExtensions
         {
             return Unprocessable("Partner i upravnik moraju biti globalni ili pripadati istoj kompaniji.");
         }
+        await shortLists.EnsureTypeAsync(request.CompanyTypeId, "CompanyType", cancellationToken);
+        await shortLists.EnsureTypeAsync(request.VatTypeId, "VatType", cancellationToken);
 
         ETagCodec.TryDecode(request.RowVersion, out var rowVersion);
         dbContext.Entry(company).Property(item => item.RowVersion).OriginalValue = rowVersion;
@@ -217,7 +223,7 @@ public static class MasterDataFeatureExtensions
                 item.TaxNumber != null && EF.Functions.Like(item.TaxNumber, search, "\\"));
         }
 
-        partners = (query.SortBy?.ToLowerInvariant(), query.Descending) switch
+        partners = (query.SortBy?.ToLowerInvariant(), query.NormalizedDescending) switch
         {
             ("name", true) => partners.OrderByDescending(item => item.Name).ThenByDescending(item => item.Id),
             ("name", false) => partners.OrderBy(item => item.Name).ThenBy(item => item.Id),
@@ -256,6 +262,7 @@ public static class MasterDataFeatureExtensions
         ClaimsPrincipal principal,
         IMasterDataPermissionService permission,
         SzAppDbContext dbContext,
+        IShortListValidator shortLists,
         CancellationToken cancellationToken)
     {
         if (!await permission.CanWriteAsync(principal, companyId, cancellationToken))
@@ -267,6 +274,7 @@ public static class MasterDataFeatureExtensions
         {
             return Results.ValidationProblem(errors);
         }
+        await shortLists.EnsureTypeAsync(request.PartnerTypeId, "PartnerType", cancellationToken);
 
         var partner = new Partner { CompanyId = companyId };
         Apply(partner, request);
@@ -282,6 +290,7 @@ public static class MasterDataFeatureExtensions
         ClaimsPrincipal principal,
         IMasterDataPermissionService permission,
         SzAppDbContext dbContext,
+        IShortListValidator shortLists,
         CancellationToken cancellationToken)
     {
         if (!await permission.CanWriteAsync(principal, companyId, cancellationToken))
@@ -293,6 +302,7 @@ public static class MasterDataFeatureExtensions
         {
             return Results.ValidationProblem(errors);
         }
+        await shortLists.EnsureTypeAsync(request.PartnerTypeId, "PartnerType", cancellationToken);
 
         var partner = await dbContext.Partners.SingleOrDefaultAsync(
             item => item.Id == partnerId && item.CompanyId == companyId,
@@ -358,7 +368,7 @@ public static class MasterDataFeatureExtensions
                 EF.Functions.Like(item.City, search, "\\") ||
                 item.PostalCode != null && EF.Functions.Like(item.PostalCode, search, "\\"));
         }
-        addresses = query.Descending
+        addresses = query.NormalizedDescending
             ? addresses.OrderByDescending(item => item.City).ThenByDescending(item => item.StreetAddress)
             : addresses.OrderBy(item => item.City).ThenBy(item => item.StreetAddress);
 
@@ -487,7 +497,7 @@ public static class MasterDataFeatureExtensions
             var search = $"%{EscapeLike(query.NormalizedSearch)}%";
             access = access.Where(item => item.Staff.Email != null && EF.Functions.Like(item.Staff.Email, search, "\\"));
         }
-        access = query.Descending
+        access = query.NormalizedDescending
             ? access.OrderByDescending(item => item.Staff.Email).ThenByDescending(item => item.Id)
             : access.OrderBy(item => item.Staff.Email).ThenBy(item => item.Id);
 

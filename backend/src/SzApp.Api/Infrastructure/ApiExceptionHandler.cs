@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using SzApp.Domain;
 
@@ -23,6 +24,8 @@ public sealed class ApiExceptionHandler(
                 (StatusCodes.Status422UnprocessableEntity, "Poslovno pravilo nije zadovoljeno", domainException.Code),
             DbUpdateConcurrencyException =>
                 (StatusCodes.Status409Conflict, "Podatak je u međuvremenu izmenjen", "concurrency.conflict"),
+            DbUpdateException dbUpdateException when IsUniqueConstraintViolation(dbUpdateException) =>
+                (StatusCodes.Status409Conflict, "Zapis sa istim ključem već postoji", "database.unique-violation"),
             KeyNotFoundException =>
                 (StatusCodes.Status404NotFound, "Podatak nije pronađen", "resource.not-found"),
             BadHttpRequestException =>
@@ -53,4 +56,15 @@ public sealed class ApiExceptionHandler(
             }
         });
     }
+
+    // SQL Server error 2627 = unique constraint (PK/UNIQUE CONSTRAINT), 2601 = unique index.
+    // Both are an expected outcome of a race (e.g. duplicate import, racing idempotent
+    // requests), not a server bug - map them to 409 instead of the generic 500 branch.
+    private static bool IsUniqueConstraintViolation(DbUpdateException exception) =>
+        exception.InnerException is SqlException sqlException && SqlErrorNumbers.IsUniqueViolation(sqlException.Number);
+}
+
+public static class SqlErrorNumbers
+{
+    public static bool IsUniqueViolation(int sqlErrorNumber) => sqlErrorNumber is 2601 or 2627;
 }

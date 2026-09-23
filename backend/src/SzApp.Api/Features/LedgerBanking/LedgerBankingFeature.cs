@@ -253,6 +253,13 @@ public static class LedgerBankingFeature
             SzAppDbContext db,
             CancellationToken cancellationToken) =>
         {
+            var errors = new Dictionary<string, string[]>();
+            if (account.Length > 10) errors["account"] = ["Konto može imati najviše 10 znakova."];
+            if (request.Name.Length > 255) errors["name"] = ["Naziv može imati najviše 255 znakova."];
+            if (request.ShortName?.Length > 50) errors["shortName"] = ["Skraćeni naziv može imati najviše 50 znakova."];
+            if (request.ParentAccount?.Length > 10) errors["parentAccount"] = ["Nadređeni konto može imati najviše 10 znakova."];
+            if (errors.Count > 0) return Results.ValidationProblem(errors);
+
             var entity = await db.Set<ChartAccount>().SingleOrDefaultAsync(x => x.Account == account, cancellationToken);
             if (entity is null)
             {
@@ -271,7 +278,8 @@ public static class LedgerBankingFeature
             return Results.Ok(new ChartAccountResponse(
                 entity.Account, entity.ShortName, entity.Name, entity.ParentAccount,
                 entity.Sign, entity.IsActive, entity.IsSynthetic));
-        }).AddEndpointFilter<AntiforgeryEndpointFilter>();
+        }).AddEndpointFilter<AntiforgeryEndpointFilter>()
+          .RequireAuthorization(p => p.RequireRole(SecurityConstants.RootRole, SecurityConstants.UpravnikRole));
 
         group.MapGet("/sub-accounts", async (SzAppDbContext db, CancellationToken cancellationToken) =>
             Results.Ok(await db.Set<SubAccount>().AsNoTracking().OrderBy(x => x.Id)
@@ -284,6 +292,12 @@ public static class LedgerBankingFeature
             SzAppDbContext db,
             CancellationToken cancellationToken) =>
         {
+            var errors = new Dictionary<string, string[]>();
+            if (id.Length > 10) errors["id"] = ["Šifra podkonta može imati najviše 10 znakova."];
+            if (request.Name.Length > 50) errors["name"] = ["Naziv može imati najviše 50 znakova."];
+            if (request.ParentSubAccountId?.Length > 10) errors["parentSubAccountId"] = ["Nadređeni podkonto može imati najviše 10 znakova."];
+            if (errors.Count > 0) return Results.ValidationProblem(errors);
+
             var entity = await db.Set<SubAccount>().SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
             if (entity is null)
             {
@@ -296,7 +310,8 @@ public static class LedgerBankingFeature
             entity.IsActive = request.IsActive;
             await db.SaveChangesAsync(cancellationToken);
             return Results.Ok(new SubAccountResponse(entity.Id, entity.Name, entity.ParentSubAccountId, entity.IsActive));
-        }).AddEndpointFilter<AntiforgeryEndpointFilter>();
+        }).AddEndpointFilter<AntiforgeryEndpointFilter>()
+          .RequireAuthorization(p => p.RequireRole(SecurityConstants.RootRole, SecurityConstants.UpravnikRole));
     }
 
     private static int GetStaffId(ClaimsPrincipal principal) =>
