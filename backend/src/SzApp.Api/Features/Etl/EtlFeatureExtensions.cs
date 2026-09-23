@@ -120,15 +120,27 @@ public static class EtlFeatureExtensions
         return Results.Ok(ToResponse(row.Run, row.Context));
     }
 
+    // ponytail: root cause of the etl-runs 500 — EtlProjection used to be a positional record, so this
+    // Select produced a constructor call `new EtlProjection(run, context)`. EF Core cannot push an
+    // OrderBy/Where added on top of that back down into SQL (it tries to re-invoke the constructor
+    // inside the ORDER BY clause and gives up: "could not be translated"). A member-init projection
+    // (`new EtlProjection { Run = ..., Context = ... }`, plain settable properties, no ctor) is the
+    // EF-recognized shape for compose-after-Select — verified against a live SQL Server 2025 instance
+    // that both this List (OrderBy-after-Select) and Get/Execute (Where-after-Select) queries now
+    // translate and execute.
     private static IQueryable<EtlProjection> Query(SzAppDbContext db, int companyId) =>
         from run in db.EtlRuns.AsNoTracking()
         join context in db.Set<EtlRunContext>().AsNoTracking() on run.Id equals context.EtlRunId
         where context.CompanyId == companyId
-        select new EtlProjection(run, context);
+        select new EtlProjection { Run = run, Context = context };
 
     private static EtlRunResponse ToResponse(EtlRun run, EtlRunContext context) => new(
         run.Id, run.SourceSystem, run.SourceFile, context.SourceTable, context.Stage.ToString(), run.Status.ToString(),
         run.SourceRowCount, run.ImportedRowCount, run.QuarantinedRowCount, run.StartedAt, run.CompletedAt, run.Error);
 
-    private sealed record EtlProjection(EtlRun Run, EtlRunContext Context);
+    private sealed class EtlProjection
+    {
+        public EtlRun Run { get; set; } = null!;
+        public EtlRunContext Context { get; set; } = null!;
+    }
 }
