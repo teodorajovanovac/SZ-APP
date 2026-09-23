@@ -1,7 +1,3 @@
-using System.Text.Json;
-using Microsoft.EntityFrameworkCore;
-using SzApp.Data;
-using SzApp.Data.Entities;
 using SzApp.Domain.Platform;
 
 namespace SzApp.Api.Features.Platform;
@@ -62,64 +58,6 @@ public sealed class DisabledEmailTransport : IEmailTransport
         throw new InvalidOperationException("Email transport nije konfigurisan. SMTP/Gmail adapter mora biti registrovan u deployment-u.");
 }
 
-public interface IPlatformOutboxHandler
-{
-    string MessageType { get; }
-    Task HandleAsync(string payloadJson, CancellationToken cancellationToken);
-}
-
+// Outbox message payload for "platform.email.send" (enqueued in EmailEndpoints.cs, handled by
+// SzApp.Worker's EmailOutboxMessageHandler — the only implementation; this record is shared shape only).
 public sealed record SendEmailOutboxPayload(long SentEmailId);
-
-public sealed class SentEmailOutboxHandler(
-    SzAppDbContext db,
-    IPlatformDocumentStorage storage,
-    IEmailTransport transport,
-    TimeProvider timeProvider) : IPlatformOutboxHandler
-{
-    public const string Type = "platform.email.send";
-    public string MessageType => Type;
-
-    public async Task HandleAsync(string payloadJson, CancellationToken cancellationToken)
-    {
-        var payload = JsonSerializer.Deserialize<SendEmailOutboxPayload>(payloadJson)
-            ?? throw new InvalidOperationException("Neispravan email outbox payload.");
-        var email = await db.Set<SentEmail>().Include(x => x.Attachments).ThenInclude(x => x.Document)
-            .SingleAsync(x => x.Id == payload.SentEmailId, cancellationToken);
-        if (email.Status == EmailSendStatus.Sent) return;
-        email.Status = EmailSendStatus.Sending;
-        await db.SaveChangesAsync(cancellationToken);
-
-        var opened = new List<Stream>();
-        try
-        {
-            var attachments = new List<EmailAttachmentContent>();
-            foreach (var link in email.Attachments)
-            {
-                if (link.Document.CompanyId != email.CompanyId) throw new InvalidOperationException("Email prilog pripada drugoj kompaniji.");
-                var stream = await storage.OpenReadAsync(link.Document.RelativePath, cancellationToken);
-                opened.Add(stream);
-                attachments.Add(new EmailAttachmentContent(link.Document.FileName, link.Document.ContentType, stream));
-            }
-            await transport.SendAsync(new EmailEnvelope(email.ToAddress, email.Cc, email.Bcc, email.Subject, email.BodyHtml, attachments), cancellationToken);
-            email.Status = EmailSendStatus.Sent;
-            email.SentAt = timeProvider.GetUtcNow();
-            email.SendDescription = null;
-            email.NextAttemptAt = null;
-            await db.SaveChangesAsync(cancellationToken);
-        }
-        catch (Exception exception)
-        {
-            email.Status = EmailSendStatus.Failed;
-            email.AttemptCount++;
-            email.SendDescription = exception.Message[..Math.Min(exception.Message.Length, 2000)];
-            var delayMinutes = Math.Min(60, Math.Pow(2, Math.Min(email.AttemptCount, 6)));
-            email.NextAttemptAt = timeProvider.GetUtcNow().AddMinutes(delayMinutes);
-            await db.SaveChangesAsync(cancellationToken);
-            throw;
-        }
-        finally
-        {
-            foreach (var stream in opened) await stream.DisposeAsync();
-        }
-    }
-}

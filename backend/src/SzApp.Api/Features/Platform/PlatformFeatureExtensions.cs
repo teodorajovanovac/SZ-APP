@@ -17,12 +17,6 @@ public static class PlatformFeatureExtensions
         return services;
     }
 
-    public static IServiceCollection AddPlatformWorkerHandlers(this IServiceCollection services)
-    {
-        services.AddScoped<IPlatformOutboxHandler, SentEmailOutboxHandler>();
-        return services;
-    }
-
     public static IEndpointRouteBuilder MapPlatformEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var companies = endpoints.MapGroup("/api/v1/companies/{companyId:int}")
