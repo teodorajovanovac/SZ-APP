@@ -9,13 +9,23 @@ public static class SerbianLegacyValueParser
 
     public static decimal ParseDecimal(string value)
     {
+        var trimmed = value.Trim();
         if (decimal.TryParse(
-                value.Trim(),
+                trimmed,
                 NumberStyles.Number | NumberStyles.AllowLeadingSign,
                 SerbianLatin,
                 out var result))
         {
             return result;
+        }
+
+        // ponytail (#7): Access/Excel exports sometimes render negatives as "(123,45)" instead of
+        // "-123,45". NumberStyles.AllowParentheses exists but doesn't compose with AllowLeadingSign,
+        // so handle it explicitly rather than pulling in a bigger parsing dependency for one format.
+        if (trimmed is ['(', .., ')'] &&
+            decimal.TryParse(trimmed[1..^1], NumberStyles.Number, SerbianLatin, out var negated))
+        {
+            return -negated;
         }
 
         throw new FormatException($"'{value}' nije ispravan sr-Latn decimalni broj.");

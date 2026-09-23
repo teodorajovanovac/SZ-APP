@@ -43,10 +43,16 @@ public sealed class LegacyCsvParser
             throw new ArgumentException("Delimiter nije dozvoljen.", nameof(delimiter));
         }
 
+        // ponytail (#7): ReadCharacterAsync below still does one ReadAsync call per character —
+        // a bigger StreamReader buffer cuts the underlying stream reads, but each character still
+        // costs an async-call round trip. Ceiling: still O(chars) async calls for a large file.
+        // Upgrade path if that shows up in profiling: read into a char[] buffer and iterate it
+        // synchronously, only awaiting when the buffer is exhausted.
         using var reader = new StreamReader(
             stream,
             LegacyEncoding.Resolve(encodingName),
             detectEncodingFromByteOrderMarks: true,
+            bufferSize: 65536,
             leaveOpen: true);
         var records = await ReadRecordsAsync(reader, delimiter, cancellationToken);
         if (records.Count == 0)
