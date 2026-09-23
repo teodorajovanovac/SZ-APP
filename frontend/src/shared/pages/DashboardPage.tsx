@@ -25,7 +25,7 @@ export function DashboardPage() {
         <Grid size={{ xs: 12, md: 6 }}>
           <Card>
             <CardContent>
-              <Typography variant="overline">Uloge</Typography>
+              <Typography variant="overline">{t('dashboard_roles')}</Typography>
               <Typography variant="h2">{user?.roles.join(', ')}</Typography>
             </CardContent>
           </Card>

@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Alert, Button, Grid, Stack, TextField } from '@mui/material'
 import { Controller, useForm } from 'react-hook-form'
+import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
 import { getErrorMessage } from '../../api/problemDetails'
 import { useCreateInvoiceBatch } from './billingApi'
@@ -27,6 +28,7 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>
 
 export function InvoiceBatchForm({ companyId, onCreated }: { companyId: number; onCreated?: () => void }) {
+  const { t } = useTranslation()
   const create = useCreateInvoiceBatch(companyId)
   const { control, handleSubmit, reset } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -42,12 +44,12 @@ export function InvoiceBatchForm({ companyId, onCreated }: { companyId: number; 
 
   return (
     <Stack component="form" onSubmit={handleSubmit(submit)} spacing={2} noValidate>
-      {create.error ? <Alert severity="error">{getErrorMessage(create.error, 'Serija nije kreirana.')}</Alert> : null}
+      {create.error ? <Alert severity="error">{getErrorMessage(create.error, t('billing_.form.notCreated'))}</Alert> : null}
       <Grid container spacing={2}>
         {([
-          ['periodYYMM', 'Period YYMM', 'number'], ['caption', 'Naziv', 'text'], ['place', 'Mesto', 'text'],
-          ['issueDate', 'Datum izdavanja', 'date'], ['serviceDateFrom', 'Usluga od', 'date'], ['serviceDateTo', 'Usluga do', 'date'],
-          ['transactionDate', 'Datum prometa', 'date'], ['dueDate', 'Rok plaćanja', 'date'], ['exchangeRateNbs', 'Kurs NBS', 'number'],
+          ['periodYYMM', t('billing_.form.period'), 'number'], ['caption', t('billing_.form.caption'), 'text'], ['place', t('billing_.form.place'), 'text'],
+          ['issueDate', t('billing_.form.issueDate'), 'date'], ['serviceDateFrom', t('billing_.form.serviceFrom'), 'date'], ['serviceDateTo', t('billing_.form.serviceTo'), 'date'],
+          ['transactionDate', t('billing_.form.transactionDate'), 'date'], ['dueDate', t('billing_.form.dueDate'), 'date'], ['exchangeRateNbs', t('billing_.form.exchangeRate'), 'number'],
         ] as const).map(([name, label, type]) => (
           <Grid key={name} size={{ xs: 12, sm: 6 }}>
             <Controller name={name} control={control} render={({ field, fieldState }) => (
@@ -56,7 +58,7 @@ export function InvoiceBatchForm({ companyId, onCreated }: { companyId: number; 
           </Grid>
         ))}
       </Grid>
-      <Button type="submit" variant="contained" disabled={create.isPending}>Kreiraj seriju</Button>
+      <Button type="submit" variant="contained" disabled={create.isPending}>{t('billing_.form.submit')}</Button>
     </Stack>
   )
 }

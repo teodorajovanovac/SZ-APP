@@ -86,7 +86,7 @@ export function AppShell() {
         href="#main-content"
         sx={{ position: 'fixed', top: -100, left: 8, zIndex: 2000, '&:focus': { top: 8 }, bgcolor: 'background.paper', p: 1 }}
       >
-        Preskoči na sadržaj
+        {t('skipToContent')}
       </Box>
       <AppBar position="fixed" sx={{ zIndex: theme.zIndex.drawer + 1 }}>
         <Toolbar>

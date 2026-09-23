@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Alert, Autocomplete, Button, Grid, Stack, TextField } from '@mui/material'
 import { Controller, useForm } from 'react-hook-form'
+import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
 import { getErrorMessage } from '../../api/problemDetails'
 import { usePartnerAccounts } from '../master-data/useMasterData'
@@ -18,6 +19,7 @@ const schema = z.object({
 type Values = z.infer<typeof schema>
 
 export function SupplierInvoiceForm({ companyId }: { companyId: number }) {
+  const { t } = useTranslation()
   const create = useCreateSupplierInvoice(companyId)
   // ponytail: calculationTypeId/documentTypeId stay raw numeric inputs — no lookup-list
   // endpoint is exposed for those yet. Wire up an Autocomplete once one exists.
@@ -31,7 +33,7 @@ export function SupplierInvoiceForm({ companyId }: { companyId: number }) {
   })
   return (
     <Stack component="form" onSubmit={handleSubmit(submit)} spacing={2} noValidate>
-      {create.error ? <Alert severity="error">{getErrorMessage(create.error, 'Dobavljački račun nije sačuvan.')}</Alert> : null}
+      {create.error ? <Alert severity="error">{getErrorMessage(create.error, t('suppliers_.form.notSaved'))}</Alert> : null}
       <Grid container spacing={2}>
         <Grid size={{ xs: 12, sm: 6 }}>
           <Controller
@@ -46,20 +48,20 @@ export function SupplierInvoiceForm({ companyId }: { companyId: number }) {
                 value={partnerAccounts.data?.items.find((account) => account.id === field.value) ?? null}
                 onChange={(_, option) => field.onChange(option?.id ?? 0)}
                 renderInput={(params) => (
-                  <TextField {...params} label="Konto dobavljača" error={Boolean(fieldState.error)} helperText={fieldState.error?.message} />
+                  <TextField {...params} label={t('suppliers_.form.partnerAccount')} error={Boolean(fieldState.error)} helperText={fieldState.error?.message} />
                 )}
               />
             )}
           />
         </Grid>
         {([
-          ['invoiceNo', 'Redni broj', 'number'], ['codeName', 'Šifra', 'text'], ['caption', 'Naziv', 'text'],
-          ['calculationTypeId', 'Tip obračuna', 'number'],
-          ['periodYYMM', 'Period YYMM', 'number'], ['amountRsd', 'Iznos RSD', 'number'], ['documentTypeId', 'Tip dokumenta', 'number'],
-          ['invoiceDate', 'Datum računa', 'date'], ['transactionDate', 'Datum prometa', 'date'],
+          ['invoiceNo', t('suppliers_.form.invoiceNo'), 'number'], ['codeName', t('suppliers_.form.codeName'), 'text'], ['caption', t('suppliers_.form.caption'), 'text'],
+          ['calculationTypeId', t('suppliers_.form.calculationType'), 'number'],
+          ['periodYYMM', t('suppliers_.form.period'), 'number'], ['amountRsd', t('suppliers_.form.amount'), 'number'], ['documentTypeId', t('suppliers_.form.documentType'), 'number'],
+          ['invoiceDate', t('suppliers_.form.invoiceDate'), 'date'], ['transactionDate', t('suppliers_.form.transactionDate'), 'date'],
         ] as const).map(([name, label, type]) => <Grid key={name} size={{ xs: 12, sm: 6 }}><Controller name={name} control={control} render={({ field, fieldState }) => <TextField {...field} onChange={(event) => field.onChange(type === 'number' ? Number(event.target.value) : event.target.value)} fullWidth label={label} type={type} error={Boolean(fieldState.error)} helperText={fieldState.error?.message} slotProps={{ inputLabel: { shrink: type === 'date' } }} />} /></Grid>)}
       </Grid>
-      <Button type="submit" variant="contained" disabled={create.isPending}>Sačuvaj dobavljački račun</Button>
+      <Button type="submit" variant="contained" disabled={create.isPending}>{t('suppliers_.form.submit')}</Button>
     </Stack>
   )
 }
