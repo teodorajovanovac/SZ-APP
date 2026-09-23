@@ -80,7 +80,11 @@ public sealed class BankStatementConfiguration : IEntityTypeConfiguration<BankSt
         entity.Property(x => x.Status).HasConversion<int>();
         entity.Property(x => x.RowVersion).IsRowVersion();
         entity.HasAlternateKey(x => new { x.Id, x.CompanyId });
-        entity.HasIndex(x => new { x.CompanyId, x.BankAccountId, x.StatementNumber, x.StatementSuffix, x.Date }).IsUnique();
+        // Explicit HasFilter(null) overrides the SQL Server provider's default convention of
+        // auto-filtering out NULLs on a unique index that includes a nullable column (StatementSuffix) --
+        // without this, SQL Server would silently allow duplicate statements when StatementSuffix is null,
+        // which is the common case (see docs/predlog.md finding on bank-statement dedup).
+        entity.HasIndex(x => new { x.CompanyId, x.BankAccountId, x.StatementNumber, x.StatementSuffix, x.Date }).IsUnique().HasFilter(null);
         entity.HasIndex(x => new { x.CompanyId, x.Status, x.Date });
         entity.HasOne(x => x.Company).WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.NoAction);
         entity.HasOne<BankAccount>().WithMany().HasForeignKey(x => x.BankAccountId).OnDelete(DeleteBehavior.NoAction);
