@@ -752,13 +752,13 @@ CREATE TABLE [ImportDefintion]
 
 CREATE TABLE [Company]
  (
-	[Id]				Long Integer NOT NULL, 
+	[Id]				Long Integer NOT NULL, -- NOT AUTOINCREMENT - zadaje se rucno ili kreira max+1
 	[PartnerId]			Long Integer NOT NULL, -- FK Partner.Id
 	[ManagerId]			Long Integer, -- FK Partner.Id -- Upravnik za SZ
 	[ShortName]			Text (50), 
 	[PrintName]			Text (50), 
-	[RelativeFolderName] 	Text (50), 
-	[LocationCategoryId]			Long Integer, 
+	[RelativeFolderName] 	Text (255), 
+	[LocationCategoryId]	Long Integer, -- FK to LoactionCategory.Id
 	[Note]			Text (255), 
 	[SortIndex]			Long Integer, 
 	[CompanyTypeId]			Long Integer,  -- FK to ShortList: TableName: CompanyType
