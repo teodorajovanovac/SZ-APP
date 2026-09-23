@@ -1,9 +1,10 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Alert, Button, Grid, Stack, TextField } from '@mui/material'
-import { Controller, useForm } from 'react-hook-form'
+import { Alert, Button, Divider, Grid, Stack, Typography } from '@mui/material'
+import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
 import { getErrorMessage } from '../../api/problemDetails'
+import { ControlledTextField } from '../../shared/components/ControlledTextField'
 import { useCreateInvoiceBatch } from './billingApi'
 
 const schema = z.object({
@@ -27,10 +28,19 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>
 
+function SectionHeading({ children }: { children: string }) {
+  return (
+    <Grid size={12}>
+      <Typography variant="overline" color="text.secondary" component="h3">{children}</Typography>
+      <Divider />
+    </Grid>
+  )
+}
+
 export function InvoiceBatchForm({ companyId, onCreated }: { companyId: number; onCreated?: () => void }) {
   const { t } = useTranslation()
   const create = useCreateInvoiceBatch(companyId)
-  const { control, handleSubmit, reset } = useForm<FormValues>({
+  const { control, handleSubmit, reset, formState } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { periodYYMM: 2601, caption: '', place: '', issueDate: '', serviceDateFrom: '', serviceDateTo: '', transactionDate: '', dueDate: '', exchangeRateNbs: 1 },
   })
@@ -44,21 +54,46 @@ export function InvoiceBatchForm({ companyId, onCreated }: { companyId: number; 
 
   return (
     <Stack component="form" onSubmit={handleSubmit(submit)} spacing={2} noValidate>
+      <Typography variant="h6" component="h2">{t('billingUi.formTitle')}</Typography>
       {create.error ? <Alert severity="error">{getErrorMessage(create.error, t('billing_.form.notCreated'))}</Alert> : null}
-      <Grid container spacing={2}>
-        {([
-          ['periodYYMM', t('billing_.form.period'), 'number'], ['caption', t('billing_.form.caption'), 'text'], ['place', t('billing_.form.place'), 'text'],
-          ['issueDate', t('billing_.form.issueDate'), 'date'], ['serviceDateFrom', t('billing_.form.serviceFrom'), 'date'], ['serviceDateTo', t('billing_.form.serviceTo'), 'date'],
-          ['transactionDate', t('billing_.form.transactionDate'), 'date'], ['dueDate', t('billing_.form.dueDate'), 'date'], ['exchangeRateNbs', t('billing_.form.exchangeRate'), 'number'],
-        ] as const).map(([name, label, type]) => (
-          <Grid key={name} size={{ xs: 12, sm: 6 }}>
-            <Controller name={name} control={control} render={({ field, fieldState }) => (
-              <TextField {...field} onChange={(event) => field.onChange(type === 'number' ? Number(event.target.value) : event.target.value)} fullWidth type={type} label={label} error={Boolean(fieldState.error)} helperText={fieldState.error?.message} slotProps={{ inputLabel: { shrink: type === 'date' } }} />
-            )} />
-          </Grid>
-        ))}
+      {create.isSuccess && formState.isSubmitSuccessful ? <Alert severity="success">{t('billingUi.created')}</Alert> : null}
+      <Grid container spacing={2} columnSpacing={3}>
+        <SectionHeading>{t('billingUi.sectionIdentification')}</SectionHeading>
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <ControlledTextField control={control} name="periodYYMM" label={t('billing_.form.period')} type="number" required />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <ControlledTextField control={control} name="caption" label={t('billing_.form.caption')} required />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <ControlledTextField control={control} name="place" label={t('billing_.form.place')} required />
+        </Grid>
+
+        <SectionHeading>{t('billingUi.sectionDates')}</SectionHeading>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <ControlledTextField control={control} name="issueDate" label={t('billing_.form.issueDate')} type="date" required />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <ControlledTextField control={control} name="serviceDateFrom" label={t('billing_.form.serviceFrom')} type="date" required />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <ControlledTextField control={control} name="serviceDateTo" label={t('billing_.form.serviceTo')} type="date" required />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <ControlledTextField control={control} name="transactionDate" label={t('billing_.form.transactionDate')} type="date" required />
+        </Grid>
+
+        <SectionHeading>{t('billingUi.sectionAmounts')}</SectionHeading>
+        <Grid size={{ xs: 12, sm: 6 }}>
+          <ControlledTextField control={control} name="dueDate" label={t('billing_.form.dueDate')} type="date" required />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6 }}>
+          <ControlledTextField control={control} name="exchangeRateNbs" label={t('billing_.form.exchangeRate')} type="number" required />
+        </Grid>
       </Grid>
-      <Button type="submit" variant="contained" disabled={create.isPending}>{t('billing_.form.submit')}</Button>
+      <Stack direction="row" justifyContent="flex-end">
+        <Button type="submit" variant="contained" disabled={create.isPending}>{t('billing_.form.submit')}</Button>
+      </Stack>
     </Stack>
   )
 }

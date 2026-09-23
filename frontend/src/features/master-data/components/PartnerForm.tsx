@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Alert, Button, Stack, TextField } from '@mui/material'
+import { Alert, Button, Divider, Grid, Stack, TextField, Typography } from '@mui/material'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { getErrorMessage } from '../../../api/problemDetails'
@@ -59,20 +59,54 @@ export function PartnerForm({ companyId, partner, onSaved, onCancel }: PartnerFo
   return (
     <Stack component="form" spacing={2} onSubmit={handleSubmit(submit)} noValidate>
       {save.isError && <Alert severity="error">{getErrorMessage(save.error, 'Partner nije sačuvan. Proverite podatke i pokušajte ponovo.')}</Alert>}
-      <TextField label="Kratak naziv" required {...register('shortName')} error={!!errors.shortName} helperText={errors.shortName?.message} />
-      <TextField label="Pun naziv" required {...register('name')} error={!!errors.name} helperText={errors.name?.message} />
-      <TextField label="Matični broj" {...register('registrationNumber')} error={!!errors.registrationNumber} helperText={errors.registrationNumber?.message} />
-      <TextField label="PIB" {...register('taxNumber')} error={!!errors.taxNumber} helperText={errors.taxNumber?.message} />
-      <TextField label="JBKJS" {...register('jbkjs')} error={!!errors.jbkjs} helperText={errors.jbkjs?.message} />
-      <TextField label="Broj lične karte" {...register('idCardNumber')} error={!!errors.idCardNumber} helperText={errors.idCardNumber?.message} />
-      <TextField label="JMBG" {...register('jmbg')} error={!!errors.jmbg} helperText={errors.jmbg?.message} />
-      <TextField label="Jezik" required {...register('language')} error={!!errors.language} helperText={errors.language?.message} />
-      <TextField label="Napomena" multiline minRows={3} {...register('note')} />
+      <Grid container spacing={2} columnSpacing={3}>
+        <Section>Identifikacija</Section>
+        <Grid size={{ xs: 12, sm: 6 }}>
+          <TextField fullWidth size="small" label="Kratak naziv" required {...register('shortName')} error={!!errors.shortName} helperText={errors.shortName?.message} />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6 }}>
+          <TextField fullWidth size="small" label="Pun naziv" required {...register('name')} error={!!errors.name} helperText={errors.name?.message} />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <TextField fullWidth size="small" label="Matični broj" {...register('registrationNumber')} error={!!errors.registrationNumber} helperText={errors.registrationNumber?.message} />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <TextField fullWidth size="small" label="PIB" {...register('taxNumber')} error={!!errors.taxNumber} helperText={errors.taxNumber?.message} />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <TextField fullWidth size="small" label="JBKJS" {...register('jbkjs')} error={!!errors.jbkjs} helperText={errors.jbkjs?.message} />
+        </Grid>
+
+        <Section>Lični podaci</Section>
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <TextField fullWidth size="small" label="Broj lične karte" {...register('idCardNumber')} error={!!errors.idCardNumber} helperText={errors.idCardNumber?.message} />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <TextField fullWidth size="small" label="JMBG" {...register('jmbg')} error={!!errors.jmbg} helperText={errors.jmbg?.message} />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <TextField fullWidth size="small" label="Jezik" required {...register('language')} error={!!errors.language} helperText={errors.language?.message} />
+        </Grid>
+
+        <Section>Napomena</Section>
+        <Grid size={12}>
+          <TextField fullWidth size="small" label="Napomena" multiline minRows={3} {...register('note')} />
+        </Grid>
+      </Grid>
       <Stack direction="row" spacing={1} justifyContent="flex-end">
         {onCancel && <Button onClick={onCancel}>Odustani</Button>}
         <Button type="submit" variant="contained" disabled={save.isPending}>Sačuvaj</Button>
       </Stack>
     </Stack>
+  )
+}
+
+function Section({ children }: { children: string }) {
+  return (
+    <Grid size={12}>
+      <Typography variant="overline" color="text.secondary" component="h3">{children}</Typography>
+      <Divider />
+    </Grid>
   )
 }
 
