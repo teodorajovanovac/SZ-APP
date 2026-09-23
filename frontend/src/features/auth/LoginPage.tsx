@@ -14,26 +14,26 @@ import {
   Typography,
 } from '@mui/material'
 import { Controller, useForm } from 'react-hook-form'
+import { useTranslation } from 'react-i18next'
 import { Navigate, useLocation } from 'react-router-dom'
 import { z } from 'zod'
 import { getErrorMessage } from '../../api/problemDetails'
 import { useAuth } from './useAuth'
-
-const loginSchema = z.object({
-  email: z.string().trim().email('Unesite ispravnu adresu e-pošte.'),
-  password: z.string().min(1, 'Lozinka je obavezna.'),
-  rememberMe: z.boolean(),
-})
-
-type LoginForm = z.infer<typeof loginSchema>
 
 interface LoginLocationState {
   from?: string
 }
 
 export function LoginPage() {
+  const { t } = useTranslation()
   const { user, login, isLoginPending, error } = useAuth()
   const location = useLocation()
+  const loginSchema = z.object({
+    email: z.string().trim().email(t('login.invalidEmail')),
+    password: z.string().min(1, t('login.passwordRequired')),
+    rememberMe: z.boolean(),
+  })
+  type LoginForm = z.infer<typeof loginSchema>
   const { control, handleSubmit } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: '', password: '', rememberMe: false },
@@ -62,12 +62,12 @@ export function LoginPage() {
               <LockOutlinedIcon />
             </Avatar>
             <Box textAlign="center">
-              <Typography component="h1" variant="h1">SZ Upravljanje</Typography>
-              <Typography color="text.secondary">Prijava zaposlenih</Typography>
+              <Typography component="h1" variant="h1">{t('login.title')}</Typography>
+              <Typography color="text.secondary">{t('login.subtitle')}</Typography>
             </Box>
             {error ? (
               <Alert severity="error" role="alert">
-                {getErrorMessage(error, 'Prijava nije uspela.')}
+                {getErrorMessage(error, t('login.failed'))}
               </Alert>
             ) : null}
             <Controller
@@ -76,7 +76,7 @@ export function LoginPage() {
               render={({ field, fieldState }) => (
                 <TextField
                   {...field}
-                  label="E-pošta"
+                  label={t('login.email')}
                   type="email"
                   autoComplete="username"
                   autoFocus
@@ -91,7 +91,7 @@ export function LoginPage() {
               render={({ field, fieldState }) => (
                 <TextField
                   {...field}
-                  label="Lozinka"
+                  label={t('login.password')}
                   type="password"
                   autoComplete="current-password"
                   error={Boolean(fieldState.error)}
@@ -105,12 +105,12 @@ export function LoginPage() {
               render={({ field }) => (
                 <FormControlLabel
                   control={<Checkbox checked={field.value} onChange={field.onChange} />}
-                  label="Ostani prijavljen/a"
+                  label={t('login.rememberMe')}
                 />
               )}
             />
             <Button type="submit" variant="contained" size="large" disabled={isLoginPending}>
-              {isLoginPending ? 'Prijavljivanje…' : 'Prijavi se'}
+              {isLoginPending ? t('login.submitPending') : t('login.submit')}
             </Button>
           </Stack>
         </CardContent>

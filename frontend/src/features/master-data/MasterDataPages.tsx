@@ -12,7 +12,7 @@ export function StaffPage() { const { activeCompany } = useActiveCompany(); retu
 export function UnitsPage() {
   const { activeCompany } = useActiveCompany()
   const units = useUnits(activeCompany.id, { page: 1, pageSize: 100 })
-  return <Stack spacing={2}><Typography variant="h4">Jedinice i ugovori</Typography>
+  return <Stack spacing={2}><Typography component="h1" variant="h1">Jedinice i ugovori</Typography>
     {units.isError && <Alert severity="error">Jedinice nisu dostupne.</Alert>}
     <Paper sx={{ overflowX: 'auto' }}><Table size="small"><TableHead><TableRow><TableCell>Oznaka</TableCell><TableCell>Ulaz</TableCell><TableCell>Površina</TableCell><TableCell>Aktivni ugovor</TableCell></TableRow></TableHead>
       <TableBody>{units.data?.items.map(unit => <UnitRow key={unit.id} companyId={activeCompany.id} unit={unit}/>)}</TableBody></Table></Paper>

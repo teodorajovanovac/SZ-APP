@@ -1,5 +1,6 @@
 import { Alert, Button, Stack, TextField } from '@mui/material'
 import { useState, type FormEvent } from 'react'
+import { getErrorMessage } from '../../../api/problemDetails'
 import { useSaveAddress } from '../useMasterData'
 import type { Address } from '../types'
 
@@ -26,7 +27,7 @@ export function AddressForm({ companyId, address, onSaved }: AddressFormProps) {
 
   return (
     <Stack component="form" spacing={2} onSubmit={submit}>
-      {save.isError && <Alert severity="error">Adresa nije sačuvana.</Alert>}
+      {save.isError && <Alert severity="error">{getErrorMessage(save.error, 'Adresa nije sačuvana.')}</Alert>}
       <TextField label="Adresa" required value={streetAddress} onChange={(event) => setStreetAddress(event.target.value)} inputProps={{ maxLength: 255 }} />
       <TextField label="Poštanski broj" value={postalCode} onChange={(event) => setPostalCode(event.target.value)} inputProps={{ maxLength: 20 }} />
       <TextField label="Grad" required value={city} onChange={(event) => setCity(event.target.value)} inputProps={{ maxLength: 255 }} />

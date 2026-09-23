@@ -1,5 +1,6 @@
 import {
   Paper,
+  Skeleton,
   Table,
   TableBody,
   TableCell,
@@ -7,6 +8,7 @@ import {
   TableHead,
   TablePagination,
   TableRow,
+  Typography,
 } from '@mui/material'
 import {
   flexRender,
@@ -16,6 +18,7 @@ import {
   type PaginationState,
   type SortingState,
 } from '@tanstack/react-table'
+import { useTranslation } from 'react-i18next'
 
 interface ServerDataTableProps<TData> {
   ariaLabel: string
@@ -27,6 +30,8 @@ interface ServerDataTableProps<TData> {
   onPaginationChange: (value: PaginationState) => void
   onSortingChange: (value: SortingState) => void
   getRowId?: (row: TData) => string
+  isLoading?: boolean
+  emptyMessage?: string
 }
 
 export function ServerDataTable<TData>({
@@ -39,7 +44,10 @@ export function ServerDataTable<TData>({
   onPaginationChange,
   onSortingChange,
   getRowId,
+  isLoading = false,
+  emptyMessage,
 }: ServerDataTableProps<TData>) {
+  const { t } = useTranslation()
   const table = useReactTable({
     data: rows,
     columns,
@@ -55,10 +63,13 @@ export function ServerDataTable<TData>({
     getRowId,
   })
 
+  const columnCount = table.getAllLeafColumns().length
+  const showEmpty = !isLoading && rows.length === 0
+
   return (
-    <Paper>
+    <Paper variant="outlined">
       <TableContainer>
-        <Table aria-label={ariaLabel}>
+        <Table aria-label={ariaLabel} aria-busy={isLoading}>
           <TableHead>
             {table.getHeaderGroups().map((group) => (
               <TableRow key={group.id}>
@@ -67,7 +78,7 @@ export function ServerDataTable<TData>({
                     key={header.id}
                     sortDirection={header.column.getIsSorted() || false}
                     onClick={header.column.getToggleSortingHandler()}
-                    sx={{ cursor: header.column.getCanSort() ? 'pointer' : 'default' }}
+                    sx={{ cursor: header.column.getCanSort() ? 'pointer' : 'default', fontWeight: 600 }}
                   >
                     {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
                   </TableCell>
@@ -76,13 +87,30 @@ export function ServerDataTable<TData>({
             ))}
           </TableHead>
           <TableBody>
-            {table.getRowModel().rows.map((row) => (
-              <TableRow key={row.id} hover>
-                {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
+            {isLoading
+              ? Array.from({ length: Math.min(pagination.pageSize, 5) }).map((_, rowIndex) => (
+                  <TableRow key={`skeleton-${rowIndex}`}>
+                    {Array.from({ length: columnCount }).map((__, cellIndex) => (
+                      <TableCell key={cellIndex}>
+                        <Skeleton variant="text" />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              : table.getRowModel().rows.map((row) => (
+                  <TableRow key={row.id} hover>
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
+                    ))}
+                  </TableRow>
                 ))}
+            {showEmpty ? (
+              <TableRow>
+                <TableCell colSpan={columnCount} align="center" sx={{ py: 4 }}>
+                  <Typography color="text.secondary">{emptyMessage ?? t('table.empty')}</Typography>
+                </TableCell>
               </TableRow>
-            ))}
+            ) : null}
           </TableBody>
         </Table>
       </TableContainer>
@@ -94,7 +122,10 @@ export function ServerDataTable<TData>({
         rowsPerPageOptions={[10, 25, 50, 100]}
         onPageChange={(_, page) => table.setPageIndex(page)}
         onRowsPerPageChange={(event) => table.setPageSize(Number(event.target.value))}
-        labelRowsPerPage="Redova po strani:"
+        labelRowsPerPage={t('table.rowsPerPage')}
+        labelDisplayedRows={({ from, to, count }) =>
+          t('table.displayedRows', { from, to, count: count === -1 ? `>${to}` : count })
+        }
       />
     </Paper>
   )

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Alert, Stack, TextField, Typography } from '@mui/material'
+import { Alert, Button, Stack, TextField, Typography } from '@mui/material'
 import type { ColumnDef, PaginationState, SortingState } from '@tanstack/react-table'
 import { ServerDataTable } from '../../../shared/components/ServerDataTable'
 import { useStaffAccess } from '../useMasterData'
@@ -26,9 +26,9 @@ export function StaffAccessList({ companyId, onSelect }: StaffAccessListProps) {
         accessorKey: 'staffEmail',
         header: 'Korisnik',
         cell: ({ row, getValue }) => (
-          <button type="button" className="MuiButtonBase-root" onClick={() => onSelect?.(row.original)}>
+          <Button variant="text" size="small" onClick={() => onSelect?.(row.original)}>
             {String(getValue())}
-          </button>
+          </Button>
         ),
       },
       { accessorKey: 'staffRole', header: 'Uloga', enableSorting: false },
@@ -38,7 +38,7 @@ export function StaffAccessList({ companyId, onSelect }: StaffAccessListProps) {
 
   return (
     <Stack spacing={2}>
-      <Typography variant="h5" component="h2">Pristup zaposlenih</Typography>
+      <Typography component="h1" variant="h1">Pristup zaposlenih</Typography>
       <TextField label="Pretraga po email adresi" value={search} onChange={(event) => setSearch(event.target.value)} size="small" />
       {result.isError && <Alert severity="error">Pristupi nisu mogli da se učitaju.</Alert>}
       <ServerDataTable
@@ -50,6 +50,7 @@ export function StaffAccessList({ companyId, onSelect }: StaffAccessListProps) {
         sorting={sorting}
         onPaginationChange={setPagination}
         onSortingChange={setSorting}
+        isLoading={result.isLoading}
         getRowId={(row) => String(row.id)}
       />
     </Stack>

@@ -1,24 +1,61 @@
-import { Alert, Button, Paper, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material'
+import { useMemo, useState } from 'react'
+import { Alert, Button, Stack, Typography } from '@mui/material'
+import type { ColumnDef, PaginationState, SortingState } from '@tanstack/react-table'
+import { useTranslation } from 'react-i18next'
 import { getErrorMessage } from '../../api/problemDetails'
+import { formatMoney } from '../../shared/format/money'
+import { ServerDataTable } from '../../shared/components/ServerDataTable'
 import { useNoticeCommand, useNotices } from './noticeApi'
+import type { Notice } from './noticeApi'
 
 export function NoticeList({ companyId, canWrite }: { companyId: number; canWrite: boolean }) {
-  const query = useNotices(companyId)
+  const { t } = useTranslation()
+  const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 25 })
+  const [sorting, setSorting] = useState<SortingState>([])
+  const query = useNotices(companyId, pagination.pageIndex + 1, pagination.pageSize)
   const command = useNoticeCommand(companyId)
   const error = query.error ?? command.error
+
+  const columns = useMemo<ColumnDef<Notice>[]>(
+    () => [
+      { accessorKey: 'partnerAccountId', header: t('notices_.columns.partnerAccount') },
+      { accessorKey: 'unpaidInvoiceCount', header: t('notices_.columns.invoiceCount') },
+      { accessorKey: 'total', header: t('notices_.columns.debt'), cell: ({ getValue }) => formatMoney(getValue<number>()) },
+      { accessorKey: 'deliveryStatus', header: t('notices_.columns.status') },
+      {
+        id: 'actions',
+        header: t('notices_.columns.action'),
+        cell: ({ row }) => (
+          <>
+            {canWrite && row.original.deliveryStatus === 'Draft' ? (
+              <Button size="small" onClick={() => command.mutate({ noticeId: row.original.id, command: 'render' })}>{t('notices_.render')}</Button>
+            ) : null}
+            {canWrite && row.original.deliveryStatus === 'Rendered' ? (
+              <Button size="small" onClick={() => command.mutate({ noticeId: row.original.id, command: 'send' })}>{t('notices_.send')}</Button>
+            ) : null}
+          </>
+        ),
+      },
+    ],
+    [canWrite, command, t],
+  )
+
   return (
-    <Paper sx={{ p: 2, overflowX: 'auto' }}>
-      <Typography component="h2" variant="h6">Opomene</Typography>
-      {error ? <Alert severity="error">{getErrorMessage(error, 'Obrada opomene nije uspela.')}</Alert> : null}
-      <Table size="small" aria-label="Opomene">
-        <TableHead><TableRow><TableCell>Partner konto</TableCell><TableCell>Broj računa</TableCell><TableCell align="right">Dug</TableCell><TableCell>Status</TableCell><TableCell align="right">Akcija</TableCell></TableRow></TableHead>
-        <TableBody>{query.data?.items.map((notice) => (
-          <TableRow key={notice.id}>
-            <TableCell>{notice.partnerAccountId}</TableCell><TableCell>{notice.unpaidInvoiceCount}</TableCell><TableCell align="right">{notice.total.toFixed(2)}</TableCell><TableCell>{notice.deliveryStatus}</TableCell>
-            <TableCell align="right">{canWrite && notice.deliveryStatus === 'Draft' ? <Button onClick={() => command.mutate({ noticeId: notice.id, command: 'render' })}>Renderuj</Button> : null}{canWrite && notice.deliveryStatus === 'Rendered' ? <Button onClick={() => command.mutate({ noticeId: notice.id, command: 'send' })}>Pošalji</Button> : null}</TableCell>
-          </TableRow>
-        ))}</TableBody>
-      </Table>
-    </Paper>
+    <Stack spacing={2}>
+      <Typography component="h1" variant="h1">{t('notices_.title')}</Typography>
+      {error ? <Alert severity="error">{getErrorMessage(error, t('notices_.processingFailed'))}</Alert> : null}
+      <ServerDataTable
+        ariaLabel={t('notices_.title')}
+        rows={query.data?.items ?? []}
+        columns={columns}
+        rowCount={query.data?.totalCount ?? 0}
+        pagination={pagination}
+        sorting={sorting}
+        onPaginationChange={setPagination}
+        onSortingChange={setSorting}
+        isLoading={query.isLoading}
+        getRowId={(row) => String(row.id)}
+      />
+    </Stack>
   )
 }

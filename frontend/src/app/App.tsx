@@ -13,7 +13,7 @@ import { RoleGuard } from '../shared/routing/RoleGuard'
 import { AppShell } from './AppShell'
 import { theme } from './theme'
 import { useActiveCompany } from '../features/companies/useActiveCompany'
-import { CompanyPage, PartnersPage, UnitsPage } from '../features/master-data/MasterDataPages'
+import { AddressesPage, CompanyPage, PartnersPage, StaffPage, UnitsPage } from '../features/master-data/MasterDataPages'
 import { BillingWorkspace } from '../features/billing/BillingWorkspace'
 import { SupplierInvoiceList } from '../features/suppliers/SupplierInvoiceList'
 import { LedgerBankingPage } from '../features/ledger-banking/LedgerBankingPage'
@@ -50,12 +50,16 @@ function AuthenticatedRoutes() {
             <Route path="administration" element={<AdministrationRoute />} />
           </Route>
           <Route path="partners" element={<PartnersPage />} />
+          <Route path="addresses" element={<AddressesPage />} />
+          <Route element={<RoleGuard allowedRoles={['Root', 'Upravnik']} />}>
+            <Route path="staff" element={<StaffPage />} />
+          </Route>
           <Route path="units" element={<UnitsPage />} />
           <Route path="contracts" element={<UnitsPage />} />
           <Route path="billing" element={<BillingRoute />} />
           <Route path="suppliers" element={<SupplierRoute />} />
-          <Route path="ledger" element={<LedgerBankingPage />} />
-          <Route path="banking" element={<LedgerBankingPage />} />
+          <Route path="ledger" element={<LedgerRoute />} />
+          <Route path="banking" element={<LedgerRoute />} />
           <Route path="notices" element={<NoticesRoute />} />
           <Route path="documents" element={<DocumentsRoute />} />
           <Route path="email" element={<EmailRoute />} />
@@ -71,6 +75,7 @@ function useCompanyPermissions() { const { activeCompany } = useActiveCompany();
 function AdministrationRoute() { const { companyId } = useCompanyPermissions(); return <PlatformAdministrationPage companyId={companyId} /> }
 function BillingRoute() { const { companyId, canWrite } = useCompanyPermissions(); return <BillingWorkspace companyId={companyId} canPost={canWrite} /> }
 function SupplierRoute() { const { companyId } = useCompanyPermissions(); return <SupplierInvoiceList companyId={companyId} /> }
+function LedgerRoute() { const { canWrite } = useCompanyPermissions(); return <LedgerBankingPage canPost={canWrite} /> }
 function NoticesRoute() { const { companyId, canWrite } = useCompanyPermissions(); return <NoticeList companyId={companyId} canWrite={canWrite} /> }
 function DocumentsRoute() { const { companyId } = useCompanyPermissions(); return <DocumentsPage companyId={companyId} /> }
 function EmailRoute() { const { companyId } = useCompanyPermissions(); return <EmailPage companyId={companyId} /> }

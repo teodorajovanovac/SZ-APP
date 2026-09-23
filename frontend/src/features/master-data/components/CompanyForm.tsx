@@ -1,5 +1,6 @@
 import { Alert, Button, CircularProgress, Stack, TextField } from '@mui/material'
 import { useEffect, useState, type FormEvent } from 'react'
+import { getErrorMessage } from '../../../api/problemDetails'
 import { useCompanyDetail, useUpdateCompany } from '../useMasterData'
 
 interface CompanyFormProps {
@@ -41,7 +42,7 @@ export function CompanyForm({ companyId }: CompanyFormProps) {
 
   return (
     <Stack component="form" spacing={2} onSubmit={submit}>
-      {update.isError && <Alert severity="error">Izmena nije sačuvana. Osvežite podatke ako ih je drugi korisnik menjao.</Alert>}
+      {update.isError && <Alert severity="error">{getErrorMessage(update.error, 'Izmena nije sačuvana. Osvežite podatke ako ih je drugi korisnik menjao.')}</Alert>}
       {update.isSuccess && <Alert severity="success">Kompanija je sačuvana.</Alert>}
       <TextField label="Kratak naziv" required value={shortName} onChange={(event) => setShortName(event.target.value)} inputProps={{ maxLength: 50 }} />
       <TextField label="Naziv za štampu" required value={printName} onChange={(event) => setPrintName(event.target.value)} inputProps={{ maxLength: 50 }} />

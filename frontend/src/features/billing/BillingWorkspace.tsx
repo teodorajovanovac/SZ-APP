@@ -1,40 +1,94 @@
-import { Alert, Button, Paper, Stack, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material'
+import { useMemo, useState } from 'react'
+import { Alert, Box, Button, Paper, Stack, Typography } from '@mui/material'
+import type { ColumnDef, PaginationState, SortingState } from '@tanstack/react-table'
+import { useTranslation } from 'react-i18next'
 import { getErrorMessage } from '../../api/problemDetails'
+import { formatMoney } from '../../shared/format/money'
+import { ServerDataTable } from '../../shared/components/ServerDataTable'
 import { useInvoiceBatches, useInvoices, usePostInvoiceBatch } from './billingApi'
 import { InvoiceBatchForm } from './InvoiceBatchForm'
+import type { InvoiceBatch, InvoiceSummary } from './types'
 
 export function BillingWorkspace({ companyId, canPost }: { companyId: number; canPost: boolean }) {
-  const batches = useInvoiceBatches(companyId)
-  const invoices = useInvoices(companyId)
+  const { t } = useTranslation()
+  const [batchPagination, setBatchPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 25 })
+  const [batchSorting, setBatchSorting] = useState<SortingState>([])
+  const [invoicePagination, setInvoicePagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 25 })
+  const [invoiceSorting, setInvoiceSorting] = useState<SortingState>([])
+
+  const batches = useInvoiceBatches(companyId, batchPagination.pageIndex + 1, batchPagination.pageSize)
+  const invoices = useInvoices(companyId, invoicePagination.pageIndex + 1, invoicePagination.pageSize)
   const post = usePostInvoiceBatch(companyId)
   const error = batches.error ?? invoices.error ?? post.error
 
+  const batchColumns = useMemo<ColumnDef<InvoiceBatch>[]>(
+    () => [
+      { accessorKey: 'periodYYMM', header: t('billing_.columns.period') },
+      { accessorKey: 'caption', header: t('billing_.columns.caption') },
+      { accessorKey: 'status', header: t('billing_.columns.status') },
+      {
+        id: 'actions',
+        header: t('billing_.columns.action'),
+        cell: ({ row }) =>
+          canPost && row.original.status === 'Generated' ? (
+            <Button size="small" disabled={post.isPending} onClick={() => post.mutate(row.original.id)}>
+              {t('billing_.post')}
+            </Button>
+          ) : null,
+      },
+    ],
+    [canPost, post, t],
+  )
+
+  const invoiceColumns = useMemo<ColumnDef<InvoiceSummary>[]>(
+    () => [
+      { accessorKey: 'sequenceNumber', header: t('billing_.columns.number') },
+      { accessorKey: 'partnerName', header: t('billing_.columns.partner') },
+      { accessorKey: 'issueDate', header: t('billing_.columns.date') },
+      {
+        accessorKey: 'invoiceTotal',
+        header: t('billing_.columns.total'),
+        cell: ({ row }) => formatMoney(row.original.invoiceTotal, row.original.currency),
+      },
+    ],
+    [t],
+  )
+
   return (
     <Stack spacing={3}>
-      <Typography component="h1" variant="h1">Fakturisanje</Typography>
-      {error ? <Alert severity="error">{getErrorMessage(error, 'Podaci fakturisanja nisu dostupni.')}</Alert> : null}
+      <Typography component="h1" variant="h1">{t('billing_.title')}</Typography>
+      {error ? <Alert severity="error">{getErrorMessage(error, t('billing_.dataUnavailable'))}</Alert> : null}
       <Paper sx={{ p: 3 }}><InvoiceBatchForm companyId={companyId} /></Paper>
-      <Paper sx={{ p: 2, overflowX: 'auto' }}>
-        <Typography component="h2" variant="h6">Serije računa</Typography>
-        <Table size="small" aria-label="Serije računa">
-          <TableHead><TableRow><TableCell>Period</TableCell><TableCell>Naziv</TableCell><TableCell>Status</TableCell><TableCell align="right">Akcija</TableCell></TableRow></TableHead>
-          <TableBody>{batches.data?.items.map((batch) => (
-            <TableRow key={batch.id}>
-              <TableCell>{batch.periodYYMM}</TableCell><TableCell>{batch.caption}</TableCell><TableCell>{batch.status}</TableCell>
-              <TableCell align="right">{canPost && batch.status === 'Generated' ? <Button onClick={() => post.mutate(batch.id)}>Knjiži</Button> : null}</TableCell>
-            </TableRow>
-          ))}</TableBody>
-        </Table>
-      </Paper>
-      <Paper sx={{ p: 2, overflowX: 'auto' }}>
-        <Typography component="h2" variant="h6">Računi</Typography>
-        <Table size="small" aria-label="Računi">
-          <TableHead><TableRow><TableCell>Broj</TableCell><TableCell>Partner</TableCell><TableCell>Datum</TableCell><TableCell align="right">Ukupno</TableCell></TableRow></TableHead>
-          <TableBody>{invoices.data?.items.map((invoice) => (
-            <TableRow key={invoice.id}><TableCell>{invoice.sequenceNumber}</TableCell><TableCell>{invoice.partnerName}</TableCell><TableCell>{invoice.issueDate}</TableCell><TableCell align="right">{invoice.invoiceTotal.toFixed(2)} {invoice.currency}</TableCell></TableRow>
-          ))}</TableBody>
-        </Table>
-      </Paper>
+      <Box>
+        <Typography component="h2" variant="h6" sx={{ mb: 1 }}>{t('billing_.batchesTitle')}</Typography>
+        <ServerDataTable
+          ariaLabel={t('billing_.batchesTitle')}
+          rows={batches.data?.items ?? []}
+          columns={batchColumns}
+          rowCount={batches.data?.totalCount ?? 0}
+          pagination={batchPagination}
+          sorting={batchSorting}
+          onPaginationChange={setBatchPagination}
+          onSortingChange={setBatchSorting}
+          isLoading={batches.isLoading}
+          getRowId={(row) => String(row.id)}
+        />
+      </Box>
+      <Box>
+        <Typography component="h2" variant="h6" sx={{ mb: 1 }}>{t('billing_.invoicesTitle')}</Typography>
+        <ServerDataTable
+          ariaLabel={t('billing_.invoicesTitle')}
+          rows={invoices.data?.items ?? []}
+          columns={invoiceColumns}
+          rowCount={invoices.data?.totalCount ?? 0}
+          pagination={invoicePagination}
+          sorting={invoiceSorting}
+          onPaginationChange={setInvoicePagination}
+          onSortingChange={setInvoiceSorting}
+          isLoading={invoices.isLoading}
+          getRowId={(row) => String(row.id)}
+        />
+      </Box>
     </Stack>
   )
 }
