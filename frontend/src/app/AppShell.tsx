@@ -2,6 +2,7 @@ import LogoutIcon from '@mui/icons-material/Logout'
 import MenuIcon from '@mui/icons-material/Menu'
 import {
   AppBar,
+  Avatar,
   Box,
   Divider,
   Drawer,
@@ -12,6 +13,7 @@ import {
   ListItemButton,
   ListItemIcon,
   ListItemText,
+  ListSubheader,
   MenuItem,
   Select,
   Stack,
@@ -20,15 +22,39 @@ import {
   Typography,
   useMediaQuery,
 } from '@mui/material'
-import { useTheme } from '@mui/material/styles'
+import { alpha, useTheme } from '@mui/material/styles'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../features/auth/useAuth'
 import { useActiveCompany } from '../features/companies/useActiveCompany'
-import { navigationItems } from './navigation'
+import { navigationItems, type NavigationItem } from './navigation'
 
-const drawerWidth = 272
+const drawerWidth = 264
+
+// Seventeen flat links read as a wall. Grouping them by what the user is doing
+// (records / invoicing / books / system) makes the list scannable; the dashboard
+// stays ungrouped at the top. Any nav item not listed here falls into "system",
+// so adding a route to navigation.ts can never make it disappear from the menu.
+const navGroups: Array<{ titleKey: string | null; paths: string[] }> = [
+  { titleKey: null, paths: ['/'] },
+  { titleKey: 'shell.groupMasterData', paths: ['/companies', '/partners', '/addresses', '/staff', '/units', '/contracts'] },
+  { titleKey: 'shell.groupBilling', paths: ['/billing', '/suppliers', '/notices'] },
+  { titleKey: 'shell.groupAccounting', paths: ['/ledger', '/banking', '/reports'] },
+  { titleKey: 'shell.groupSystem', paths: ['/documents', '/email', '/imports', '/administration'] },
+]
+
+function groupItems(items: NavigationItem[]) {
+  const assigned = new Set(navGroups.flatMap((group) => group.paths))
+  return navGroups.map((group, index) => ({
+    titleKey: group.titleKey,
+    items: items.filter((item) =>
+      index === navGroups.length - 1 && !assigned.has(item.path)
+        ? true
+        : group.paths.includes(item.path),
+    ),
+  })).filter((group) => group.items.length > 0)
+}
 
 export function AppShell() {
   const theme = useTheme()
@@ -40,38 +66,7 @@ export function AppShell() {
   const visibleItems = navigationItems.filter(
     (item) => !item.roles || user?.roles.some((role) => item.roles?.includes(role)),
   )
-
-  const drawer = (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Toolbar>
-        <Typography variant="h6" component="div" fontWeight={700}>{t('appName')}</Typography>
-      </Toolbar>
-      <Divider />
-      <List component="nav" aria-label={t('navigation')} sx={{ flex: 1, overflowY: 'auto', py: 1 }}>
-        {visibleItems.map((item) => {
-          const Icon = item.icon
-          return (
-            <ListItemButton
-              key={item.path}
-              component={NavLink}
-              to={item.path}
-              end={item.path === '/'}
-              onClick={() => setMobileOpen(false)}
-              sx={{ '&.active': { bgcolor: 'action.selected', color: 'primary.main' } }}
-            >
-              <ListItemIcon><Icon aria-hidden="true" /></ListItemIcon>
-              <ListItemText primary={t(item.labelKey)} />
-            </ListItemButton>
-          )
-        })}
-      </List>
-      <Divider />
-      <Box sx={{ p: 2 }}>
-        <Typography variant="body2" fontWeight={600} noWrap>{user?.displayName}</Typography>
-        <Typography variant="caption" color="text.secondary">{user?.roles.join(', ')}</Typography>
-      </Box>
-    </Box>
-  )
+  const groups = groupItems(visibleItems)
 
   const changeLanguage = async (language: string) => {
     localStorage.setItem('sz.language', language)
@@ -79,56 +74,162 @@ export function AppShell() {
     document.documentElement.lang = language
   }
 
+  const onDarkSurface = {
+    color: 'common.white',
+    '.MuiOutlinedInput-notchedOutline': { borderColor: alpha('#fff', 0.45) },
+    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: alpha('#fff', 0.75) },
+    '.MuiSvgIcon-root': { color: 'common.white' },
+  }
+
+  const companySelect = (
+    <FormControl size="small" fullWidth={!isDesktop} sx={{ minWidth: isDesktop ? 220 : undefined }}>
+      <InputLabel id="company-select-label" sx={isDesktop ? { color: 'common.white' } : undefined}>
+        {t('activeCompany')}
+      </InputLabel>
+      <Select
+        labelId="company-select-label"
+        value={activeCompany.id}
+        label={t('activeCompany')}
+        onChange={(event) => selectCompany(Number(event.target.value))}
+        sx={isDesktop ? onDarkSurface : undefined}
+      >
+        {companies.map((company) => <MenuItem key={company.id} value={company.id}>{company.name}</MenuItem>)}
+      </Select>
+    </FormControl>
+  )
+
+  const languageSelect = (
+    <FormControl size="small" sx={{ minWidth: isDesktop ? 84 : undefined }} fullWidth={!isDesktop}>
+      <Select
+        value={i18n.resolvedLanguage ?? 'sr-Latn'}
+        onChange={(event) => void changeLanguage(event.target.value)}
+        inputProps={{ 'aria-label': t('language') }}
+        sx={isDesktop ? onDarkSurface : undefined}
+      >
+        <MenuItem value="sr-Latn">LAT</MenuItem>
+        <MenuItem value="sr-Cyrl">ЋИР</MenuItem>
+        <MenuItem value="en">EN</MenuItem>
+      </Select>
+    </FormControl>
+  )
+
+  const drawer = (
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      {/* Desktop: the fixed AppBar covers this strip, so it is a pure spacer.
+          Mobile: the drawer floats over the page and needs its own brand header. */}
+      <Toolbar sx={{ gap: 1.25, bgcolor: { xs: 'primary.main', lg: 'transparent' }, color: { xs: 'common.white', lg: 'inherit' } }}>
+        <Typography variant="h6" component="p" sx={{ display: { xs: 'block', lg: 'none' } }}>
+          {t('appName')}
+        </Typography>
+      </Toolbar>
+      {!isDesktop && (
+        <>
+          <Stack spacing={1.5} sx={{ px: 2, pt: 2, pb: 1 }}>
+            {companySelect}
+            {languageSelect}
+          </Stack>
+          <Divider sx={{ mt: 1 }} />
+        </>
+      )}
+      {/* minHeight:0 lets this flex child actually shrink, so the list scrolls
+          instead of pushing the user footer off the bottom of the viewport. */}
+      <Box
+        component="nav"
+        aria-label={t('navigation')}
+        sx={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', px: 1.25, py: 1 }}
+      >
+        {groups.map((group, index) => (
+          <List
+            key={group.titleKey ?? 'primary'}
+            dense
+            disablePadding
+            sx={{ mb: index === groups.length - 1 ? 0 : 0.5 }}
+            subheader={
+              group.titleKey ? (
+                <ListSubheader disableSticky sx={{ px: 1.5, pt: 1 }}>{t(group.titleKey)}</ListSubheader>
+              ) : undefined
+            }
+          >
+            {group.items.map((item) => {
+              const Icon = item.icon
+              return (
+                <ListItemButton
+                  key={item.path}
+                  component={NavLink}
+                  to={item.path}
+                  end={item.path === '/'}
+                  onClick={() => setMobileOpen(false)}
+                  sx={{
+                    minHeight: 40,
+                    mb: 0.25,
+                    color: 'text.primary',
+                    '&.active': {
+                      bgcolor: 'action.selected',
+                      color: 'primary.main',
+                      fontWeight: 700,
+                      '& .MuiListItemIcon-root': { color: 'primary.main' },
+                      '& .MuiListItemText-primary': { fontWeight: 700 },
+                    },
+                  }}
+                >
+                  <ListItemIcon><Icon fontSize="small" aria-hidden="true" /></ListItemIcon>
+                  <ListItemText primary={t(item.labelKey)} slotProps={{ primary: { variant: 'body2' } }} />
+                </ListItemButton>
+              )
+            })}
+          </List>
+        ))}
+      </Box>
+      <Divider />
+      <Stack direction="row" spacing={1.25} alignItems="center" sx={{ p: 2, flexShrink: 0 }}>
+        <Avatar sx={{ width: 34, height: 34, bgcolor: 'primary.main', fontSize: '0.8125rem', fontWeight: 700 }}>
+          {(user?.displayName ?? '?').slice(0, 2).toUpperCase()}
+        </Avatar>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography variant="body2" fontWeight={600} noWrap>{user?.displayName}</Typography>
+          <Typography variant="caption" color="text.secondary" noWrap display="block">
+            {user?.roles.join(', ')}
+          </Typography>
+        </Box>
+      </Stack>
+    </Box>
+  )
+
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
       <Box
         component="a"
         href="#main-content"
-        sx={{ position: 'fixed', top: -100, left: 8, zIndex: 2000, '&:focus': { top: 8 }, bgcolor: 'background.paper', p: 1 }}
+        sx={{
+          position: 'fixed', top: -100, left: 8, zIndex: 2000, '&:focus': { top: 8 },
+          bgcolor: 'background.paper', color: 'text.primary', px: 2, py: 1, borderRadius: 1, boxShadow: 3,
+        }}
       >
         {t('skipToContent')}
       </Box>
       <AppBar position="fixed" sx={{ zIndex: theme.zIndex.drawer + 1 }}>
-        <Toolbar>
+        <Toolbar sx={{ gap: 1 }}>
           {!isDesktop && (
             <IconButton color="inherit" edge="start" onClick={() => setMobileOpen(true)} aria-label={t('openNavigation')}>
               <MenuIcon />
             </IconButton>
           )}
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1, display: { xs: 'none', sm: 'block' } }}>
+          <Typography variant="h6" component="p" sx={{ flexGrow: 1, minWidth: 0 }} noWrap>
             {t('appName')}
           </Typography>
-          <Stack direction="row" spacing={1} alignItems="center">
-            <FormControl size="small" sx={{ minWidth: { xs: 140, sm: 210 } }}>
-              <InputLabel id="company-select-label" sx={{ color: 'common.white' }}>{t('activeCompany')}</InputLabel>
-              <Select
-                labelId="company-select-label"
-                value={activeCompany.id}
-                label={t('activeCompany')}
-                onChange={(event) => selectCompany(Number(event.target.value))}
-                sx={{ color: 'common.white', '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,.6)' }, '.MuiSvgIcon-root': { color: 'common.white' } }}
-              >
-                {companies.map((company) => <MenuItem key={company.id} value={company.id}>{company.name}</MenuItem>)}
-              </Select>
-            </FormControl>
-            <FormControl size="small" sx={{ minWidth: 76 }}>
-              <Select
-                value={i18n.resolvedLanguage ?? 'sr-Latn'}
-                onChange={(event) => void changeLanguage(event.target.value)}
-                inputProps={{ 'aria-label': t('language') }}
-                sx={{ color: 'common.white', '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,.6)' }, '.MuiSvgIcon-root': { color: 'common.white' } }}
-              >
-                <MenuItem value="sr-Latn">LAT</MenuItem>
-                <MenuItem value="sr-Cyrl">ЋИР</MenuItem>
-                <MenuItem value="en">EN</MenuItem>
-              </Select>
-            </FormControl>
-            <Tooltip title={t('logout')}>
-              <IconButton color="inherit" onClick={() => void logout()} aria-label={t('logout')}>
-                <LogoutIcon />
-              </IconButton>
-            </Tooltip>
-          </Stack>
+          {/* On phones the company and language pickers live in the drawer — the
+              header keeps the product name and the one destructive action. */}
+          {isDesktop && (
+            <Stack direction="row" spacing={1} alignItems="center">
+              {companySelect}
+              {languageSelect}
+            </Stack>
+          )}
+          <Tooltip title={t('logout')}>
+            <IconButton color="inherit" onClick={() => void logout()} aria-label={t('logout')}>
+              <LogoutIcon />
+            </IconButton>
+          </Tooltip>
         </Toolbar>
       </AppBar>
       <Box component="aside" sx={{ width: { lg: drawerWidth }, flexShrink: { lg: 0 } }}>
@@ -142,7 +243,19 @@ export function AppShell() {
           {drawer}
         </Drawer>
       </Box>
-      <Box component="main" id="main-content" tabIndex={-1} sx={{ flexGrow: 1, minWidth: 0, p: { xs: 2, sm: 3 }, pt: { xs: 11, sm: 12 } }}>
+      <Box
+        component="main"
+        id="main-content"
+        tabIndex={-1}
+        sx={{
+          flexGrow: 1,
+          minWidth: 0,
+          px: { xs: 2, sm: 3, lg: 4 },
+          pb: { xs: 4, sm: 6 },
+          pt: { xs: 2.5, sm: 3 },
+          mt: { xs: 7, sm: 8 },
+        }}
+      >
         <Outlet />
       </Box>
     </Box>
