@@ -27,7 +27,7 @@ export function BillingWorkspace({ companyId, canPost }: { companyId: number; ca
   // The list endpoints take page/pageSize only — no sortBy — so no column advertises sorting.
   const batchColumns = useMemo<ColumnDef<InvoiceBatch>[]>(
     () => [
-      { accessorKey: 'periodYYMM', header: t('billing_.columns.period'), enableSorting: false, meta: { numeric: true } },
+      { accessorKey: 'periodYYMM', header: t('billing_.columns.period'), enableSorting: false, meta: { align: 'left', numeric: true } },
       { accessorKey: 'caption', header: t('billing_.columns.caption'), enableSorting: false, meta: { ellipsis: true } },
       { accessorKey: 'status', header: t('billing_.columns.status'), enableSorting: false },
       {

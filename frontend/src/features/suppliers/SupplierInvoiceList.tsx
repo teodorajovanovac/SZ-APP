@@ -19,8 +19,8 @@ export function SupplierInvoiceList({ companyId }: { companyId: number }) {
 
   const columns = useMemo<ColumnDef<SupplierInvoice>[]>(
     () => [
-      { accessorKey: 'invoiceNo', header: t('suppliers_.columns.number'), enableSorting: false, meta: { numeric: true } },
-      { accessorKey: 'periodYYMM', header: t('suppliers_.columns.period'), enableSorting: false, meta: { numeric: true } },
+      { accessorKey: 'invoiceNo', header: t('suppliers_.columns.number'), enableSorting: false, meta: { align: 'left', numeric: true } },
+      { accessorKey: 'periodYYMM', header: t('suppliers_.columns.period'), enableSorting: false, meta: { align: 'left', numeric: true } },
       { accessorKey: 'caption', header: t('suppliers_.columns.caption'), enableSorting: false, meta: { ellipsis: true } },
       // amountRsd shown at 2 decimals like every other money value (no sub-cent precision requirement found).
       { accessorKey: 'amountRsd', header: t('suppliers_.columns.rsd'), enableSorting: false, meta: { numeric: true }, cell: ({ getValue }) => formatMoney(getValue<number>()) },

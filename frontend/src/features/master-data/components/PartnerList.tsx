@@ -53,8 +53,8 @@ export function PartnerList({ companyId, onSelect }: PartnerListProps) {
         ),
       },
       { accessorKey: 'name', header: 'Pun naziv', meta: { ellipsis: true } },
-      { accessorKey: 'taxNumber', header: 'PIB', meta: { numeric: true } },
-      { accessorKey: 'registrationNumber', header: 'Matični broj', enableSorting: false, meta: { numeric: true } },
+      { accessorKey: 'taxNumber', header: 'PIB', meta: { align: 'left', numeric: true } },
+      { accessorKey: 'registrationNumber', header: 'Matični broj', enableSorting: false, meta: { align: 'left', numeric: true } },
       { accessorKey: 'language', header: 'Jezik', enableSorting: false },
       {
         id: 'actions',

@@ -44,7 +44,7 @@ export function AddressList({ companyId, onSelect }: AddressListProps) {
           </Link>
         ),
       },
-      { accessorKey: 'postalCode', header: 'Poštanski broj', enableSorting: false, meta: { numeric: true } },
+      { accessorKey: 'postalCode', header: 'Poštanski broj', enableSorting: false, meta: { align: 'left', numeric: true } },
       { accessorKey: 'city', header: 'Grad' },
       { accessorKey: 'countryCode', header: 'Država', enableSorting: false },
       {
