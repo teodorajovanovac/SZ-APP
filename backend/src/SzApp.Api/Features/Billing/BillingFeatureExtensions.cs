@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using SzApp.Api.Infrastructure;
 using SzApp.Api.Security;
@@ -34,8 +35,8 @@ public static class BillingFeatureExtensions
             .RequireAuthorization(policy => policy.RequireRole(WriteRoles)).AddEndpointFilter<AntiforgeryEndpointFilter>();
 
         var suppliers = root.MapGroup("/supplier-invoices").WithTags("Billing - Supplier invoices");
-        suppliers.MapGet("/", (int companyId, int page, int pageSize, BillingService service, CancellationToken ct) =>
-            service.ListSupplierInvoicesAsync(companyId, page, pageSize, ct));
+        suppliers.MapGet("/", (int companyId, [AsParameters] SupplierInvoiceListQuery query, BillingService service, CancellationToken ct) =>
+            service.ListSupplierInvoicesAsync(companyId, query, ct));
         suppliers.MapPost("/", (int companyId, CreateSupplierInvoiceRequest request, BillingService service, CancellationToken ct) =>
                 service.CreateSupplierInvoiceAsync(companyId, request, ct))
             .RequireAuthorization(policy => policy.RequireRole(WriteRoles)).AddEndpointFilter<AntiforgeryEndpointFilter>();

@@ -48,17 +48,25 @@ public sealed class BillingService(
         return new(entity.Id, entity.Name, entity.SupplierAmountRule, entity.AllocationRule, entity.QuantityRule, entity.UnitOfMeasureId, entity.Note);
     }
 
-    public async Task<BillingPage<SupplierInvoiceResponse>> ListSupplierInvoicesAsync(int companyId, int page, int pageSize, CancellationToken ct)
+    public async Task<BillingPage<SupplierInvoiceResponse>> ListSupplierInvoicesAsync(int companyId, SupplierInvoiceListQuery filter, CancellationToken ct)
     {
-        (page, pageSize) = NormalizePage(page, pageSize);
+        var (page, pageSize) = NormalizePage(filter.Page ?? 1, filter.PageSize ?? 25);
         var query = db.Set<SupplierInvoice>().AsNoTracking().Where(x => x.CompanyId == companyId);
+        if (filter.PeriodYYMM is { } periodYYMM) query = query.Where(x => x.PeriodYYMM == periodYYMM);
+        if (filter.SupplierPartnerAccountId is { } supplierPartnerAccountId) query = query.Where(x => x.SupplierPartnerAccountId == supplierPartnerAccountId);
+        if (filter.DocumentTypeId is { } documentTypeId) query = query.Where(x => x.DocumentTypeId == documentTypeId);
+        if (filter.HasExtraordinaryMarker is { } hasExtraordinaryMarker)
+            query = hasExtraordinaryMarker
+                ? query.Where(x => !string.IsNullOrWhiteSpace(x.ExtraordinaryInvoiceMarker))
+                : query.Where(x => string.IsNullOrWhiteSpace(x.ExtraordinaryInvoiceMarker));
         var total = await query.CountAsync(ct);
         var items = await query.OrderByDescending(x => x.PeriodYYMM).ThenBy(x => x.InvoiceNo)
             .Skip((page - 1) * pageSize).Take(pageSize)
             .Select(x => new SupplierInvoiceResponse(
                 x.Id, x.InvoiceNo, x.CodeName, x.Caption, x.CalculationTypeId, x.PeriodYYMM,
                 x.InvoiceTotalCalculationAmountEur, x.InvoiceTotalCalculationAmountRsd, x.PostedInvoiceAmount,
-                x.InvoiceDate, x.TransactionDate, x.UnitTypes.OrderBy(y => y.UnitTypeId).Select(y => y.UnitTypeId).ToArray(),
+                x.InvoiceDate, x.TransactionDate, x.SupplierPartnerAccountId, x.DocumentTypeId, x.ExtraordinaryInvoiceMarker,
+                x.UnitTypes.OrderBy(y => y.UnitTypeId).Select(y => y.UnitTypeId).ToArray(),
                 Convert.ToBase64String(x.RowVersion)))
             .ToArrayAsync(ct);
         return new(items, page, pageSize, total);
@@ -118,7 +126,8 @@ public sealed class BillingService(
         await db.SaveChangesAsync(ct);
         return new(entity.Id, entity.InvoiceNo, entity.CodeName, entity.Caption, entity.CalculationTypeId, entity.PeriodYYMM,
             entity.InvoiceTotalCalculationAmountEur, entity.InvoiceTotalCalculationAmountRsd, entity.PostedInvoiceAmount,
-            entity.InvoiceDate, entity.TransactionDate, entity.UnitTypes.Select(x => x.UnitTypeId).Order().ToArray(), Convert.ToBase64String(entity.RowVersion));
+            entity.InvoiceDate, entity.TransactionDate, entity.SupplierPartnerAccountId, entity.DocumentTypeId, entity.ExtraordinaryInvoiceMarker,
+            entity.UnitTypes.Select(x => x.UnitTypeId).Order().ToArray(), Convert.ToBase64String(entity.RowVersion));
     }
 
     public async Task<BillingPage<InvoiceBatchResponse>> ListInvoiceBatchesAsync(int companyId, int page, int pageSize, CancellationToken ct)
