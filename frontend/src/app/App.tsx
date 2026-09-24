@@ -7,6 +7,7 @@ import { AuthProvider } from '../features/auth/AuthProvider'
 import { LoginPage } from '../features/auth/LoginPage'
 import { useAuth } from '../features/auth/useAuth'
 import { ActiveCompanyProvider } from '../features/companies/ActiveCompanyProvider'
+import { CompanyScopeProvider } from '../features/companies/CompanyScopeProvider'
 import { DashboardPage } from '../shared/pages/DashboardPage'
 import { NotFoundPage } from '../shared/pages/NotFoundPage'
 import { RoleGuard } from '../shared/routing/RoleGuard'
@@ -41,32 +42,34 @@ function AuthenticatedRoutes() {
 
   return (
     <ActiveCompanyProvider key={user.id} companies={user.companies}>
-      <Routes>
-        <Route element={<AppShell />}>
-          <Route index element={<DashboardPage />} />
-          <Route element={<RoleGuard allowedRoles={['Root', 'Upravnik']} />}>
-            <Route path="companies" element={<CompanyPage />} />
-            <Route path="imports" element={<EtlRunsPage />} />
-            <Route path="administration" element={<AdministrationRoute />} />
+      <CompanyScopeProvider>
+        <Routes>
+          <Route element={<AppShell />}>
+            <Route index element={<DashboardPage />} />
+            <Route element={<RoleGuard allowedRoles={['Root', 'Upravnik']} />}>
+              <Route path="companies" element={<CompanyPage />} />
+              <Route path="imports" element={<EtlRunsPage />} />
+              <Route path="administration" element={<AdministrationRoute />} />
+            </Route>
+            <Route path="partners" element={<PartnersPage />} />
+            <Route path="addresses" element={<AddressesPage />} />
+            <Route element={<RoleGuard allowedRoles={['Root', 'Upravnik']} />}>
+              <Route path="staff" element={<StaffPage />} />
+            </Route>
+            <Route path="units" element={<UnitsPage />} />
+            <Route path="contracts" element={<UnitsPage />} />
+            <Route path="billing" element={<BillingRoute />} />
+            <Route path="suppliers" element={<SupplierRoute />} />
+            <Route path="ledger" element={<LedgerRoute />} />
+            <Route path="banking" element={<LedgerRoute />} />
+            <Route path="notices" element={<NoticesRoute />} />
+            <Route path="documents" element={<DocumentsRoute />} />
+            <Route path="email" element={<EmailRoute />} />
+            <Route path="reports" element={<ReportsPage />} />
           </Route>
-          <Route path="partners" element={<PartnersPage />} />
-          <Route path="addresses" element={<AddressesPage />} />
-          <Route element={<RoleGuard allowedRoles={['Root', 'Upravnik']} />}>
-            <Route path="staff" element={<StaffPage />} />
-          </Route>
-          <Route path="units" element={<UnitsPage />} />
-          <Route path="contracts" element={<UnitsPage />} />
-          <Route path="billing" element={<BillingRoute />} />
-          <Route path="suppliers" element={<SupplierRoute />} />
-          <Route path="ledger" element={<LedgerRoute />} />
-          <Route path="banking" element={<LedgerRoute />} />
-          <Route path="notices" element={<NoticesRoute />} />
-          <Route path="documents" element={<DocumentsRoute />} />
-          <Route path="email" element={<EmailRoute />} />
-          <Route path="reports" element={<ReportsPage />} />
-        </Route>
-        <Route path="*" element={<NotFoundPage />} />
-      </Routes>
+          <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+      </CompanyScopeProvider>
     </ActiveCompanyProvider>
   )
 }

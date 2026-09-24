@@ -2,13 +2,13 @@ import LogoutIcon from '@mui/icons-material/Logout'
 import MenuIcon from '@mui/icons-material/Menu'
 import {
   AppBar,
+  Autocomplete,
   Avatar,
   Box,
   Divider,
   Drawer,
   FormControl,
   IconButton,
-  InputLabel,
   List,
   ListItemButton,
   ListItemIcon,
@@ -17,20 +17,55 @@ import {
   MenuItem,
   Select,
   Stack,
+  TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Toolbar,
   Tooltip,
   Typography,
   useMediaQuery,
 } from '@mui/material'
 import { alpha, useTheme } from '@mui/material/styles'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../features/auth/useAuth'
+import type { CompanyScope } from '../features/companies/companyScope'
 import { useActiveCompany } from '../features/companies/useActiveCompany'
+import { useCompanyScope } from '../features/companies/useCompanyScope'
+import { useLocationCategories } from '../features/master-data/useMasterData'
+import type { LocationCategory } from '../features/master-data/types'
 import { navigationItems, type NavigationItem } from './navigation'
 
 const drawerWidth = 264
+
+interface LocationCategoryOption {
+  id: number
+  label: string
+}
+
+// Flattens the parentId-linked category tree into a searchable list of full paths
+// (e.g. "BW", "BW / Plot 24"), depth-first so children follow their parent — the
+// backend already orders siblings by SortIndex/Name, we just preserve that order.
+function flattenLocationCategories(categories: LocationCategory[]): LocationCategoryOption[] {
+  const byParent = new Map<number | null, LocationCategory[]>()
+  for (const category of categories) {
+    const siblings = byParent.get(category.parentId) ?? []
+    siblings.push(category)
+    byParent.set(category.parentId, siblings)
+  }
+  const options: LocationCategoryOption[] = []
+  const visit = (parentId: number | null, prefix: string, ancestors: Set<number>) => {
+    for (const node of byParent.get(parentId) ?? []) {
+      if (ancestors.has(node.id)) continue // defensive: ignore a cyclic parentId
+      const label = prefix ? `${prefix} / ${node.name}` : node.name
+      options.push({ id: node.id, label })
+      visit(node.id, label, new Set(ancestors).add(node.id))
+    }
+  }
+  visit(null, '', new Set())
+  return options
+}
 
 // Seventeen flat links read as a wall. Grouping them by what the user is doing
 // (records / invoicing / books / system) makes the list scannable; the dashboard
@@ -62,7 +97,30 @@ export function AppShell() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const { t, i18n } = useTranslation()
   const { user, logout } = useAuth()
-  const { companies, activeCompany, selectCompany } = useActiveCompany()
+  const { companies, activeCompany } = useActiveCompany()
+  const { scope, setScope } = useCompanyScope()
+  const [scopeMode, setScopeMode] = useState<CompanyScope['mode']>(scope.mode)
+  // Lazily fetched: only once the user actually switches to "Po lokaciji" — a
+  // fresh page load in single-company mode never fires this request.
+  const { data: locationCategories = [] } = useLocationCategories(scopeMode === 'location' ? activeCompany.id : 0)
+  const locationOptions = useMemo(() => flattenLocationCategories(locationCategories), [locationCategories])
+  const selectedLocationOption =
+    scope.mode === 'location' ? locationOptions.find((option) => option.id === scope.locationCategoryId) ?? null : null
+
+  const handleSelectCompany = (companyId: number) => setScope({ mode: 'single', companyId })
+
+  const handleScopeModeChange = (_: unknown, nextMode: CompanyScope['mode'] | null) => {
+    if (!nextMode) return
+    setScopeMode(nextMode)
+    if (nextMode === 'single') setScope({ mode: 'single', companyId: activeCompany.id })
+    if (nextMode === 'all') setScope({ mode: 'all' })
+    // 'location' commits once a category is actually picked below.
+  }
+
+  const handleSelectLocationCategory = (option: LocationCategoryOption | null) => {
+    if (option) setScope({ mode: 'location', locationCategoryId: option.id })
+  }
+
   const visibleItems = navigationItems.filter(
     (item) => !item.roles || user?.roles.some((role) => item.roles?.includes(role)),
   )
@@ -79,23 +137,65 @@ export function AppShell() {
     '.MuiOutlinedInput-notchedOutline': { borderColor: alpha('#fff', 0.45) },
     '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: alpha('#fff', 0.75) },
     '.MuiSvgIcon-root': { color: 'common.white' },
+    '.MuiInputLabel-root': { color: alpha('#fff', 0.85) },
+    '.MuiInputLabel-root.Mui-focused': { color: 'common.white' },
   }
 
   const companySelect = (
-    <FormControl size="small" fullWidth={!isDesktop} sx={{ minWidth: isDesktop ? 220 : undefined }}>
-      <InputLabel id="company-select-label" sx={isDesktop ? { color: 'common.white' } : undefined}>
-        {t('activeCompany')}
-      </InputLabel>
-      <Select
-        labelId="company-select-label"
-        value={activeCompany.id}
-        label={t('activeCompany')}
-        onChange={(event) => selectCompany(Number(event.target.value))}
-        sx={isDesktop ? onDarkSurface : undefined}
-      >
-        {companies.map((company) => <MenuItem key={company.id} value={company.id}>{company.name}</MenuItem>)}
-      </Select>
-    </FormControl>
+    <Autocomplete
+      size="small"
+      disableClearable
+      fullWidth
+      sx={{ width: isDesktop ? 240 : '100%' }}
+      options={companies}
+      value={activeCompany}
+      isOptionEqualToValue={(option, value) => option.id === value.id}
+      getOptionLabel={(option) => option.name}
+      onChange={(_, value) => value && handleSelectCompany(value.id)}
+      renderInput={(params) => (
+        <TextField {...params} label={t('activeCompany')} sx={isDesktop ? onDarkSurface : undefined} />
+      )}
+    />
+  )
+
+  const scopeToggle = (
+    <ToggleButtonGroup
+      size="small"
+      exclusive
+      fullWidth={!isDesktop}
+      value={scopeMode}
+      onChange={handleScopeModeChange}
+      aria-label={t('companyScope.groupLabel')}
+      sx={
+        isDesktop
+          ? {
+              '.MuiToggleButton-root': { color: alpha('#fff', 0.85), borderColor: alpha('#fff', 0.45) },
+              '.MuiToggleButton-root.Mui-selected': { color: 'common.white', bgcolor: alpha('#fff', 0.18) },
+            }
+          : undefined
+      }
+    >
+      <ToggleButton value="single">{t('companyScope.single')}</ToggleButton>
+      <ToggleButton value="all">{t('companyScope.all')}</ToggleButton>
+      <ToggleButton value="location">{t('companyScope.location')}</ToggleButton>
+    </ToggleButtonGroup>
+  )
+
+  const locationCategorySelect = scopeMode === 'location' && (
+    <Autocomplete
+      size="small"
+      fullWidth
+      sx={{ width: isDesktop ? 220 : '100%' }}
+      options={locationOptions}
+      value={selectedLocationOption}
+      isOptionEqualToValue={(option, value) => option.id === value.id}
+      getOptionLabel={(option) => option.label}
+      noOptionsText={t('companyScope.noLocationCategories')}
+      onChange={(_, value) => handleSelectLocationCategory(value)}
+      renderInput={(params) => (
+        <TextField {...params} label={t('companyScope.locationCategory')} sx={isDesktop ? onDarkSurface : undefined} />
+      )}
+    />
   )
 
   const languageSelect = (
@@ -122,6 +222,8 @@ export function AppShell() {
         <>
           <Stack spacing={1.5} sx={{ px: 2, pt: 2, pb: 1 }}>
             {companySelect}
+            {scopeToggle}
+            {locationCategorySelect}
             {languageSelect}
           </Stack>
           <Divider sx={{ mt: 1 }} />
@@ -216,8 +318,10 @@ export function AppShell() {
           {/* On phones the company and language pickers live in the drawer — the
               header keeps the product name and the one destructive action. */}
           {isDesktop && (
-            <Stack direction="row" spacing={1} alignItems="center">
+            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" sx={{ rowGap: 1 }}>
               {companySelect}
+              {scopeToggle}
+              {locationCategorySelect}
               {languageSelect}
             </Stack>
           )}

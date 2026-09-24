@@ -15,7 +15,7 @@ test('prijava, aktivna kompanija i pristup izveštajima', async ({ page }) => {
   await page.getByLabel(/E-po/).fill('root@example.test')
   await page.getByLabel('Lozinka').fill('Strong-Test-123!')
   await page.getByRole('button', { name: 'Prijavi se' }).click()
-  await expect(page.getByRole('combobox', { name: 'Aktivna kompanija' })).toContainText('SZ Test')
+  await expect(page.getByRole('combobox', { name: 'Aktivna kompanija' })).toHaveValue('SZ Test')
   await page.locator('a[href="/reports"]').click()
   await expect(page.getByRole('heading', { name: 'Analize i izveštaji' })).toBeVisible()
 })
