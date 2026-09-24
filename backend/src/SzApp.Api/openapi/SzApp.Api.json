@@ -1882,9 +1882,8 @@
             }
           },
           {
-            "name": "page",
+            "name": "Page",
             "in": "query",
-            "required": true,
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -1895,9 +1894,51 @@
             }
           },
           {
-            "name": "pageSize",
+            "name": "PageSize",
             "in": "query",
-            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "PeriodYYMM",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "SupplierPartnerAccountId",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "HasExtraordinaryMarker",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "DocumentTypeId",
+            "in": "query",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -9864,6 +9905,9 @@
           "postedAmount",
           "invoiceDate",
           "transactionDate",
+          "supplierPartnerAccountId",
+          "documentTypeId",
+          "extraordinaryInvoiceMarker",
           "unitTypeIds",
           "rowVersion"
         ],
@@ -9938,6 +9982,28 @@
           "transactionDate": {
             "type": "string",
             "format": "date"
+          },
+          "supplierPartnerAccountId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "documentTypeId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "extraordinaryInvoiceMarker": {
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "unitTypeIds": {
             "type": "array",

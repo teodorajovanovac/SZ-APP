@@ -16,6 +16,7 @@ import type {
 export const masterDataKeys = {
   company: (companyId: number) => ['master-data', companyId, 'company'] as const,
   locationCategories: (companyId: number) => ['master-data', companyId, 'location-categories'] as const,
+  shortLists: (companyId: number, tableName: string) => ['master-data', companyId, 'short-lists', tableName] as const,
   partners: (companyId: number, page: PageRequest) => ['master-data', companyId, 'partners', page] as const,
   addresses: (companyId: number, page: PageRequest) => ['master-data', companyId, 'addresses', page] as const,
   staffAccess: (companyId: number, page: PageRequest) => ['master-data', companyId, 'staff-access', page] as const,

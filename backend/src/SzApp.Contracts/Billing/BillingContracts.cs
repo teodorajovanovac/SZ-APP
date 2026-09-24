@@ -31,6 +31,9 @@ public sealed record SupplierInvoiceResponse(
     decimal PostedAmount,
     DateOnly InvoiceDate,
     DateOnly TransactionDate,
+    int SupplierPartnerAccountId,
+    int DocumentTypeId,
+    string? ExtraordinaryInvoiceMarker,
     IReadOnlyList<int> UnitTypeIds,
     string RowVersion);
 

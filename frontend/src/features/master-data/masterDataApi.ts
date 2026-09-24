@@ -19,6 +19,7 @@ import type {
   SavePartnerAccount,
   SaveStaffAccess,
   SaveUnit,
+  ShortListItem,
   StaffAccess,
   Unit,
 } from './types'
@@ -51,6 +52,10 @@ export const masterDataApi = {
       }),
     locationCategories: (companyId: number) =>
       apiRequest<LocationCategory[]>(`${companyBase(companyId)}/location-categories`),
+  },
+  shortLists: {
+    list: (companyId: number, tableName: string) =>
+      apiRequest<ShortListItem[]>(`${companyBase(companyId)}/short-lists/${tableName}`),
   },
   partners: {
     list: (companyId: number, request: PageRequest) =>

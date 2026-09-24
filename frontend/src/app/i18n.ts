@@ -324,6 +324,13 @@ export const resources = {
         buildingEntranceTitle: 'Ulaz',
         idSearchLabel: 'ID kompanije / broj konta',
       },
+      suppliersFilters: {
+        periodLabel: 'Period', periodAll: 'Svi periodi',
+        supplierLabel: 'Dobavljač',
+        markerLabel: 'Vanredni marker', markerAll: 'Svi', markerWith: 'Sa markerom', markerWithout: 'Bez markera',
+        documentTypeLabel: 'Tip dokumenta', documentTypeAll: 'Svi tipovi',
+        colSupplier: 'Dobavljač', colMarker: 'Marker', colDocumentType: 'Tip dokumenta',
+      },
     },
   },
   'sr-Cyrl': {
@@ -648,6 +655,13 @@ export const resources = {
         buildingEntranceTitle: 'Улаз',
         idSearchLabel: 'ID компаније / број конта',
       },
+      suppliersFilters: {
+        periodLabel: 'Период', periodAll: 'Сви периоди',
+        supplierLabel: 'Добављач',
+        markerLabel: 'Ванредни маркер', markerAll: 'Сви', markerWith: 'Са маркером', markerWithout: 'Без маркера',
+        documentTypeLabel: 'Тип документа', documentTypeAll: 'Сви типови',
+        colSupplier: 'Добављач', colMarker: 'Маркер', colDocumentType: 'Тип документа',
+      },
     },
   },
   en: {
@@ -971,6 +985,13 @@ export const resources = {
         unitTitle: 'Unit',
         buildingEntranceTitle: 'Entrance',
         idSearchLabel: 'Company Id / account number',
+      },
+      suppliersFilters: {
+        periodLabel: 'Period', periodAll: 'All periods',
+        supplierLabel: 'Supplier',
+        markerLabel: 'Extraordinary marker', markerAll: 'All', markerWith: 'With marker', markerWithout: 'Without marker',
+        documentTypeLabel: 'Document type', documentTypeAll: 'All types',
+        colSupplier: 'Supplier', colMarker: 'Marker', colDocumentType: 'Document type',
       },
     },
   },
