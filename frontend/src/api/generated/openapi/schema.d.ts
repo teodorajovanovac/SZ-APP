@@ -1417,9 +1417,13 @@ export interface paths {
         };
         get: {
             parameters: {
-                query: {
-                    page: number | string;
-                    pageSize: number | string;
+                query?: {
+                    Page?: number | string;
+                    PageSize?: number | string;
+                    PeriodYYMM?: number | string;
+                    SupplierPartnerAccountId?: number | string;
+                    HasExtraordinaryMarker?: boolean;
+                    DocumentTypeId?: number | string;
                 };
                 header?: never;
                 path: {
@@ -5803,6 +5807,11 @@ export interface components {
             invoiceDate: string;
             /** Format: date */
             transactionDate: string;
+            /** Format: int32 */
+            supplierPartnerAccountId: number | string;
+            /** Format: int32 */
+            documentTypeId: number | string;
+            extraordinaryInvoiceMarker: null | string;
             unitTypeIds: (number | string)[];
             rowVersion: string;
         };

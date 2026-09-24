@@ -39,6 +39,17 @@ export interface LocationCategory {
   sortIndex: number
 }
 
+export interface ShortListItem {
+  id: number
+  tableName: string
+  caption: string
+  shortName: string | null
+  description: string | null
+  indexValue: number
+  indexSort: number
+  indexKey: string | null
+}
+
 export interface Partner {
   id: number
   companyId: number

@@ -14,8 +14,18 @@ export interface SupplierInvoice {
   postedAmount: number
   invoiceDate: string
   transactionDate: string
+  supplierPartnerAccountId: number
+  documentTypeId: number
+  extraordinaryInvoiceMarker: string | null
   unitTypeIds: number[]
   rowVersion: string
+}
+
+export interface SupplierInvoiceFilters {
+  periodYYMM?: number
+  supplierPartnerAccountId?: number
+  hasExtraordinaryMarker?: boolean
+  documentTypeId?: number
 }
 
 export interface CreateSupplierInvoice {
@@ -27,10 +37,15 @@ export interface CreateSupplierInvoice {
   invoiceDescription: string | null; paymentReference: string | null; unitTypeIds: number[]
 }
 
-export function useSupplierInvoices(companyId: number, page = 1, pageSize = 25) {
+export function useSupplierInvoices(companyId: number, page = 1, pageSize = 25, filters: SupplierInvoiceFilters = {}) {
+  const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
+  if (filters.periodYYMM != null) params.set('periodYYMM', String(filters.periodYYMM))
+  if (filters.supplierPartnerAccountId != null) params.set('supplierPartnerAccountId', String(filters.supplierPartnerAccountId))
+  if (filters.hasExtraordinaryMarker != null) params.set('hasExtraordinaryMarker', String(filters.hasExtraordinaryMarker))
+  if (filters.documentTypeId != null) params.set('documentTypeId', String(filters.documentTypeId))
   return useQuery({
-    queryKey: ['companies', companyId, 'supplier-invoices', page, pageSize],
-    queryFn: () => apiRequest<BillingPage<SupplierInvoice>>(`/api/v1/companies/${companyId}/supplier-invoices?page=${page}&pageSize=${pageSize}`),
+    queryKey: ['companies', companyId, 'supplier-invoices', page, pageSize, filters],
+    queryFn: () => apiRequest<BillingPage<SupplierInvoice>>(`/api/v1/companies/${companyId}/supplier-invoices?${params.toString()}`),
   })
 }
 

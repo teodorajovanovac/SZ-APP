@@ -314,6 +314,13 @@ export const resources = {
         empty: 'Nema ugovora za zadate filtere.',
         loadError: 'Ugovori nisu mogli da se učitaju.',
       },
+      suppliersFilters: {
+        periodLabel: 'Period', periodAll: 'Svi periodi',
+        supplierLabel: 'Dobavljač',
+        markerLabel: 'Vanredni marker', markerAll: 'Svi', markerWith: 'Sa markerom', markerWithout: 'Bez markera',
+        documentTypeLabel: 'Tip dokumenta', documentTypeAll: 'Svi tipovi',
+        colSupplier: 'Dobavljač', colMarker: 'Marker', colDocumentType: 'Tip dokumenta',
+      },
     },
   },
   'sr-Cyrl': {
@@ -628,6 +635,13 @@ export const resources = {
         empty: 'Нема уговора за задате филтере.',
         loadError: 'Уговори нису могли да се учитају.',
       },
+      suppliersFilters: {
+        periodLabel: 'Период', periodAll: 'Сви периоди',
+        supplierLabel: 'Добављач',
+        markerLabel: 'Ванредни маркер', markerAll: 'Сви', markerWith: 'Са маркером', markerWithout: 'Без маркера',
+        documentTypeLabel: 'Тип документа', documentTypeAll: 'Сви типови',
+        colSupplier: 'Добављач', colMarker: 'Маркер', colDocumentType: 'Тип документа',
+      },
     },
   },
   en: {
@@ -941,6 +955,13 @@ export const resources = {
         colUnitType: 'Unit type',
         empty: 'No contracts match the current filters.',
         loadError: 'Contracts could not be loaded.',
+      },
+      suppliersFilters: {
+        periodLabel: 'Period', periodAll: 'All periods',
+        supplierLabel: 'Supplier',
+        markerLabel: 'Extraordinary marker', markerAll: 'All', markerWith: 'With marker', markerWithout: 'Without marker',
+        documentTypeLabel: 'Document type', documentTypeAll: 'All types',
+        colSupplier: 'Supplier', colMarker: 'Marker', colDocumentType: 'Document type',
       },
     },
   },
