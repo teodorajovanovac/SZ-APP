@@ -23,6 +23,7 @@ import { EmailPage } from '../features/email'
 import { PlatformAdministrationPage } from '../features/administration/PlatformAdministrationPage'
 import { ReportsPage } from '../features/reports/ReportsPage'
 import { EtlRunsPage } from '../features/imports/EtlRunsPage'
+import { LedgerCardsPage } from '../features/ledger-cards/LedgerCardsPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -60,6 +61,7 @@ function AuthenticatedRoutes() {
           <Route path="suppliers" element={<SupplierRoute />} />
           <Route path="ledger" element={<LedgerRoute />} />
           <Route path="banking" element={<LedgerRoute />} />
+          <Route path="kartice" element={<LedgerCardsPage />} />
           <Route path="notices" element={<NoticesRoute />} />
           <Route path="documents" element={<DocumentsRoute />} />
           <Route path="email" element={<EmailRoute />} />
