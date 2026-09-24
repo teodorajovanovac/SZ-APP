@@ -68,7 +68,7 @@ export function useMenu(companyId: number) {
 
 /** Groups the flat, role-filtered menu list into top-level entries with their children. */
 export function buildMenuGroups(items: MenuItemDto[] | undefined): MenuGroup[] {
-  if (!items) return []
+  if (!Array.isArray(items)) return []
   const topLevel = [...items.filter((item) => item.parentId === null)].sort((a, b) => a.sortIndex - b.sortIndex)
   return topLevel.map((item) => ({
     item,
