@@ -60,6 +60,15 @@ export function usePartners(companyId: number, page: PageRequest) {
   })
 }
 
+export function usePartnerDetail(companyId: number, partnerId: number) {
+  return useQuery({
+    queryKey: ['master-data', companyId, 'partners', partnerId],
+    queryFn: () => masterDataApi.partners.get(companyId, partnerId),
+    enabled: companyId > 0 && partnerId > 0,
+    retry: false,
+  })
+}
+
 export function useSavePartner(companyId: number, partnerId?: number) {
   const queryClient = useQueryClient()
   return useMutation({
@@ -123,6 +132,15 @@ export function useBuildingEntrances(companyId: number, page: PageRequest) {
   return useQuery({ queryKey: masterDataKeys.buildingEntrances(companyId, page), queryFn: () => masterDataApi.buildingEntrances.list(companyId, page), enabled: companyId > 0, placeholderData: (previous) => previous })
 }
 
+export function useBuildingEntranceDetail(companyId: number, entranceId: number) {
+  return useQuery({
+    queryKey: ['master-data', companyId, 'building-entrances', entranceId],
+    queryFn: () => masterDataApi.buildingEntrances.get(companyId, entranceId),
+    enabled: companyId > 0 && entranceId > 0,
+    retry: false,
+  })
+}
+
 export function useSaveBuildingEntrance(companyId: number, entranceId?: number) {
   const queryClient = useQueryClient()
   return useMutation({
@@ -133,6 +151,15 @@ export function useSaveBuildingEntrance(companyId: number, entranceId?: number) 
 
 export function useUnits(companyId: number, page: PageRequest) {
   return useQuery({ queryKey: masterDataKeys.units(companyId, page), queryFn: () => masterDataApi.units.list(companyId, page), enabled: companyId > 0, placeholderData: (previous) => previous })
+}
+
+export function useUnitDetail(companyId: number, unitId: number) {
+  return useQuery({
+    queryKey: ['master-data', companyId, 'units', unitId],
+    queryFn: () => masterDataApi.units.get(companyId, unitId),
+    enabled: companyId > 0 && unitId > 0,
+    retry: false,
+  })
 }
 
 export function useSaveUnit(companyId: number, unitId?: number) {

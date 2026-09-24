@@ -23,20 +23,18 @@ import type { ContractOverviewRow, ContractsMode } from './types'
 export function ContractsPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const { scope } = useCompanyScope()
+  const { scope, setScope } = useCompanyScope()
   const scopeParams = companyScopeToQueryParams(scope)
 
-  const [companyIdInput, setCompanyIdInput] = useState('')
-  const [partnerAccountInput, setPartnerAccountInput] = useState('')
+  const [idInput, setIdInput] = useState('')
   const [search, setSearch] = useState('')
   const [isActive, setIsActive] = useState(true)
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 25 })
   const [sorting] = useState<SortingState>([])
 
-  // Boss's spec has two dedicated id boxes (Company Id / PartnerAccount broj) but
-  // the backend has a single idSearch param that ORs across both columns - whichever
-  // box has text wins; Company Id takes priority if both are filled.
-  const idSearch = companyIdInput.trim() || partnerAccountInput.trim() || undefined
+  // One combined field: the backend's idSearch param already ORs Company.Id and
+  // PartnerAccount.AccountNumber, so a single input is all the UI needs.
+  const idSearch = idInput.trim() || undefined
 
   const contracts = useContracts({
     mode: (scopeParams.mode as ContractsMode | undefined) ?? 'single',
@@ -85,26 +83,42 @@ export function ContractsPage() {
         header: t('contracts_.colCompanyShortName'),
         accessorKey: 'companyShortName',
         cell: ({ row }) => (
-          <ClickableCell onClick={() => navigate('/companies')}>{row.original.companyShortName}</ClickableCell>
+          <ClickableCell
+            onClick={() => {
+              setScope({ mode: 'single', companyId: row.original.companyId })
+              navigate('/companies')
+            }}
+          >
+            {row.original.companyShortName}
+          </ClickableCell>
         ),
       },
       {
         id: 'buildingEntranceName',
         header: t('contracts_.colBuildingEntrance'),
         accessorKey: 'buildingEntranceName',
-        // No detail page exists for a single building entrance today - plain text,
-        // not a link (see report for the drill-through gap).
-        cell: ({ row }) => row.original.buildingEntranceName ?? '—',
+        cell: ({ row }) =>
+          row.original.buildingEntranceId != null ? (
+            <ClickableCell
+              onClick={() => navigate(`/building-entrances/${row.original.companyId}/${row.original.buildingEntranceId}`)}
+            >
+              {row.original.buildingEntranceName ?? `#${row.original.buildingEntranceId}`}
+            </ClickableCell>
+          ) : (
+            row.original.buildingEntranceName ?? '—'
+          ),
       },
       {
         id: 'partnerName',
         header: t('contracts_.colPartner'),
         accessorKey: 'partnerName',
         cell: ({ row }) =>
-          row.original.partnerName ? (
-            <ClickableCell onClick={() => navigate('/partners')}>{row.original.partnerName}</ClickableCell>
+          row.original.partnerId != null ? (
+            <ClickableCell onClick={() => navigate(`/partners/${row.original.companyId}/${row.original.partnerId}`)}>
+              {row.original.partnerName ?? `#${row.original.partnerId}`}
+            </ClickableCell>
           ) : (
-            '—'
+            row.original.partnerName ?? '—'
           ),
       },
       {
@@ -112,7 +126,9 @@ export function ContractsPage() {
         header: t('contracts_.colUnit'),
         accessorKey: 'unitName',
         cell: ({ row }) => (
-          <ClickableCell onClick={() => navigate('/units')}>{row.original.unitName ?? `#${row.original.unitId}`}</ClickableCell>
+          <ClickableCell onClick={() => navigate(`/units/${row.original.companyId}/${row.original.unitId}`)}>
+            {row.original.unitName ?? `#${row.original.unitId}`}
+          </ClickableCell>
         ),
       },
       {
@@ -123,7 +139,7 @@ export function ContractsPage() {
         cell: ({ row }) => row.original.unitTypeName ?? '—',
       },
     ],
-    [navigate, t],
+    [navigate, setScope, t],
   )
 
   return (
@@ -133,19 +149,10 @@ export function ContractsPage() {
       </Typography>
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
         <TextField
-          label={t('contracts_.companyIdSearchLabel')}
-          value={companyIdInput}
+          label={t('masterDataDetail_.idSearchLabel')}
+          value={idInput}
           onChange={(event) => {
-            setCompanyIdInput(event.target.value)
-            setPagination((value) => ({ ...value, pageIndex: 0 }))
-          }}
-          size="small"
-        />
-        <TextField
-          label={t('contracts_.partnerAccountSearchLabel')}
-          value={partnerAccountInput}
-          onChange={(event) => {
-            setPartnerAccountInput(event.target.value)
+            setIdInput(event.target.value)
             setPagination((value) => ({ ...value, pageIndex: 0 }))
           }}
           size="small"

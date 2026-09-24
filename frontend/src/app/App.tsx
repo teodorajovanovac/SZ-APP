@@ -15,6 +15,9 @@ import { AppShell } from './AppShell'
 import { theme } from './theme'
 import { useActiveCompany } from '../features/companies/useActiveCompany'
 import { AddressesPage, CompanyPage, PartnersPage, StaffPage, UnitsPage } from '../features/master-data/MasterDataPages'
+import { BuildingEntranceDetailPage } from '../features/master-data/pages/BuildingEntranceDetailPage'
+import { PartnerDetailPage } from '../features/master-data/pages/PartnerDetailPage'
+import { UnitDetailPage } from '../features/master-data/pages/UnitDetailPage'
 import { ContractsPage } from '../features/contracts/ContractsPage'
 import { BillingWorkspace } from '../features/billing/BillingWorkspace'
 import { SupplierInvoiceList } from '../features/suppliers/SupplierInvoiceList'
@@ -60,6 +63,9 @@ function AuthenticatedRoutes() {
             </Route>
             <Route path="units" element={<UnitsPage />} />
             <Route path="contracts" element={<ContractsPage />} />
+            <Route path="partners/:companyId/:partnerId" element={<PartnerDetailPage />} />
+            <Route path="units/:companyId/:unitId" element={<UnitDetailPage />} />
+            <Route path="building-entrances/:companyId/:entranceId" element={<BuildingEntranceDetailPage />} />
             <Route path="billing" element={<BillingRoute />} />
             <Route path="suppliers" element={<SupplierRoute />} />
             <Route path="ledger" element={<LedgerRoute />} />

@@ -96,6 +96,7 @@ public static class ContractsOverviewEndpoints
                     ((contract.Unit.BuildingEntrance.EntranceName != null && EF.Functions.Like(contract.Unit.BuildingEntrance.EntranceName, like, "\\")) ||
                      (contract.Unit.BuildingEntrance.BuildingName != null && EF.Functions.Like(contract.Unit.BuildingEntrance.BuildingName, like, "\\")))) ||
                 (contract.OwnerPartner != null && EF.Functions.Like(contract.OwnerPartner.Name, like, "\\")) ||
+                (contract.OwnerPartner != null && contract.OwnerPartner.TaxNumber != null && EF.Functions.Like(contract.OwnerPartner.TaxNumber, like, "\\")) ||
                 (contract.Unit.Name != null && EF.Functions.Like(contract.Unit.Name, like, "\\")) ||
                 (contract.OwnerPartnerId != null && db.Set<PartnerCommunication>().Any(comm =>
                     comm.PartnerId == contract.OwnerPartnerId && EF.Functions.Like(comm.ValueNormalized, like, "\\"))));
