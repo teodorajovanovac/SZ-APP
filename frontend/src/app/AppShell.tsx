@@ -28,33 +28,9 @@ import { useTranslation } from 'react-i18next'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../features/auth/useAuth'
 import { useActiveCompany } from '../features/companies/useActiveCompany'
-import { navigationItems, type NavigationItem } from './navigation'
+import { buildMenuGroups, iconForName, useMenu } from './useMenu'
 
 const drawerWidth = 264
-
-// Seventeen flat links read as a wall. Grouping them by what the user is doing
-// (records / invoicing / books / system) makes the list scannable; the dashboard
-// stays ungrouped at the top. Any nav item not listed here falls into "system",
-// so adding a route to navigation.ts can never make it disappear from the menu.
-const navGroups: Array<{ titleKey: string | null; paths: string[] }> = [
-  { titleKey: null, paths: ['/'] },
-  { titleKey: 'shell.groupMasterData', paths: ['/companies', '/partners', '/addresses', '/staff', '/units', '/contracts'] },
-  { titleKey: 'shell.groupBilling', paths: ['/billing', '/suppliers', '/notices'] },
-  { titleKey: 'shell.groupAccounting', paths: ['/ledger', '/banking', '/reports'] },
-  { titleKey: 'shell.groupSystem', paths: ['/documents', '/email', '/imports', '/administration'] },
-]
-
-function groupItems(items: NavigationItem[]) {
-  const assigned = new Set(navGroups.flatMap((group) => group.paths))
-  return navGroups.map((group, index) => ({
-    titleKey: group.titleKey,
-    items: items.filter((item) =>
-      index === navGroups.length - 1 && !assigned.has(item.path)
-        ? true
-        : group.paths.includes(item.path),
-    ),
-  })).filter((group) => group.items.length > 0)
-}
 
 export function AppShell() {
   const theme = useTheme()
@@ -63,10 +39,10 @@ export function AppShell() {
   const { t, i18n } = useTranslation()
   const { user, logout } = useAuth()
   const { companies, activeCompany, selectCompany } = useActiveCompany()
-  const visibleItems = navigationItems.filter(
-    (item) => !item.roles || user?.roles.some((role) => item.roles?.includes(role)),
-  )
-  const groups = groupItems(visibleItems)
+  // Menu structure, captions and role filtering all come from the API now
+  // (core.MenuItem + Translation) so they can be edited without a frontend deploy.
+  const menu = useMenu(activeCompany.id)
+  const groups = buildMenuGroups(menu.data)
 
   const changeLanguage = async (language: string) => {
     localStorage.setItem('sz.language', language)
@@ -134,47 +110,52 @@ export function AppShell() {
         aria-label={t('navigation')}
         sx={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', px: 1.25, py: 1 }}
       >
-        {groups.map((group, index) => (
-          <List
-            key={group.titleKey ?? 'primary'}
-            dense
-            disablePadding
-            sx={{ mb: index === groups.length - 1 ? 0 : 0.5 }}
-            subheader={
-              group.titleKey ? (
-                <ListSubheader disableSticky sx={{ px: 1.5, pt: 1 }}>{t(group.titleKey)}</ListSubheader>
-              ) : undefined
-            }
-          >
-            {group.items.map((item) => {
-              const Icon = item.icon
-              return (
-                <ListItemButton
-                  key={item.path}
-                  component={NavLink}
-                  to={item.path}
-                  end={item.path === '/'}
-                  onClick={() => setMobileOpen(false)}
-                  sx={{
-                    minHeight: 40,
-                    mb: 0.25,
-                    color: 'text.primary',
-                    '&.active': {
-                      bgcolor: 'action.selected',
-                      color: 'primary.main',
-                      fontWeight: 700,
-                      '& .MuiListItemIcon-root': { color: 'primary.main' },
-                      '& .MuiListItemText-primary': { fontWeight: 700 },
-                    },
-                  }}
-                >
-                  <ListItemIcon><Icon fontSize="small" aria-hidden="true" /></ListItemIcon>
-                  <ListItemText primary={t(item.labelKey)} slotProps={{ primary: { variant: 'body2' } }} />
-                </ListItemButton>
-              )
-            })}
-          </List>
-        ))}
+        {groups.map((group, index) => {
+          // A top-level item with a Path (e.g. the dashboard) is a leaf, not a
+          // group header -- render it alone, ungrouped, like before.
+          const leaves = group.item.path ? [group.item] : group.children
+          return (
+            <List
+              key={group.item.id}
+              dense
+              disablePadding
+              sx={{ mb: index === groups.length - 1 ? 0 : 0.5 }}
+              subheader={
+                group.item.path ? undefined : (
+                  <ListSubheader disableSticky sx={{ px: 1.5, pt: 1 }}>{group.item.caption}</ListSubheader>
+                )
+              }
+            >
+              {leaves.map((leaf) => {
+                const Icon = iconForName(leaf.iconName)
+                return (
+                  <ListItemButton
+                    key={leaf.id}
+                    component={NavLink}
+                    to={leaf.path ?? '/'}
+                    end={leaf.path === '/'}
+                    onClick={() => setMobileOpen(false)}
+                    sx={{
+                      minHeight: 40,
+                      mb: 0.25,
+                      color: 'text.primary',
+                      '&.active': {
+                        bgcolor: 'action.selected',
+                        color: 'primary.main',
+                        fontWeight: 700,
+                        '& .MuiListItemIcon-root': { color: 'primary.main' },
+                        '& .MuiListItemText-primary': { fontWeight: 700 },
+                      },
+                    }}
+                  >
+                    <ListItemIcon><Icon fontSize="small" aria-hidden="true" /></ListItemIcon>
+                    <ListItemText primary={leaf.caption} slotProps={{ primary: { variant: 'body2' } }} />
+                  </ListItemButton>
+                )
+              })}
+            </List>
+          )
+        })}
       </Box>
       <Divider />
       <Stack direction="row" spacing={1.25} alignItems="center" sx={{ p: 2, flexShrink: 0 }}>
