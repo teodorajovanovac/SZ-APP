@@ -181,3 +181,15 @@ public sealed class Translation
     public Language Language { get; set; } = null!;
     public Company? Company { get; set; }
 }
+
+public sealed class MenuItem
+{
+    public int Id { get; set; }
+    public int? ParentId { get; set; }
+    public string ResourceKey { get; set; } = string.Empty; // e.g. "menu.contracts" -- looked up in Translations
+    public string? IconName { get; set; }   // MUI icon component name as a string, e.g. "Gavel"
+    public string? Path { get; set; }       // frontend route, e.g. "/contracts" -- null for a pure group header
+    public int SortIndex { get; set; }
+    public string? RequiredRoles { get; set; } // comma-separated role names, e.g. "Root,Upravnik" -- null = everyone
+    public MenuItem? Parent { get; set; }
+}

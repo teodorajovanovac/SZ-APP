@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SzApp.Data;
 
@@ -11,9 +12,11 @@ using SzApp.Data;
 namespace SzApp.Data.Migrations
 {
     [DbContext(typeof(SzAppDbContext))]
-    partial class SzAppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260924173759_AddMenuItems")]
+    partial class AddMenuItems
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
