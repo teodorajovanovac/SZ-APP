@@ -138,3 +138,15 @@ public sealed class TranslationConfiguration : IEntityTypeConfiguration<Translat
         e.HasOne(x => x.Language).WithMany().HasForeignKey(x => x.LanguageCode); e.HasOne(x => x.Company).WithMany().HasForeignKey(x => x.CompanyId);
     }
 }
+
+public sealed class MenuItemConfiguration : IEntityTypeConfiguration<MenuItem>
+{
+    public void Configure(EntityTypeBuilder<MenuItem> e)
+    {
+        e.ToTable("MenuItem", "core"); e.HasKey(x => x.Id); e.Property(x => x.Id).UseIdentityColumn();
+        e.Property(x => x.ResourceKey).HasMaxLength(100); e.Property(x => x.IconName).HasMaxLength(100); e.Property(x => x.Path).HasMaxLength(100);
+        e.Property(x => x.RequiredRoles).HasMaxLength(255);
+        e.HasIndex(x => new { x.ParentId, x.SortIndex });
+        e.HasOne(x => x.Parent).WithMany().HasForeignKey(x => x.ParentId);
+    }
+}

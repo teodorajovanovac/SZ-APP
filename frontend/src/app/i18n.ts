@@ -286,6 +286,16 @@ export const resources = {
         resultEmpty: 'Upit nije vratio nijedan red.',
         blockedLegacy: 'Legacy akcija je blokirana.',
       },
+      menu: {
+        ledgerCards: 'Kartice',
+      },
+      kartice: {
+        title: 'Konto kartica',
+        inProgress: 'Ova stranica je u razvoju.',
+        description: 'Kartica konta biće prikazana ovde nakon što izveštaj bude implementiran.',
+        params: 'Prosleđeni parametri',
+        noParams: 'Nijedan parametar nije prosleđen.',
+      },
     },
   },
   'sr-Cyrl': {
@@ -572,6 +582,16 @@ export const resources = {
         resultEmpty: 'Упит није вратио ниједан ред.',
         blockedLegacy: 'Legacy акција је блокирана.',
       },
+      menu: {
+        ledgerCards: 'Картице',
+      },
+      kartice: {
+        title: 'Конто картица',
+        inProgress: 'Ова страница је у развоју.',
+        description: 'Картица конта биће приказана овде након што извештај буде имплементиран.',
+        params: 'Прослеђени параметри',
+        noParams: 'Ниједан параметар није прослеђен.',
+      },
     },
   },
   en: {
@@ -857,6 +877,16 @@ export const resources = {
         resultTitle: 'Result',
         resultEmpty: 'The query returned no rows.',
         blockedLegacy: 'Legacy action is blocked.',
+      },
+      menu: {
+        ledgerCards: 'Ledger cards',
+      },
+      kartice: {
+        title: 'Ledger card',
+        inProgress: 'This page is still being built.',
+        description: 'The account ledger card will appear here once the report is implemented.',
+        params: 'Received parameters',
+        noParams: 'No parameters were passed.',
       },
     },
   },

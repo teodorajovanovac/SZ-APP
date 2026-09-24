@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SzApp.Data;
 
@@ -11,9 +12,11 @@ using SzApp.Data;
 namespace SzApp.Data.Migrations
 {
     [DbContext(typeof(SzAppDbContext))]
-    partial class SzAppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260924173759_AddMenuItems")]
+    partial class AddMenuItems
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1291,22 +1294,11 @@ namespace SzApp.Data.Migrations
                     b.Property<int?>("CompanyTypeId")
                         .HasColumnType("int");
 
-                    b.Property<string>("ExternalAccount")
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
-
                     b.Property<DateOnly?>("LedgerEntryDate")
                         .HasColumnType("date");
 
-                    b.Property<int?>("LocationCategoryId")
-                        .HasColumnType("int");
-
                     b.Property<int?>("ManagerId")
                         .HasColumnType("int");
-
-                    b.Property<string>("Note")
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
 
                     b.Property<int>("PartnerId")
                         .HasColumnType("int");
@@ -1317,8 +1309,8 @@ namespace SzApp.Data.Migrations
                         .HasColumnType("nvarchar(50)");
 
                     b.Property<string>("RelativeFolderName")
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
@@ -1331,17 +1323,12 @@ namespace SzApp.Data.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
-                    b.Property<int?>("SortIndex")
-                        .HasColumnType("int");
-
                     b.Property<int?>("VatTypeId")
                         .HasColumnType("int");
 
                     b.HasKey("Id");
 
                     b.HasIndex("CompanyTypeId");
-
-                    b.HasIndex("LocationCategoryId");
 
                     b.HasIndex("ManagerId");
 
@@ -4716,11 +4703,6 @@ namespace SzApp.Data.Migrations
                         .HasForeignKey("CompanyTypeId")
                         .OnDelete(DeleteBehavior.NoAction);
 
-                    b.HasOne("SzApp.Data.Entities.LocationCategory", "LocationCategory")
-                        .WithMany()
-                        .HasForeignKey("LocationCategoryId")
-                        .OnDelete(DeleteBehavior.NoAction);
-
                     b.HasOne("SzApp.Data.Entities.Partner", "Manager")
                         .WithMany()
                         .HasForeignKey("ManagerId")
@@ -4738,8 +4720,6 @@ namespace SzApp.Data.Migrations
                         .OnDelete(DeleteBehavior.NoAction);
 
                     b.Navigation("CompanyType");
-
-                    b.Navigation("LocationCategory");
 
                     b.Navigation("Manager");
 
