@@ -1,9 +1,11 @@
 import { ThemeProvider } from '@mui/material/styles'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import type { CurrentUser } from '../api/generated/client'
 import { AuthContext, type AuthContextValue } from '../features/auth/authContext'
 import { CompanyContext } from '../features/companies/companyContext'
+import { CompanyScopeContext } from '../features/companies/companyScopeContext'
 import { theme } from './theme'
 import { AppShell } from './AppShell'
 
@@ -26,21 +28,28 @@ const auth: AuthContextValue = {
 
 describe('AppShell', () => {
   it('izlaže landmark-e i skriva nedozvoljene stavke', () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     render(
       <ThemeProvider theme={theme}>
-        <MemoryRouter>
-          <AuthContext.Provider value={auth}>
-            <CompanyContext.Provider
-              value={{ companies: reviewUser.companies, activeCompany: reviewUser.companies[0]!, selectCompany: vi.fn() }}
-            >
-              <Routes>
-                <Route element={<AppShell />}>
-                  <Route index element={<h1>Kontrolna tabla</h1>} />
-                </Route>
-              </Routes>
-            </CompanyContext.Provider>
-          </AuthContext.Provider>
-        </MemoryRouter>
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter>
+            <AuthContext.Provider value={auth}>
+              <CompanyContext.Provider
+                value={{ companies: reviewUser.companies, activeCompany: reviewUser.companies[0]!, selectCompany: vi.fn() }}
+              >
+                <CompanyScopeContext.Provider
+                  value={{ scope: { mode: 'single', companyId: reviewUser.companies[0]!.id }, setScope: vi.fn() }}
+                >
+                  <Routes>
+                    <Route element={<AppShell />}>
+                      <Route index element={<h1>Kontrolna tabla</h1>} />
+                    </Route>
+                  </Routes>
+                </CompanyScopeContext.Provider>
+              </CompanyContext.Provider>
+            </AuthContext.Provider>
+          </MemoryRouter>
+        </QueryClientProvider>
       </ThemeProvider>,
     )
 
