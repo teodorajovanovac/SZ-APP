@@ -5,6 +5,7 @@ import type {
   BuildingEntrance,
   CompanyDetail,
   Contract,
+  LocationCategory,
   PageRequest,
   PagedResponse,
   Partner,
@@ -48,6 +49,8 @@ export const masterDataApi = {
         method: 'DELETE',
         headers: { 'If-Match': `"${rowVersion}"` },
       }),
+    locationCategories: (companyId: number) =>
+      apiRequest<LocationCategory[]>(`${companyBase(companyId)}/location-categories`),
   },
   partners: {
     list: (companyId: number, request: PageRequest) =>

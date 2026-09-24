@@ -81,6 +81,11 @@ public static class MasterDataFeatureExtensions
         {
             return Unprocessable("Upravnik mora biti postojeći globalni partner.");
         }
+        if (request.LocationCategoryId.HasValue && !await dbContext.Set<LocationCategory>().AnyAsync(
+                item => item.Id == request.LocationCategoryId, cancellationToken))
+        {
+            return Unprocessable("LocationCategoryId mora biti postojeća lokacijska kategorija.");
+        }
         await shortLists.EnsureTypeAsync(request.CompanyTypeId, "CompanyType", cancellationToken);
         await shortLists.EnsureTypeAsync(request.VatTypeId, "VatType", cancellationToken);
 
@@ -144,6 +149,11 @@ public static class MasterDataFeatureExtensions
                 cancellationToken))
         {
             return Unprocessable("Partner i upravnik moraju biti globalni ili pripadati istoj kompaniji.");
+        }
+        if (request.LocationCategoryId.HasValue && !await dbContext.Set<LocationCategory>().AnyAsync(
+                item => item.Id == request.LocationCategoryId, cancellationToken))
+        {
+            return Unprocessable("LocationCategoryId mora biti postojeća lokacijska kategorija.");
         }
         await shortLists.EnsureTypeAsync(request.CompanyTypeId, "CompanyType", cancellationToken);
         await shortLists.EnsureTypeAsync(request.VatTypeId, "VatType", cancellationToken);
@@ -654,6 +664,10 @@ public static class MasterDataFeatureExtensions
         company.CompanyTypeId,
         company.VatTypeId,
         company.LedgerEntryDate,
+        company.LocationCategoryId,
+        company.Note,
+        company.SortIndex,
+        company.ExternalAccount,
         Convert.ToBase64String(company.RowVersion));
 
     private static PartnerResponse ToResponse(Partner partner) => new(
@@ -687,6 +701,10 @@ public static class MasterDataFeatureExtensions
         company.CompanyTypeId = request.CompanyTypeId;
         company.VatTypeId = request.VatTypeId;
         company.LedgerEntryDate = request.LedgerEntryDate;
+        company.LocationCategoryId = request.LocationCategoryId;
+        company.Note = TrimToNull(request.Note);
+        company.SortIndex = request.SortIndex;
+        company.ExternalAccount = TrimToNull(request.ExternalAccount);
     }
 
     private static void Apply(Company company, UpdateCompanyRequest request) => Apply(
@@ -699,7 +717,11 @@ public static class MasterDataFeatureExtensions
             request.RelativeFolderName,
             request.CompanyTypeId,
             request.VatTypeId,
-            request.LedgerEntryDate));
+            request.LedgerEntryDate,
+            request.LocationCategoryId,
+            request.Note,
+            request.SortIndex,
+            request.ExternalAccount));
 
     private static void Apply(Partner partner, SavePartnerRequest request)
     {

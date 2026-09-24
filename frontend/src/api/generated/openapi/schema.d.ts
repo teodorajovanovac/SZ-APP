@@ -3889,6 +3889,39 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/location-categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/fiscal-years": {
         parameters: {
             query?: never;
@@ -4826,6 +4859,12 @@ export interface components {
             vatTypeId: null | number | string;
             /** Format: date */
             ledgerEntryDate: null | string;
+            /** Format: int32 */
+            locationCategoryId: null | number | string;
+            note: null | string;
+            /** Format: int32 */
+            sortIndex: null | number | string;
+            externalAccount: null | string;
         };
         CreateInterestRateRequest: {
             /** Format: date */
@@ -5702,6 +5741,12 @@ export interface components {
             vatTypeId: null | number | string;
             /** Format: date */
             ledgerEntryDate: null | string;
+            /** Format: int32 */
+            locationCategoryId: null | number | string;
+            note: null | string;
+            /** Format: int32 */
+            sortIndex: null | number | string;
+            externalAccount: null | string;
             rowVersion: string;
         };
     };

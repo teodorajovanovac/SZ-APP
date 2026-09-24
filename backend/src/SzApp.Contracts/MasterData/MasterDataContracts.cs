@@ -16,6 +16,10 @@ public sealed record CompanyDetailResponse(
     int? CompanyTypeId,
     int? VatTypeId,
     DateOnly? LedgerEntryDate,
+    int? LocationCategoryId,
+    string? Note,
+    int? SortIndex,
+    string? ExternalAccount,
     string RowVersion);
 
 public sealed record CreateCompanyRequest(
@@ -26,7 +30,11 @@ public sealed record CreateCompanyRequest(
     string? RelativeFolderName,
     int? CompanyTypeId,
     int? VatTypeId,
-    DateOnly? LedgerEntryDate);
+    DateOnly? LedgerEntryDate,
+    int? LocationCategoryId,
+    string? Note,
+    int? SortIndex,
+    string? ExternalAccount);
 
 public sealed record UpdateCompanyRequest(
     int PartnerId,
@@ -37,7 +45,13 @@ public sealed record UpdateCompanyRequest(
     int? CompanyTypeId,
     int? VatTypeId,
     DateOnly? LedgerEntryDate,
+    int? LocationCategoryId,
+    string? Note,
+    int? SortIndex,
+    string? ExternalAccount,
     string RowVersion);
+
+public sealed record LocationCategoryResponse(int Id, string Name, int? ParentId, int SortIndex);
 
 public sealed record PartnerResponse(
     int Id,

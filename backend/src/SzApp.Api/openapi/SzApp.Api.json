@@ -4469,6 +4469,18 @@
         }
       }
     },
+    "/api/v1/companies/{companyId}/location-categories": {
+      "get": {
+        "tags": [
+          "Platform"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/v1/companies/{companyId}/fiscal-years": {
       "get": {
         "tags": [
@@ -5947,7 +5959,11 @@
           "relativeFolderName",
           "companyTypeId",
           "vatTypeId",
-          "ledgerEntryDate"
+          "ledgerEntryDate",
+          "locationCategoryId",
+          "note",
+          "sortIndex",
+          "externalAccount"
         ],
         "type": "object",
         "properties": {
@@ -6004,6 +6020,36 @@
               "string"
             ],
             "format": "date"
+          },
+          "locationCategoryId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sortIndex": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "externalAccount": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -9796,6 +9842,10 @@
           "companyTypeId",
           "vatTypeId",
           "ledgerEntryDate",
+          "locationCategoryId",
+          "note",
+          "sortIndex",
+          "externalAccount",
           "rowVersion"
         ],
         "type": "object",
@@ -9853,6 +9903,36 @@
               "string"
             ],
             "format": "date"
+          },
+          "locationCategoryId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sortIndex": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "externalAccount": {
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "rowVersion": {
             "type": "string"

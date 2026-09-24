@@ -16,11 +16,16 @@ public sealed class Company
     public int? CompanyTypeId { get; set; }
     public int? VatTypeId { get; set; }
     public DateOnly? LedgerEntryDate { get; set; }
+    public int? LocationCategoryId { get; set; }
+    public string? Note { get; set; }
+    public int? SortIndex { get; set; }
+    public string? ExternalAccount { get; set; }
     public byte[] RowVersion { get; set; } = [];
     public Partner Partner { get; set; } = null!;
     public Partner? Manager { get; set; }
     public ShortList? CompanyType { get; set; }
     public ShortList? VatType { get; set; }
+    public LocationCategory? LocationCategory { get; set; }
     public ICollection<StaffAccess> StaffAccess { get; } = new List<StaffAccess>();
 }
 

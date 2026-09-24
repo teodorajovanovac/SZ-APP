@@ -10,7 +10,10 @@ public static class MasterDataValidation
         request.ManagerId,
         request.ShortName,
         request.PrintName,
-        request.RelativeFolderName);
+        request.RelativeFolderName,
+        request.LocationCategoryId,
+        request.Note,
+        request.ExternalAccount);
 
     public static Dictionary<string, string[]> Validate(UpdateCompanyRequest request)
     {
@@ -19,7 +22,10 @@ public static class MasterDataValidation
             request.ManagerId,
             request.ShortName,
             request.PrintName,
-            request.RelativeFolderName);
+            request.RelativeFolderName,
+            request.LocationCategoryId,
+            request.Note,
+            request.ExternalAccount);
         if (!ETagCodec.TryDecode(request.RowVersion, out _))
         {
             errors[nameof(request.RowVersion)] = ["RowVersion mora biti validan Base64 ETag."];
@@ -96,7 +102,10 @@ public static class MasterDataValidation
         int? managerId,
         string shortName,
         string printName,
-        string? relativeFolderName)
+        string? relativeFolderName,
+        int? locationCategoryId,
+        string? note,
+        string? externalAccount)
     {
         var errors = new Dictionary<string, string[]>(StringComparer.Ordinal);
         if (partnerId <= 0)
@@ -107,9 +116,15 @@ public static class MasterDataValidation
         {
             errors[nameof(managerId)] = ["ManagerId mora biti pozitivan kada je naveden."];
         }
+        if (locationCategoryId <= 0)
+        {
+            errors[nameof(locationCategoryId)] = ["LocationCategoryId mora biti pozitivan kada je naveden."];
+        }
         Required(errors, nameof(shortName), shortName, 50);
         Required(errors, nameof(printName), printName, 50);
         OptionalMax(errors, nameof(relativeFolderName), relativeFolderName, 50);
+        OptionalMax(errors, nameof(note), note, 255);
+        OptionalMax(errors, nameof(externalAccount), externalAccount, 255);
         return errors;
     }
 

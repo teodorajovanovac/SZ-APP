@@ -83,12 +83,15 @@ public sealed class SzAppDbContext(DbContextOptions<SzAppDbContext> options)
             entity.Property(x => x.ShortName).HasMaxLength(50);
             entity.Property(x => x.PrintName).HasMaxLength(50);
             entity.Property(x => x.RelativeFolderName).HasMaxLength(50);
+            entity.Property(x => x.Note).HasMaxLength(255);
+            entity.Property(x => x.ExternalAccount).HasMaxLength(255);
             entity.Property(x => x.RowVersion).IsRowVersion();
             entity.HasIndex(x => x.ShortName);
             entity.HasOne(x => x.Partner).WithMany().HasForeignKey(x => x.PartnerId);
             entity.HasOne(x => x.Manager).WithMany().HasForeignKey(x => x.ManagerId);
             entity.HasOne(x => x.CompanyType).WithMany().HasForeignKey(x => x.CompanyTypeId);
             entity.HasOne(x => x.VatType).WithMany().HasForeignKey(x => x.VatTypeId);
+            entity.HasOne(x => x.LocationCategory).WithMany().HasForeignKey(x => x.LocationCategoryId);
         });
 
         builder.Entity<Partner>(entity =>
