@@ -155,6 +155,7 @@ app.MapHealthChecks("/health/ready", new HealthCheckOptions
 }).AllowAnonymous();
 
 app.MapMasterDataEndpoints();
+app.MapContractsOverviewEndpoints();
 app.MapBillingEndpoints();
 app.MapLedgerBankingEndpoints();
 app.MapPlatformEndpoints();
