@@ -15,6 +15,7 @@ import { AppShell } from './AppShell'
 import { theme } from './theme'
 import { useActiveCompany } from '../features/companies/useActiveCompany'
 import { AddressesPage, CompanyPage, PartnersPage, StaffPage, UnitsPage } from '../features/master-data/MasterDataPages'
+import { ContractsPage } from '../features/contracts/ContractsPage'
 import { BillingWorkspace } from '../features/billing/BillingWorkspace'
 import { SupplierInvoiceList } from '../features/suppliers/SupplierInvoiceList'
 import { LedgerBankingPage } from '../features/ledger-banking/LedgerBankingPage'
@@ -58,7 +59,7 @@ function AuthenticatedRoutes() {
               <Route path="staff" element={<StaffPage />} />
             </Route>
             <Route path="units" element={<UnitsPage />} />
-            <Route path="contracts" element={<UnitsPage />} />
+            <Route path="contracts" element={<ContractsPage />} />
             <Route path="billing" element={<BillingRoute />} />
             <Route path="suppliers" element={<SupplierRoute />} />
             <Route path="ledger" element={<LedgerRoute />} />
