@@ -1291,11 +1291,22 @@ namespace SzApp.Data.Migrations
                     b.Property<int?>("CompanyTypeId")
                         .HasColumnType("int");
 
+                    b.Property<string>("ExternalAccount")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
                     b.Property<DateOnly?>("LedgerEntryDate")
                         .HasColumnType("date");
 
+                    b.Property<int?>("LocationCategoryId")
+                        .HasColumnType("int");
+
                     b.Property<int?>("ManagerId")
                         .HasColumnType("int");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
 
                     b.Property<int>("PartnerId")
                         .HasColumnType("int");
@@ -1306,8 +1317,8 @@ namespace SzApp.Data.Migrations
                         .HasColumnType("nvarchar(50)");
 
                     b.Property<string>("RelativeFolderName")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
 
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
@@ -1320,12 +1331,17 @@ namespace SzApp.Data.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<int?>("SortIndex")
+                        .HasColumnType("int");
+
                     b.Property<int?>("VatTypeId")
                         .HasColumnType("int");
 
                     b.HasKey("Id");
 
                     b.HasIndex("CompanyTypeId");
+
+                    b.HasIndex("LocationCategoryId");
 
                     b.HasIndex("ManagerId");
 
@@ -3260,6 +3276,44 @@ namespace SzApp.Data.Migrations
                     b.ToTable("LocationCategory", "core");
                 });
 
+            modelBuilder.Entity("SzApp.Data.Entities.MenuItem", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("IconName")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int?>("ParentId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Path")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("RequiredRoles")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("ResourceKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("SortIndex")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ParentId", "SortIndex");
+
+                    b.ToTable("MenuItem", "core");
+                });
+
             modelBuilder.Entity("SzApp.Data.Entities.OutboxMessage", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4662,6 +4716,11 @@ namespace SzApp.Data.Migrations
                         .HasForeignKey("CompanyTypeId")
                         .OnDelete(DeleteBehavior.NoAction);
 
+                    b.HasOne("SzApp.Data.Entities.LocationCategory", "LocationCategory")
+                        .WithMany()
+                        .HasForeignKey("LocationCategoryId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.HasOne("SzApp.Data.Entities.Partner", "Manager")
                         .WithMany()
                         .HasForeignKey("ManagerId")
@@ -4679,6 +4738,8 @@ namespace SzApp.Data.Migrations
                         .OnDelete(DeleteBehavior.NoAction);
 
                     b.Navigation("CompanyType");
+
+                    b.Navigation("LocationCategory");
 
                     b.Navigation("Manager");
 
@@ -5242,6 +5303,16 @@ namespace SzApp.Data.Migrations
             modelBuilder.Entity("SzApp.Data.Entities.LocationCategory", b =>
                 {
                     b.HasOne("SzApp.Data.Entities.LocationCategory", "Parent")
+                        .WithMany()
+                        .HasForeignKey("ParentId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.Navigation("Parent");
+                });
+
+            modelBuilder.Entity("SzApp.Data.Entities.MenuItem", b =>
+                {
+                    b.HasOne("SzApp.Data.Entities.MenuItem", "Parent")
                         .WithMany()
                         .HasForeignKey("ParentId")
                         .OnDelete(DeleteBehavior.NoAction);

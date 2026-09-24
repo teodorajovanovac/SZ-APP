@@ -81,13 +81,53 @@ public static class MasterDataFeatureExtensions
         {
             return Unprocessable("Upravnik mora biti postojeći globalni partner.");
         }
+        if (request.LocationCategoryId.HasValue && !await dbContext.Set<LocationCategory>().AnyAsync(
+                item => item.Id == request.LocationCategoryId, cancellationToken))
+        {
+            return Unprocessable("LocationCategoryId mora biti postojeća lokacijska kategorija.");
+        }
         await shortLists.EnsureTypeAsync(request.CompanyTypeId, "CompanyType", cancellationToken);
         await shortLists.EnsureTypeAsync(request.VatTypeId, "VatType", cancellationToken);
 
-        var company = new Company();
+        // Company.Id is assigned by the app, not left to auto-increment (boss's explicit
+        // requirement): max(Id)+1 by default, or a specific free Id when this Root-only caller
+        // (see MapPost registration below) supplies one. The column itself stays IDENTITY at the
+        // DB level (see the comment on its EF config) -- SET IDENTITY_INSERT lets us write an
+        // explicit value into it for this one insert without touching the schema.
+        int companyId;
+        if (request.Id.HasValue)
+        {
+            if (request.Id.Value <= 0)
+            {
+                return Unprocessable("Id mora biti pozitivan broj.");
+            }
+            if (await dbContext.Companies.AnyAsync(item => item.Id == request.Id.Value, cancellationToken))
+            {
+                return Results.Conflict(new { message = $"Kompanija sa Id {request.Id.Value} već postoji." });
+            }
+            companyId = request.Id.Value;
+        }
+        else
+        {
+            companyId = (await dbContext.Companies.MaxAsync(item => (int?)item.Id, cancellationToken) ?? 0) + 1;
+        }
+
+        var company = new Company { Id = companyId };
         Apply(company, request);
         dbContext.Companies.Add(company);
-        await dbContext.SaveChangesAsync(cancellationToken);
+
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("SET IDENTITY_INSERT core.Company ON", cancellationToken);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        finally
+        {
+            await dbContext.Database.ExecuteSqlRawAsync("SET IDENTITY_INSERT core.Company OFF", cancellationToken);
+        }
+        await transaction.CommitAsync(cancellationToken);
+
         SetETag(httpContext, company.RowVersion);
         return Results.Created($"/api/v1/companies/{company.Id}", ToResponse(company));
     }
@@ -144,6 +184,11 @@ public static class MasterDataFeatureExtensions
                 cancellationToken))
         {
             return Unprocessable("Partner i upravnik moraju biti globalni ili pripadati istoj kompaniji.");
+        }
+        if (request.LocationCategoryId.HasValue && !await dbContext.Set<LocationCategory>().AnyAsync(
+                item => item.Id == request.LocationCategoryId, cancellationToken))
+        {
+            return Unprocessable("LocationCategoryId mora biti postojeća lokacijska kategorija.");
         }
         await shortLists.EnsureTypeAsync(request.CompanyTypeId, "CompanyType", cancellationToken);
         await shortLists.EnsureTypeAsync(request.VatTypeId, "VatType", cancellationToken);
@@ -654,6 +699,10 @@ public static class MasterDataFeatureExtensions
         company.CompanyTypeId,
         company.VatTypeId,
         company.LedgerEntryDate,
+        company.LocationCategoryId,
+        company.Note,
+        company.SortIndex,
+        company.ExternalAccount,
         Convert.ToBase64String(company.RowVersion));
 
     private static PartnerResponse ToResponse(Partner partner) => new(
@@ -687,6 +736,10 @@ public static class MasterDataFeatureExtensions
         company.CompanyTypeId = request.CompanyTypeId;
         company.VatTypeId = request.VatTypeId;
         company.LedgerEntryDate = request.LedgerEntryDate;
+        company.LocationCategoryId = request.LocationCategoryId;
+        company.Note = TrimToNull(request.Note);
+        company.SortIndex = request.SortIndex;
+        company.ExternalAccount = TrimToNull(request.ExternalAccount);
     }
 
     private static void Apply(Company company, UpdateCompanyRequest request) => Apply(
@@ -699,7 +752,11 @@ public static class MasterDataFeatureExtensions
             request.RelativeFolderName,
             request.CompanyTypeId,
             request.VatTypeId,
-            request.LedgerEntryDate));
+            request.LedgerEntryDate,
+            request.LocationCategoryId,
+            request.Note,
+            request.SortIndex,
+            request.ExternalAccount));
 
     private static void Apply(Partner partner, SavePartnerRequest request)
     {

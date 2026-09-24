@@ -27,6 +27,7 @@ public static class PlatformFeatureExtensions
         companies.MapWorkflowEndpoints();
         companies.MapAdministrationEndpoints();
         companies.MapReferenceDataEndpoints();
+        companies.MapMenuEndpoints();
         return endpoints;
     }
 }

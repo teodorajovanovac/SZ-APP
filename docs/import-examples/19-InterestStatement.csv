@@ -1,0 +1,2 @@
+﻿Id;CompanyId;Account;Date;Amount;Balance;Days;Rate;Coefficient;Interest;PartnerAccountId;SubAccountId;InvoiceBatchId
+1;1;2040;31.1.2026.;3500,00;3500,00;30;10,0000;0,00821918;28,77;1;;1

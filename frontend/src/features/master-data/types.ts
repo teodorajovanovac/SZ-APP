@@ -23,10 +23,21 @@ export interface CompanyDetail {
   companyTypeId: number | null
   vatTypeId: number | null
   ledgerEntryDate: string | null
+  locationCategoryId: number | null
+  note: string | null
+  sortIndex: number | null
+  externalAccount: string | null
   rowVersion: string
 }
 
 export type SaveCompany = Omit<CompanyDetail, 'id' | 'rowVersion'> & { rowVersion?: string }
+
+export interface LocationCategory {
+  id: number
+  name: string
+  parentId: number | null
+  sortIndex: number
+}
 
 export interface Partner {
   id: number

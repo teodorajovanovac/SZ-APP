@@ -9,13 +9,18 @@ test('prijava, aktivna kompanija i pristup izveštajima', async ({ page }) => {
     if (url.pathname === '/api/v1/auth/login') { authenticated = true; return route.fulfill({ json: user }) }
     if (url.pathname === '/api/v1/auth/me') return authenticated ? route.fulfill({ json: user }) : route.fulfill({ status: 401, json: { status: 401, title: 'Unauthorized' } })
     if (url.pathname.endsWith('/analyses') || url.pathname.endsWith('/reports')) return route.fulfill({ json: [] })
+    if (url.pathname.endsWith('/menu')) return route.fulfill({ json: [
+      { id: 1, parentId: null, resourceKey: 'menu.dashboard', caption: 'Početna', iconName: 'Dashboard', path: '/', sortIndex: 0 },
+      { id: 11, parentId: null, resourceKey: 'menu.groupFinance', caption: 'Finansije', iconName: null, path: null, sortIndex: 1 },
+      { id: 15, parentId: 11, resourceKey: 'menu.reports', caption: 'Izveštaji', iconName: 'QueryStats', path: '/reports', sortIndex: 0 },
+    ] })
     return route.fulfill({ json: { items: [], page: 1, pageSize: 25, totalCount: 0 } })
   })
   await page.goto('/login')
   await page.getByLabel(/E-po/).fill('root@example.test')
   await page.getByLabel('Lozinka').fill('Strong-Test-123!')
   await page.getByRole('button', { name: 'Prijavi se' }).click()
-  await expect(page.getByRole('combobox', { name: 'Aktivna kompanija' })).toContainText('SZ Test')
+  await expect(page.getByRole('combobox', { name: 'Aktivna kompanija' })).toHaveValue('SZ Test')
   await page.locator('a[href="/reports"]').click()
   await expect(page.getByRole('heading', { name: 'Analize i izveštaji' })).toBeVisible()
 })

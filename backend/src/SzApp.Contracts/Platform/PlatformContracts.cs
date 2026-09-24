@@ -30,3 +30,5 @@ public sealed record TranslationResponse(long Id, string LanguageCode, string Re
 public sealed record SaveTranslationRequest(string LanguageCode, string ResourceKey, int? ResourceId, string Value);
 public sealed record ShortListResponse(int Id, string TableName, string Caption, string? ShortName, string? Description, int IndexValue, int IndexSort, string? IndexKey);
 public sealed record SaveShortListRequest(string TableName, string Caption, string? ShortName, string? Description, int IndexValue, int IndexSort, string? IndexKey);
+
+public sealed record MenuItemResponse(int Id, int? ParentId, string ResourceKey, string Caption, string? IconName, string? Path, int SortIndex);

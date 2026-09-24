@@ -1,0 +1,4 @@
+﻿Code;Name;IsActive;IsDefault;SortIndex
+srLat;Srpski (latinica);-1;-1;1
+srCyr;Srpski (ćirilica);-1;0;2
+en;English;-1;0;3

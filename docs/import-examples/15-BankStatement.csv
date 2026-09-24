@@ -1,0 +1,2 @@
+﻿Id;BankAccountId;StatementNumber;StatementSuffix;Date;PreviousBalance;NewBalance;Debit;Credit;CountDebitEntry;CountCreditEntry;Note;JournalEntryId;IsPosted
+1;1;12;;31.1.2026.;50000,00;53500,00;12000,00;15500,00;1;1;;0;0

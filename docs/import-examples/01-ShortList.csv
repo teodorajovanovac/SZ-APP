@@ -1,0 +1,4 @@
+﻿Id;TableName;Caption;ShortName;Description;IndexValue;IndexSort;IndexKey;TranslationId
+1;UnitType;Stan;Stan;;1;1;;0
+2;UnitType;Poslovni prostor;Lokal;;2;2;;0
+3;PartnerType;Fizičko lice;Fizičko lice;;1;1;;0

@@ -1,0 +1,2 @@
+﻿Id;CompanyId;PeriodYYMM;Caption;Month;Year;Place;IssueDate;ServiceDateFrom;ServiceDateTo;TransactionDate;DueDate;ExchangeRateNbs;JournalEntryId;EntryDate;StaffId;ExtraordinaryInvoiceMarker;BalanceAsOfDate;PreviousValueDate;IsInterestCalculated;PaymentPurpose
+1;1;2601;Januar 2026;1;2026;Beograd;5.2.2026.;1.1.2026.;31.1.2026.;5.2.2026.;20.2.2026.;117,5;0;5.2.2026.;1;;31.1.2026.;31.12.2025.;-1;Održavanje 01/2026
