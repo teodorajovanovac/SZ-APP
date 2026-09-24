@@ -122,7 +122,7 @@ public static class MasterDataValidation
         }
         Required(errors, nameof(shortName), shortName, 50);
         Required(errors, nameof(printName), printName, 50);
-        OptionalMax(errors, nameof(relativeFolderName), relativeFolderName, 50);
+        OptionalMax(errors, nameof(relativeFolderName), relativeFolderName, 255);
         OptionalMax(errors, nameof(note), note, 255);
         OptionalMax(errors, nameof(externalAccount), externalAccount, 255);
         return errors;

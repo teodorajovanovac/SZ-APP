@@ -79,10 +79,16 @@ public sealed class SzAppDbContext(DbContextOptions<SzAppDbContext> options)
         {
             entity.ToTable("Company", "core");
             entity.HasKey(x => x.Id);
+            // Stays an IDENTITY column at the DB/FK level -- rebuilding it as a plain column would
+            // require dropping and recreating every FK across the schema that references
+            // Company.Id (Unit, StaffAccess, Invoice, LedgerEntry, JournalEntry, ...), which SQL
+            // Server cannot do via ALTER COLUMN and is too risky to hand-write blind. Instead,
+            // CreateCompanyAsync assigns Id explicitly (max+1, or Root's chosen free Id) via
+            // SET IDENTITY_INSERT -- same effective behavior the boss asked for, zero schema risk.
             entity.Property(x => x.Id).UseIdentityColumn();
             entity.Property(x => x.ShortName).HasMaxLength(50);
             entity.Property(x => x.PrintName).HasMaxLength(50);
-            entity.Property(x => x.RelativeFolderName).HasMaxLength(50);
+            entity.Property(x => x.RelativeFolderName).HasMaxLength(255);
             entity.Property(x => x.Note).HasMaxLength(255);
             entity.Property(x => x.ExternalAccount).HasMaxLength(255);
             entity.Property(x => x.RowVersion).IsRowVersion();

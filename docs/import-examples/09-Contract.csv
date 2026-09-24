@@ -1,0 +1,2 @@
+﻿Id;AccountNumber;UnitId;OwnerPartnerId;InvoicePartnerId;TenetPartnerId;ContractDate;ContractEndDate;InvoiceStartDate;InvoiceEndDate;IsActive;Note;InvoiceDeliveryLocation;InvoiceDeliveryUnitId;InvoiceLegacyMasterId;IsPrintInvoiceMandatory;IsPrintInvoiceToPostOffice;IsPrintInvoiceSkiped;ExportExternalAccount
+1;1001;1;2;2;0;1.1.2026.;;1.1.2026.;;-1;;;0;0;-1;0;0;

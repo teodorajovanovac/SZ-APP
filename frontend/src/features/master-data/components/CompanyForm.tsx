@@ -65,7 +65,7 @@ export function CompanyForm({ companyId }: CompanyFormProps) {
           <TextField fullWidth size="small" label="Naziv za štampu" required value={printName} onChange={(event) => setPrintName(event.target.value)} slotProps={{ htmlInput: { maxLength: 50 } }} />
         </Grid>
         <Grid size={{ xs: 12, sm: 6 }}>
-          <TextField fullWidth size="small" label="Relativni folder" value={relativeFolderName} onChange={(event) => setRelativeFolderName(event.target.value)} slotProps={{ htmlInput: { maxLength: 50 } }} />
+          <TextField fullWidth size="small" label="Relativni folder" value={relativeFolderName} onChange={(event) => setRelativeFolderName(event.target.value)} slotProps={{ htmlInput: { maxLength: 255 } }} />
         </Grid>
         <Grid size={{ xs: 12, sm: 6 }}>
           <Autocomplete

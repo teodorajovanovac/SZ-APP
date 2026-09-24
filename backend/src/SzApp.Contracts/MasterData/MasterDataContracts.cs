@@ -34,7 +34,8 @@ public sealed record CreateCompanyRequest(
     int? LocationCategoryId,
     string? Note,
     int? SortIndex,
-    string? ExternalAccount);
+    string? ExternalAccount,
+    int? Id = null);
 
 public sealed record UpdateCompanyRequest(
     int PartnerId,

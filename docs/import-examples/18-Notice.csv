@@ -1,0 +1,2 @@
+﻿Id;NoticeBatchId;PartnerAccountId;UnpaidInvoiceCount;Debt;InvoiceText;IsActive;PaymentReference;AditionalCosts;Total
+1;0;1;2;7000,00;Neplaćeni računi za period 12/2025-01/2026;-1;;0;7000,00

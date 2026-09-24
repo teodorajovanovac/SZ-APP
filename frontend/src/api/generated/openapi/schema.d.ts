@@ -4865,6 +4865,8 @@ export interface components {
             /** Format: int32 */
             sortIndex: null | number | string;
             externalAccount: null | string;
+            /** Format: int32 */
+            id?: null | number | string;
         };
         CreateInterestRateRequest: {
             /** Format: date */
