@@ -53,6 +53,7 @@ Podaci SZ
         ** Partner.Name         otvara podatke o Partneru
         ** Unit.Name            otvara podatke o jedinci
         ** Unit.UnitTypeId > ShortList.ShortName (TableName:UnitType)  - ništa
+        
 
 Šifarnici 
     Partneri
