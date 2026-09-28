@@ -2843,7 +2843,77 @@
             }
           }
         }
-      },
+      }
+    },
+    "/api/v1/companies/{companyId}/interest/period-presets": {
+      "get": {
+        "tags": [
+          "Billing - Interest"
+        ],
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "periodYYMM",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "previousValueDate",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "balanceAsOfDate",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "dueDate",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterestPeriodPresetsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/companies/{companyId}/interest/runs": {
       "post": {
         "tags": [
           "Billing - Interest"
@@ -2864,7 +2934,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateInterestStatementRequest"
+                "$ref": "#/components/schemas/RunInterestRequest"
               }
             }
           },
@@ -2876,10 +2946,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/InterestStatementResponse"
-                  }
+                  "$ref": "#/components/schemas/InterestRunResponse"
                 }
               }
             }
@@ -3095,6 +3162,162 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/v1/companies/{companyId}/notice-additional-costs": {
+      "get": {
+        "tags": [
+          "Billing - Notice additional costs"
+        ],
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NoticeAditionalCostResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Billing - Notice additional costs"
+        ],
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveNoticeAditionalCostRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoticeAditionalCostResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/companies/{companyId}/notice-additional-costs/{id}": {
+      "put": {
+        "tags": [
+          "Billing - Notice additional costs"
+        ],
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveNoticeAditionalCostRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoticeAditionalCostResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Billing - Notice additional costs"
+        ],
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
           }
         }
       }
@@ -6847,70 +7070,6 @@
           }
         }
       },
-      "CreateInterestStatementRequest": {
-        "required": [
-          "account",
-          "principal",
-          "balance",
-          "partnerAccountId",
-          "subAccountId",
-          "invoiceBatchId",
-          "from",
-          "to"
-        ],
-        "type": "object",
-        "properties": {
-          "account": {
-            "type": "string"
-          },
-          "principal": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "balance": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "partnerAccountId": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32"
-          },
-          "subAccountId": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "invoiceBatchId": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32"
-          },
-          "from": {
-            "type": "string",
-            "format": "date"
-          },
-          "to": {
-            "type": "string",
-            "format": "date"
-          }
-        }
-      },
       "CreateInvoiceBatchRequest": {
         "required": [
           "periodYYMM",
@@ -7839,6 +7998,53 @@
           }
         }
       },
+      "InterestPeriodPresetResponse": {
+        "required": [
+          "key",
+          "start",
+          "end"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "start": {
+            "type": "string",
+            "format": "date"
+          },
+          "end": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "InterestPeriodPresetsResponse": {
+        "required": [
+          "defaultPreset",
+          "lastRunEnd",
+          "presets"
+        ],
+        "type": "object",
+        "properties": {
+          "defaultPreset": {
+            "type": "string"
+          },
+          "lastRunEnd": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "presets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InterestPeriodPresetResponse"
+            }
+          }
+        }
+      },
       "InterestRateResponse": {
         "required": [
           "id",
@@ -7873,6 +8079,57 @@
           }
         }
       },
+      "InterestRunResponse": {
+        "required": [
+          "invoiceBatchId",
+          "periodStart",
+          "periodEnd",
+          "rowCount",
+          "totalInterest",
+          "totals"
+        ],
+        "type": "object",
+        "properties": {
+          "invoiceBatchId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "periodStart": {
+            "type": "string",
+            "format": "date"
+          },
+          "periodEnd": {
+            "type": "string",
+            "format": "date"
+          },
+          "rowCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "totalInterest": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "totals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InterestTotalResponse"
+            }
+          }
+        }
+      },
       "InterestStatementResponse": {
         "required": [
           "id",
@@ -7885,6 +8142,7 @@
           "coefficient",
           "interest",
           "partnerAccountId",
+          "subAccountId",
           "invoiceBatchId"
         ],
         "type": "object",
@@ -7960,6 +8218,12 @@
             ],
             "format": "int32"
           },
+          "subAccountId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "invoiceBatchId": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
@@ -7967,6 +8231,35 @@
               "string"
             ],
             "format": "int32"
+          }
+        }
+      },
+      "InterestTotalResponse": {
+        "required": [
+          "partnerAccountId",
+          "subAccountId",
+          "interest"
+        ],
+        "type": "object",
+        "properties": {
+          "partnerAccountId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "subAccountId": {
+            "type": "string"
+          },
+          "interest": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
           }
         }
       },
@@ -8915,6 +9208,76 @@
           }
         }
       },
+      "NoticeAditionalCostResponse": {
+        "required": [
+          "id",
+          "dateStart",
+          "dateEnd",
+          "companyId",
+          "aditionalCostsLowerAmount",
+          "aditionalCostsLowerLimit",
+          "aditionalCostsUpperAmount",
+          "rowVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "dateStart": {
+            "type": "string",
+            "format": "date"
+          },
+          "dateEnd": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "companyId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "aditionalCostsLowerAmount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "aditionalCostsLowerLimit": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "aditionalCostsUpperAmount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "rowVersion": {
+            "type": "string"
+          }
+        }
+      },
       "NoticeBatchResponse": {
         "required": [
           "id",
@@ -8922,6 +9285,9 @@
           "date",
           "noticeTemplateId",
           "noticeTypeId",
+          "aditionalCostsLowerAmount",
+          "aditionalCostsLowerLimit",
+          "aditionalCostsUpperAmount",
           "rowVersion"
         ],
         "type": "object",
@@ -8956,6 +9322,33 @@
               "string"
             ],
             "format": "int32"
+          },
+          "aditionalCostsLowerAmount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "aditionalCostsLowerLimit": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "aditionalCostsUpperAmount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
           },
           "rowVersion": {
             "type": "string"
@@ -9153,7 +9546,6 @@
           "debt",
           "invoiceText",
           "paymentReference",
-          "additionalCosts",
           "lines"
         ],
         "type": "object",
@@ -9190,14 +9582,6 @@
           },
           "paymentReference": {
             "type": "string"
-          },
-          "additionalCosts": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
           },
           "lines": {
             "type": "array",
@@ -9805,6 +10189,32 @@
           }
         }
       },
+      "RunInterestRequest": {
+        "required": [
+          "invoiceBatchId",
+          "periodStart",
+          "periodEnd"
+        ],
+        "type": "object",
+        "properties": {
+          "invoiceBatchId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "periodStart": {
+            "type": "string",
+            "format": "date"
+          },
+          "periodEnd": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
       "RunReportRequest": {
         "required": [
           "parameters"
@@ -10222,6 +10632,64 @@
               "string"
             ],
             "format": "int32"
+          }
+        }
+      },
+      "SaveNoticeAditionalCostRequest": {
+        "required": [
+          "dateStart",
+          "dateEnd",
+          "isGlobal",
+          "aditionalCostsLowerAmount",
+          "aditionalCostsLowerLimit",
+          "aditionalCostsUpperAmount",
+          "rowVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "dateStart": {
+            "type": "string",
+            "format": "date"
+          },
+          "dateEnd": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "isGlobal": {
+            "type": "boolean"
+          },
+          "aditionalCostsLowerAmount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "aditionalCostsLowerLimit": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "aditionalCostsUpperAmount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "rowVersion": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -10955,6 +11423,9 @@
     },
     {
       "name": "Billing - Notice templates"
+    },
+    {
+      "name": "Billing - Notice additional costs"
     },
     {
       "name": "Billing - Notice batches"

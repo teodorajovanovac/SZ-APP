@@ -870,13 +870,12 @@ public sealed class BillingService(
             entity.AditionalCostsLowerAmount, entity.AditionalCostsLowerLimit, entity.AditionalCostsUpperAmount, Convert.ToBase64String(entity.RowVersion));
     }
 
-    internal async Task<NoticeCostRule[]> LoadNoticeCostRulesAsync(int? companyId, CancellationToken ct) =>
+    private async Task<NoticeCostRule[]> LoadNoticeCostRulesAsync(int? companyId, CancellationToken ct) =>
         await db.Set<NoticeAditionalCost>().AsNoTracking()
             .Where(x => x.CompanyId == null || x.CompanyId == companyId)
             .Select(x => new NoticeCostRule(x.Id, x.DateStart, x.DateEnd, x.CompanyId,
                 x.AditionalCostsLowerAmount, x.AditionalCostsLowerLimit, x.AditionalCostsUpperAmount))
             .ToArrayAsync(ct);
-    }
 
     public Task<NoticeGenerationResponse> GenerateNoticesAsync(int companyId, int batchId, GenerateNoticesRequest request, CancellationToken ct) =>
         ExecuteSerializableAsync(() => GenerateNoticesCoreAsync(companyId, batchId, request, ct), ct);
