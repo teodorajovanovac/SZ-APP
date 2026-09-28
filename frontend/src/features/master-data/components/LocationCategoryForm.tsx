@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { getErrorMessage } from '../../../api/problemDetails'
 import { masterDataApi } from '../masterDataApi'
+import { invalidateLocationCategories } from '../useMasterData'
 import type { LocationCategory, SaveLocationCategory } from '../types'
 
 interface LocationCategoryFormProps {
@@ -12,10 +13,6 @@ interface LocationCategoryFormProps {
   all: LocationCategory[]
   onSaved: () => void
 }
-
-// Location categories are global; every company's cached copy is stale after a change.
-export const invalidateLocationCategories = (queryClient: ReturnType<typeof useQueryClient>) =>
-  queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === 'master-data' && query.queryKey[2] === 'location-categories' })
 
 export function LocationCategoryForm({ companyId, category, all, onSaved }: LocationCategoryFormProps) {
   const { t } = useTranslation()
