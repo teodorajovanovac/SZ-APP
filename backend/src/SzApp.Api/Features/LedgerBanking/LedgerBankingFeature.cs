@@ -138,7 +138,8 @@ public static class LedgerBankingFeature
             IJournalPostingService service,
             CancellationToken cancellationToken) =>
             Results.Created("", await service.CreateDraftAsync(companyId, request, cancellationToken)))
-            .AddEndpointFilter<AntiforgeryEndpointFilter>();
+            .AddEndpointFilter<AntiforgeryEndpointFilter>()
+            .RequireAuthorization(SecurityConstants.CompanyWritePolicy);
 
         group.MapPost("/journal-entries/{id:int}/post", async (
             int companyId,
@@ -150,7 +151,8 @@ public static class LedgerBankingFeature
             Results.Ok(await service.PostAsync(
                 companyId, id, GetStaffId(principal), DecodeVersion(request.RowVersion), cancellationToken)))
             .AddEndpointFilter<IdempotencyKeyEndpointFilter>()
-            .AddEndpointFilter<AntiforgeryEndpointFilter>();
+            .AddEndpointFilter<AntiforgeryEndpointFilter>()
+            .RequireAuthorization(SecurityConstants.CompanyPostPolicy);
 
         group.MapPost("/journal-entries/{id:int}/reverse", async (
             int companyId,
@@ -162,7 +164,8 @@ public static class LedgerBankingFeature
             Results.Ok(await service.ReverseAsync(
                 companyId, id, GetStaffId(principal), DecodeVersion(request.RowVersion), cancellationToken)))
             .AddEndpointFilter<IdempotencyKeyEndpointFilter>()
-            .AddEndpointFilter<AntiforgeryEndpointFilter>();
+            .AddEndpointFilter<AntiforgeryEndpointFilter>()
+            .RequireAuthorization(SecurityConstants.CompanyPostPolicy);
     }
 
     private static void MapBankingEndpoints(RouteGroupBuilder group)
@@ -206,7 +209,8 @@ public static class LedgerBankingFeature
             CancellationToken cancellationToken) =>
             Results.Ok(await service.ImportAsync(companyId, request, cancellationToken)))
             .AddEndpointFilter<IdempotencyKeyEndpointFilter>()
-            .AddEndpointFilter<AntiforgeryEndpointFilter>();
+            .AddEndpointFilter<AntiforgeryEndpointFilter>()
+            .RequireAuthorization(SecurityConstants.CompanyWritePolicy);
 
         group.MapPost("/bank-statement-lines/{id:int}/match", async (
             int companyId,
@@ -215,7 +219,8 @@ public static class LedgerBankingFeature
             IBankStatementService service,
             CancellationToken cancellationToken) =>
             Results.Ok(await service.MatchAsync(companyId, id, request, cancellationToken)))
-            .AddEndpointFilter<AntiforgeryEndpointFilter>();
+            .AddEndpointFilter<AntiforgeryEndpointFilter>()
+            .RequireAuthorization(SecurityConstants.CompanyWritePolicy);
 
         group.MapPost("/bank-statement-lines/{id:int}/ignore", async (
             int companyId,
@@ -224,7 +229,8 @@ public static class LedgerBankingFeature
             IBankStatementService service,
             CancellationToken cancellationToken) =>
             Results.Ok(await service.IgnoreAsync(companyId, id, DecodeVersion(request.RowVersion), cancellationToken)))
-            .AddEndpointFilter<AntiforgeryEndpointFilter>();
+            .AddEndpointFilter<AntiforgeryEndpointFilter>()
+            .RequireAuthorization(SecurityConstants.CompanyWritePolicy);
 
         group.MapPost("/bank-statements/{id:int}/post", async (
             int companyId,
@@ -236,7 +242,8 @@ public static class LedgerBankingFeature
             Results.Ok(await service.PostAsync(
                 companyId, id, GetStaffId(principal), DecodeVersion(request.RowVersion), cancellationToken)))
             .AddEndpointFilter<IdempotencyKeyEndpointFilter>()
-            .AddEndpointFilter<AntiforgeryEndpointFilter>();
+            .AddEndpointFilter<AntiforgeryEndpointFilter>()
+            .RequireAuthorization(SecurityConstants.CompanyPostPolicy);
     }
 
     private static void MapCatalogueEndpoints(RouteGroupBuilder group)

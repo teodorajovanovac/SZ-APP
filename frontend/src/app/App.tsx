@@ -1,7 +1,8 @@
 import { CssBaseline } from '@mui/material'
 import { ThemeProvider } from '@mui/material/styles'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { api } from '../api/generated/client'
 import { AuthGate } from '../features/auth/AuthGate'
 import { AuthProvider } from '../features/auth/AuthProvider'
 import { LoginPage } from '../features/auth/LoginPage'
@@ -83,7 +84,20 @@ function AuthenticatedRoutes() {
   )
 }
 
-function useCompanyPermissions() { const { activeCompany } = useActiveCompany(); const { user } = useAuth(); return { companyId: activeCompany.id, canWrite: Boolean(user?.roles.some(role => role === 'Root' || role === 'Upravnik' || role === 'Moderator')) } }
+// SEC-02: canWrite must reflect the caller's StaffAccess role for the *active* company, not the
+// global ASP.NET Identity roles on the user (those are only ever assigned to Root -- see
+// Program.cs bootstrap -- so reading user.roles here made every non-Root staff member read-only
+// regardless of their per-company role). /companies/{id}/context returns the resolved role
+// (Root for platform admins, otherwise the StaffAccess row for that company).
+function useCompanyPermissions() {
+  const { activeCompany } = useActiveCompany()
+  const context = useQuery({
+    queryKey: ['companies', activeCompany.id, 'context'],
+    queryFn: () => api.companies.context(activeCompany.id),
+  })
+  const role = context.data?.role
+  return { companyId: activeCompany.id, canWrite: role === 'Root' || role === 'Upravnik' || role === 'Moderator' }
+}
 function AdministrationRoute() { const { companyId } = useCompanyPermissions(); return <PlatformAdministrationPage companyId={companyId} /> }
 function BillingRoute() { const { companyId, canWrite } = useCompanyPermissions(); return <BillingWorkspace companyId={companyId} canPost={canWrite} /> }
 function SupplierRoute() { const { companyId } = useCompanyPermissions(); return <SupplierInvoiceList companyId={companyId} /> }

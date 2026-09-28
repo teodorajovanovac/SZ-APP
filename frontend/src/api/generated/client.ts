@@ -12,6 +12,12 @@ export interface CompanySummary {
   registrationNumber?: string | null
 }
 
+export interface CompanyContext {
+  id: number
+  shortName: string
+  role: UserRole
+}
+
 export interface CurrentUser {
   id: number
   displayName: string
@@ -122,5 +128,6 @@ export const api = {
   },
   companies: {
     list: () => apiRequest<CompanySummary[]>('/api/v1/companies'),
+    context: (companyId: number) => apiRequest<CompanyContext>(`/api/v1/companies/${companyId}/context`),
   },
 }
