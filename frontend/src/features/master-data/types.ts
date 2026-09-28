@@ -132,10 +132,12 @@ export interface Unit {
   k4: number | null
   k5: number | null
   floorNumber: number | null
+  activeContractDate: string | null
+  activeContractEndDate: string | null
   rowVersion: string
 }
 
-export type SaveUnit = Omit<Unit, 'id' | 'companyId' | 'contractId' | 'rowVersion'> & { rowVersion?: string }
+export type SaveUnit = Omit<Unit, 'id' | 'companyId' | 'contractId' | 'activeContractDate' | 'activeContractEndDate' | 'rowVersion'> & { rowVersion?: string }
 
 export interface Contract {
   id: number

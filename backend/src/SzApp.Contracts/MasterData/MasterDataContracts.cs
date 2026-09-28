@@ -139,6 +139,8 @@ public sealed record UnitResponse(
     decimal? K4,
     decimal? K5,
     int? FloorNumber,
+    DateOnly? ActiveContractDate,
+    DateOnly? ActiveContractEndDate,
     string RowVersion);
 
 public sealed record SaveUnitRequest(
