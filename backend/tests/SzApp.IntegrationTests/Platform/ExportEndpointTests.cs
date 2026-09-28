@@ -13,7 +13,7 @@ public sealed class ExportEndpointTests(WebApplicationFactory<Program> factory) 
         factory.CreateClient(); // builds the host
         return factory.Services.GetRequiredService<EndpointDataSource>().Endpoints
             .OfType<RouteEndpoint>()
-            .Single(x => x.RoutePattern.RawText == route)
+            .Single(x => x.RoutePattern.RawText?.TrimEnd('/') == route)
             .Metadata.GetOrderedMetadata<IAuthorizeData>().ToArray();
     }
 
