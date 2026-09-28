@@ -5,6 +5,8 @@ import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
 import { getErrorMessage } from '../../api/problemDetails'
 import { ControlledTextField } from '../../shared/components/ControlledTextField'
+import { MoneyField } from '../../shared/components/MoneyField'
+import { currentPeriodYYMM, MonthYearField } from '../../shared/components/MonthYearField'
 import { useCreateInvoiceBatch } from './billingApi'
 
 const schema = z.object({
@@ -23,7 +25,7 @@ const schema = z.object({
   serviceDateTo: z.string().min(1),
   transactionDate: z.string().min(1),
   dueDate: z.string().min(1),
-  exchangeRateNbs: z.number().positive(),
+  exchangeRateNbs: z.number({ error: 'Kurs mora biti broj.' }).positive('Kurs mora biti pozitivan broj.'),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -42,7 +44,7 @@ export function InvoiceBatchForm({ companyId, onCreated }: { companyId: number; 
   const create = useCreateInvoiceBatch(companyId)
   const { control, handleSubmit, reset, formState } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { periodYYMM: 2601, caption: '', place: '', issueDate: '', serviceDateFrom: '', serviceDateTo: '', transactionDate: '', dueDate: '', exchangeRateNbs: 1 },
+    defaultValues: { periodYYMM: currentPeriodYYMM(), caption: '', place: '', issueDate: '', serviceDateFrom: '', serviceDateTo: '', transactionDate: '', dueDate: '', exchangeRateNbs: 1 },
   })
   const submit = async (value: FormValues) => {
     const month = value.periodYYMM % 100
@@ -60,7 +62,7 @@ export function InvoiceBatchForm({ companyId, onCreated }: { companyId: number; 
       <Grid container spacing={2} columnSpacing={3}>
         <SectionHeading>{t('billingUi.sectionIdentification')}</SectionHeading>
         <Grid size={{ xs: 12, sm: 4 }}>
-          <ControlledTextField control={control} name="periodYYMM" label={t('billing_.form.period')} type="number" required />
+          <MonthYearField control={control} name="periodYYMM" label={t('billing_.form.period')} required />
         </Grid>
         <Grid size={{ xs: 12, sm: 4 }}>
           <ControlledTextField control={control} name="caption" label={t('billing_.form.caption')} required />
@@ -88,7 +90,7 @@ export function InvoiceBatchForm({ companyId, onCreated }: { companyId: number; 
           <ControlledTextField control={control} name="dueDate" label={t('billing_.form.dueDate')} type="date" required />
         </Grid>
         <Grid size={{ xs: 12, sm: 6 }}>
-          <ControlledTextField control={control} name="exchangeRateNbs" label={t('billing_.form.exchangeRate')} type="number" required />
+          <MoneyField control={control} name="exchangeRateNbs" label={t('billing_.form.exchangeRate')} required />
         </Grid>
       </Grid>
       <Stack direction="row" justifyContent="flex-end">

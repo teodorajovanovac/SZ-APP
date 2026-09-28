@@ -1,25 +1,13 @@
 import { useMemo, useState } from 'react'
-import {
-  Alert,
-  Box,
-  Button,
-  Chip,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
-  Stack,
-  Tab,
-  Tabs,
-  Typography,
-} from '@mui/material'
+import { Alert, Box, Button, Chip, Stack, Tab, Tabs, Typography } from '@mui/material'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ColumnDef, PaginationState, SortingState } from '@tanstack/react-table'
 import { useTranslation } from 'react-i18next'
 import { useLocation } from 'react-router-dom'
 import { ApiProblemError } from '../../api/generated/client'
 import { useActiveCompany } from '../companies/useActiveCompany'
+import { formatDate } from '../../shared/format/date'
+import { ConfirmDialog } from '../../shared/components/ConfirmDialog'
 import { ServerDataTable } from '../../shared/components/ServerDataTable'
 import { ledgerBankingApi } from './ledgerBankingApi'
 import { canPostJournal, canPostStatement, formatMoney } from './ledgerBankingFormat'
@@ -72,7 +60,7 @@ function JournalPanel({ companyId, canPost }: { companyId: number; canPost: bool
   const queryClient = useQueryClient()
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 25 })
   const [sorting, setSorting] = useState<SortingState>([])
-  const [reverseTarget, setReverseTarget] = useState<JournalEntrySummary | null>(null)
+  const [pendingAction, setPendingAction] = useState<{ journal: JournalEntrySummary; reverse: boolean } | null>(null)
   const queryKey = ['ledger-journals', companyId, pagination]
   const journals = useQuery({
     queryKey,
@@ -88,7 +76,11 @@ function JournalPanel({ companyId, canPost }: { companyId: number; canPost: bool
   const columns = useMemo<ColumnDef<JournalEntrySummary>[]>(
     () => [
       { accessorKey: 'id', header: t('ledgerBanking.journalColumns.number') },
-      { accessorKey: 'postingDate', header: t('ledgerBanking.journalColumns.date') },
+      {
+        accessorKey: 'postingDate',
+        header: t('ledgerBanking.journalColumns.date'),
+        cell: ({ getValue }) => formatDate(getValue<string>()),
+      },
       {
         accessorKey: 'description',
         header: t('ledgerBanking.journalColumns.description'),
@@ -130,7 +122,7 @@ function JournalPanel({ companyId, canPost }: { companyId: number; canPost: bool
               size="small"
               variant="contained"
               disabled={mutation.isPending}
-              onClick={() => mutation.mutate({ journal: row.original, reverse: false })}
+              onClick={() => setPendingAction({ journal: row.original, reverse: false })}
             >
               {t('ledgerBanking.post')}
             </Button>
@@ -140,7 +132,7 @@ function JournalPanel({ companyId, canPost }: { companyId: number; canPost: bool
               variant="outlined"
               color="warning"
               disabled={mutation.isPending}
-              onClick={() => setReverseTarget(row.original)}
+              onClick={() => setPendingAction({ journal: row.original, reverse: true })}
             >
               {t('ledgerBanking.reverse')}
             </Button>
@@ -169,28 +161,26 @@ function JournalPanel({ companyId, canPost }: { companyId: number; canPost: bool
         emptyMessage={`${t('ledgerBanking.journalsEmptyTitle')} — ${t('ledgerBanking.journalsEmptyBody')}`}
         getRowId={(row) => String(row.id)}
       />
-      <Dialog open={reverseTarget !== null} onClose={() => setReverseTarget(null)}>
-        <DialogTitle>{t('ledgerBanking.reverseConfirmTitle')}</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            {t('ledgerBanking.reverseConfirmBody', { number: reverseTarget?.id })}
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setReverseTarget(null)}>{t('common.cancel')}</Button>
-          <Button
-            color="warning"
-            variant="contained"
-            disabled={mutation.isPending}
-            onClick={() => {
-              if (reverseTarget) mutation.mutate({ journal: reverseTarget, reverse: true })
-              setReverseTarget(null)
-            }}
-          >
-            {t('ledgerBanking.reverseConfirm')}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ConfirmDialog
+        open={pendingAction !== null}
+        title={pendingAction?.reverse ? t('ledgerBanking.reverseConfirmTitle') : t('ledgerBanking.postConfirmTitle')}
+        description={
+          pendingAction?.reverse
+            ? t('ledgerBanking.reverseConfirmBody', { number: pendingAction.journal.id })
+            : t('ledgerBanking.postConfirmBody', {
+                number: pendingAction?.journal.id,
+                amount: formatMoney(pendingAction?.journal.balance ?? 0, pendingAction?.journal.currency),
+              })
+        }
+        confirmLabel={pendingAction?.reverse ? t('ledgerBanking.reverseConfirm') : t('ledgerBanking.post')}
+        destructive={pendingAction?.reverse}
+        pending={mutation.isPending}
+        onClose={() => setPendingAction(null)}
+        onConfirm={() => {
+          if (pendingAction) mutation.mutate(pendingAction)
+          setPendingAction(null)
+        }}
+      />
     </Stack>
   )
 }
@@ -200,6 +190,7 @@ function StatementPanel({ companyId, canPost }: { companyId: number; canPost: bo
   const queryClient = useQueryClient()
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 25 })
   const [sorting, setSorting] = useState<SortingState>([])
+  const [pendingStatement, setPendingStatement] = useState<BankStatementSummary | null>(null)
   const statements = useQuery({
     queryKey: ['bank-statements', companyId, pagination],
     queryFn: () => ledgerBankingApi.statements.list(companyId, pagination.pageIndex, pagination.pageSize),
@@ -211,7 +202,11 @@ function StatementPanel({ companyId, canPost }: { companyId: number; canPost: bo
   const columns = useMemo<ColumnDef<BankStatementSummary>[]>(
     () => [
       { accessorKey: 'statementNumber', header: t('ledgerBanking.statementColumns.number') },
-      { accessorKey: 'date', header: t('ledgerBanking.statementColumns.date') },
+      {
+        accessorKey: 'date',
+        header: t('ledgerBanking.statementColumns.date'),
+        cell: ({ getValue }) => formatDate(getValue<string>()),
+      },
       { accessorKey: 'previousBalance', header: t('ledgerBanking.statementColumns.previousBalance'), cell: ({ getValue }) => formatMoney(getValue<number>()) },
       { accessorKey: 'debit', header: t('ledgerBanking.statementColumns.debit'), cell: ({ getValue }) => formatMoney(getValue<number>()) },
       { accessorKey: 'credit', header: t('ledgerBanking.statementColumns.credit'), cell: ({ getValue }) => formatMoney(getValue<number>()) },
@@ -237,7 +232,7 @@ function StatementPanel({ companyId, canPost }: { companyId: number; canPost: bo
               size="small"
               variant="contained"
               disabled={!canPostStatement(row.original) || post.isPending}
-              onClick={() => post.mutate(row.original)}
+              onClick={() => setPendingStatement(row.original)}
             >
               {t('ledgerBanking.post')}
             </Button>
@@ -264,6 +259,21 @@ function StatementPanel({ companyId, canPost }: { companyId: number; canPost: bo
         isLoading={statements.isLoading}
         emptyMessage={`${t('ledgerBanking.statementsEmptyTitle')} — ${t('ledgerBanking.statementsEmptyBody')}`}
         getRowId={(row) => String(row.id)}
+      />
+      <ConfirmDialog
+        open={pendingStatement !== null}
+        title={t('ledgerBanking.postStatementConfirmTitle')}
+        description={t('ledgerBanking.postStatementConfirmBody', {
+          number: pendingStatement?.statementNumber,
+          amount: formatMoney(pendingStatement?.newBalance ?? 0),
+        })}
+        confirmLabel={t('ledgerBanking.post')}
+        pending={post.isPending}
+        onClose={() => setPendingStatement(null)}
+        onConfirm={() => {
+          if (pendingStatement) post.mutate(pendingStatement)
+          setPendingStatement(null)
+        }}
       />
     </Stack>
   )

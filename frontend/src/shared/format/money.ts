@@ -7,3 +7,8 @@ export function formatMoney(value: number, currency = 'RSD') {
     maximumFractionDigits: 2,
   }).format(value)
 }
+
+/** Serbian plain-number formatting (grouped thousands, comma decimal) for non-money numeric cells. */
+export function formatNumber(value: number) {
+  return new Intl.NumberFormat('sr-Latn-RS', { maximumFractionDigits: 2 }).format(value)
+}

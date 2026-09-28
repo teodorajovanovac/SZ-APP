@@ -812,8 +812,18 @@ public static class MasterDataFeatureExtensions
         partner.RegistrationNumber = TrimToNull(request.RegistrationNumber);
         partner.TaxNumber = TrimToNull(request.TaxNumber);
         partner.Jbkjs = TrimToNull(request.Jbkjs);
-        partner.IdCardNumber = TrimToNull(request.IdCardNumber);
-        partner.Jmbg = TrimToNull(request.Jmbg);
+        // IdCardNumber/Jmbg are masked in PartnerResponse, so the client can never round-trip
+        // the real value back unchanged — unlike every other field here, null on these two
+        // means "leave as-is", not "clear it". Only overwrite when the client actually sent
+        // a value (the user typed a replacement).
+        if (request.IdCardNumber is not null)
+        {
+            partner.IdCardNumber = TrimToNull(request.IdCardNumber);
+        }
+        if (request.Jmbg is not null)
+        {
+            partner.Jmbg = TrimToNull(request.Jmbg);
+        }
         partner.PartnerTypeId = request.PartnerTypeId;
         partner.Language = request.Language.Trim();
         partner.Note = TrimToNull(request.Note);

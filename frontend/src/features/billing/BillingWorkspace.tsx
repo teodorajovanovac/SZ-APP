@@ -3,7 +3,9 @@ import { Alert, Box, Button, Link, Paper, Stack, Typography } from '@mui/materia
 import type { ColumnDef, PaginationState, SortingState } from '@tanstack/react-table'
 import { useTranslation } from 'react-i18next'
 import { getErrorMessage } from '../../api/problemDetails'
+import { formatDate } from '../../shared/format/date'
 import { formatMoney } from '../../shared/format/money'
+import { ConfirmDialog } from '../../shared/components/ConfirmDialog'
 import { FormDialog } from '../../shared/components/FormDialog'
 import { ServerDataTable } from '../../shared/components/ServerDataTable'
 import { useInvoiceBatches, useInvoices, usePostInvoiceBatch } from './billingApi'
@@ -18,6 +20,7 @@ export function BillingWorkspace({ companyId, canPost }: { companyId: number; ca
   const [invoicePagination, setInvoicePagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 25 })
   const [invoiceSorting, setInvoiceSorting] = useState<SortingState>([])
   const [openInvoiceId, setOpenInvoiceId] = useState<number>()
+  const [pendingBatch, setPendingBatch] = useState<InvoiceBatch | null>(null)
 
   const batches = useInvoiceBatches(companyId, batchPagination.pageIndex + 1, batchPagination.pageSize)
   const invoices = useInvoices(companyId, invoicePagination.pageIndex + 1, invoicePagination.pageSize)
@@ -37,7 +40,7 @@ export function BillingWorkspace({ companyId, canPost }: { companyId: number; ca
         meta: { align: 'right' },
         cell: ({ row }) =>
           canPost && row.original.status === 'Generated' ? (
-            <Button size="small" variant="outlined" disabled={post.isPending} onClick={() => post.mutate(row.original.id)}>
+            <Button size="small" variant="outlined" disabled={post.isPending} onClick={() => setPendingBatch(row.original)}>
               {t('billing_.post')}
             </Button>
           ) : null,
@@ -59,7 +62,12 @@ export function BillingWorkspace({ companyId, canPost }: { companyId: number; ca
         ),
       },
       { accessorKey: 'partnerName', header: t('billing_.columns.partner'), enableSorting: false, meta: { ellipsis: true } },
-      { accessorKey: 'issueDate', header: t('billing_.columns.date'), enableSorting: false },
+      {
+        accessorKey: 'issueDate',
+        header: t('billing_.columns.date'),
+        enableSorting: false,
+        cell: ({ getValue }) => formatDate(getValue<string>()),
+      },
       {
         accessorKey: 'invoiceTotal',
         header: t('billing_.columns.total'),
@@ -118,6 +126,19 @@ export function BillingWorkspace({ companyId, canPost }: { companyId: number; ca
       >
         {openInvoiceId !== undefined ? <InvoiceDetail companyId={companyId} invoiceId={openInvoiceId} /> : null}
       </FormDialog>
+
+      <ConfirmDialog
+        open={pendingBatch !== null}
+        title={t('billingUi.postConfirmTitle')}
+        description={t('billingUi.postConfirmBody', { period: pendingBatch?.periodYYMM, caption: pendingBatch?.caption })}
+        confirmLabel={t('billing_.post')}
+        pending={post.isPending}
+        onClose={() => setPendingBatch(null)}
+        onConfirm={() => {
+          if (pendingBatch) post.mutate(pendingBatch.id)
+          setPendingBatch(null)
+        }}
+      />
     </Stack>
   )
 }

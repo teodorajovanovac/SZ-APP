@@ -4,6 +4,7 @@ import type { ColumnDef, PaginationState, SortingState } from '@tanstack/react-t
 import { useTranslation } from 'react-i18next'
 import { getErrorMessage } from '../../api/problemDetails'
 import { formatMoney } from '../../shared/format/money'
+import { ConfirmDialog } from '../../shared/components/ConfirmDialog'
 import { ServerDataTable } from '../../shared/components/ServerDataTable'
 import { useNoticeCommand, useNotices } from './noticeApi'
 import type { Notice } from './noticeApi'
@@ -23,6 +24,7 @@ export function NoticeList({ companyId, canWrite }: { companyId: number; canWrit
   const query = useNotices(companyId, pagination.pageIndex + 1, pagination.pageSize)
   const command = useNoticeCommand(companyId)
   const error = query.error ?? command.error
+  const [pendingSend, setPendingSend] = useState<Notice | null>(null)
 
   const columns = useMemo<ColumnDef<Notice>[]>(
     () => [
@@ -60,7 +62,7 @@ export function NoticeList({ companyId, canWrite }: { companyId: number; canWrit
                 size="small"
                 variant="contained"
                 disabled={command.isPending}
-                onClick={() => command.mutate({ noticeId: row.original.id, command: 'send' })}
+                onClick={() => setPendingSend(row.original)}
               >
                 {t('notices_.send')}
               </Button>
@@ -91,6 +93,21 @@ export function NoticeList({ companyId, canWrite }: { companyId: number; canWrit
         isLoading={query.isLoading}
         emptyMessage={`${t('notices_.emptyTitle')} — ${t('notices_.emptyBody')}`}
         getRowId={(row) => String(row.id)}
+      />
+      <ConfirmDialog
+        open={pendingSend !== null}
+        title={t('notices_.sendConfirmTitle')}
+        description={t('notices_.sendConfirmBody', {
+          account: pendingSend?.partnerAccountId,
+          debt: formatMoney(pendingSend?.total ?? 0),
+        })}
+        confirmLabel={t('notices_.send')}
+        pending={command.isPending}
+        onClose={() => setPendingSend(null)}
+        onConfirm={() => {
+          if (pendingSend) command.mutate({ noticeId: pendingSend.id, command: 'send' })
+          setPendingSend(null)
+        }}
       />
     </Stack>
   )

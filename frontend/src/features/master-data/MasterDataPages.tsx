@@ -1,6 +1,7 @@
 import { Alert, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from '@mui/material'
 import { useTranslation } from 'react-i18next'
 import { useActiveCompany } from '../companies/useActiveCompany'
+import { formatDate } from '../../shared/format/date'
 import { AddressList, CompanyForm, PartnerList, StaffAccessList } from './index'
 import { useUnits } from './useMasterData'
 import type { Unit } from './types'
@@ -56,7 +57,7 @@ function UnitRow({ unit }: { unit: Unit }) {
       <TableCell>{unit.name ?? `#${unit.id}`}</TableCell>
       <TableCell>{unit.buildingEntranceId ?? '—'}</TableCell>
       <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>{unit.k1?.toFixed(2) ?? '—'}</TableCell>
-      <TableCell>{unit.activeContractDate ? `${unit.activeContractDate} – ${unit.activeContractEndDate ?? 'aktivno'}` : '—'}</TableCell>
+      <TableCell>{unit.activeContractDate ? `${formatDate(unit.activeContractDate)} – ${unit.activeContractEndDate ? formatDate(unit.activeContractEndDate) : 'aktivno'}` : '—'}</TableCell>
     </TableRow>
   )
 }
