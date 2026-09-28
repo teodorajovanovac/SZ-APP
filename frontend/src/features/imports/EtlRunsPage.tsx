@@ -7,6 +7,7 @@ import {
   Button,
   Chip,
   Divider,
+  Link,
   MenuItem,
   Paper,
   Skeleton,
@@ -22,6 +23,7 @@ import {
 } from '@mui/material'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
+import { Link as RouterLink } from 'react-router-dom'
 import { apiRequest } from '../../api/generated/client'
 import { useActiveCompany } from '../companies/useActiveCompany'
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog'
@@ -84,6 +86,7 @@ export function EtlRunsPage() {
       <Box component="header">
         <Typography component="h1" variant="h1">{t('imports_.title')}</Typography>
         <Typography color="text.secondary" sx={{ mt: 1, maxWidth: 720 }}>{t('imports_.subtitle')}</Typography>
+        <Link component={RouterLink} to="/export" sx={{ display: 'inline-block', mt: 1 }}>{t('export_.link')}</Link>
       </Box>
 
       {upload.isError || execute.isError ? <Alert severity="error">{t('imports_.importFailed')}</Alert> : null}

@@ -6,6 +6,8 @@ public static class SerbianLegacyValueParser
 {
     private static readonly CultureInfo SerbianLatin = CultureInfo.GetCultureInfo("sr-Latn-RS");
     private static readonly string[] DateFormats = ["d.M.yyyy", "dd.MM.yyyy", "d.M.yyyy.", "dd.MM.yyyy."];
+    private static readonly string[] DateTimeFormats =
+        ["d.M.yyyy H:mm:ss", "d.M.yyyy H:mm", "d.M.yyyy. H:mm:ss", "d.M.yyyy. H:mm"];
 
     public static decimal ParseDecimal(string value)
     {
@@ -41,6 +43,18 @@ public static class SerbianLegacyValueParser
                 out var result))
         {
             return result;
+        }
+
+        // ETL-07: LegacyCsvWriter exports datetime columns as "d.M.yyyy H:mm:ss" — accept that
+        // (and the Access "H:mm" variant) so an export round-trips; the time part is dropped.
+        if (DateTime.TryParseExact(
+                value.Trim(),
+                DateTimeFormats,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AllowWhiteSpaces,
+                out var withTime))
+        {
+            return DateOnly.FromDateTime(withTime);
         }
 
         throw new FormatException($"'{value}' nije datum u formatu d.M.yyyy.");

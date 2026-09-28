@@ -11,6 +11,7 @@ using SzApp.Api.Features.MasterData;
 using SzApp.Api.Features.Platform;
 using SzApp.Api.Features.Reports;
 using SzApp.Api.Features.Etl;
+using SzApp.Api.Features.Export;
 using SzApp.Api.Infrastructure;
 using SzApp.Api.Security;
 using SzApp.Contracts;
@@ -193,6 +194,7 @@ app.MapLedgerBankingEndpoints();
 app.MapPlatformEndpoints();
 app.MapReportsEndpoints();
 app.MapEtlEndpoints();
+app.MapExportEndpoints();
 
 var auth = app.MapGroup("/api/v1/auth").WithTags("Auth");
 
