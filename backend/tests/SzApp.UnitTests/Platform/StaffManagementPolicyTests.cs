@@ -9,11 +9,11 @@ public sealed class StaffManagementPolicyTests
 
     [Fact]
     public void Root_ManagesAnyoneElse_IncludingOtherRoots() =>
-        Assert.True(StaffManagementPolicy.CanManage(true, 1, [], 2, targetIsRoot: true, []));
+        Assert.True(StaffManagementPolicy.CanManage(true, 1, new HashSet<int>(), 2, targetIsRoot: true, []));
 
     [Fact]
     public void NobodyManagesTheirOwnAccount_EvenRoot() =>
-        Assert.False(StaffManagementPolicy.CanManage(true, 7, [], 7, true, []));
+        Assert.False(StaffManagementPolicy.CanManage(true, 7, new HashSet<int>(), 7, true, []));
 
     [Fact]
     public void Upravnik_ManagesStaffWhoseCompaniesAreAllHis() =>
@@ -33,7 +33,7 @@ public sealed class StaffManagementPolicyTests
 
     [Fact]
     public void NonAdmin_ManagesNobody() =>
-        Assert.False(StaffManagementPolicy.CanManage(false, 1, [], 9, false, [1]));
+        Assert.False(StaffManagementPolicy.CanManage(false, 1, new HashSet<int>(), 9, false, [1]));
 
     [Theory]
     [InlineData(true, true, null, true)]      // Root may create Root, no grant needed
