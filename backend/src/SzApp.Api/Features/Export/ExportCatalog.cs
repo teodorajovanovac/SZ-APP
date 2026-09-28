@@ -139,6 +139,7 @@ public static class ExportCatalog
         var columns = typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .Where(p => p.CanRead && p.GetIndexParameters().Length == 0 && IsScalar(p.PropertyType))
             .Where(p => only is null ? !SecretFragments.Any(f => p.Name.Contains(f, StringComparison.OrdinalIgnoreCase)) : only.Contains(p.Name))
+            .OrderBy(p => only is null ? 0 : Array.IndexOf(only, p.Name))
             .Select(p => new ExportColumn(rename?.GetValueOrDefault(p.Name) ?? p.Name, p, PersonalColumns.Contains(p.Name)))
             .ToArray();
         return new ExportTable(name, group, importTable, columns, (db, ids) => query(db, ids), (db, ids, ct) => Stream(query(db, ids).AsNoTracking(), ct), rowFilter);
