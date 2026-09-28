@@ -18,6 +18,7 @@ public sealed class SzAppDbContext(DbContextOptions<SzAppDbContext> options)
     public DbSet<StaffAccess> StaffAccess => Set<StaffAccess>();
     public DbSet<JournalEntry> JournalEntries => Set<JournalEntry>();
     public DbSet<LedgerEntry> LedgerEntries => Set<LedgerEntry>();
+    public DbSet<PostingPeriodLock> PostingPeriodLocks => Set<PostingPeriodLock>();
     public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<InvoiceLine> InvoiceLines => Set<InvoiceLine>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
@@ -174,7 +175,9 @@ public sealed class SzAppDbContext(DbContextOptions<SzAppDbContext> options)
         {
             entity.ToTable("LedgerEntry", "finance", table =>
             {
-                table.HasCheckConstraint("CK_LedgerEntry_Amounts", "[DebitAmount] >= 0 AND [CreditAmount] >= 0 AND NOT ([DebitAmount] > 0 AND [CreditAmount] > 0)");
+                // P9: storno is a NEGATIVE amount on the same side ("crveni storno"), so negatives
+                // are legal; a line still may not carry amounts on both sides.
+                table.HasCheckConstraint("CK_LedgerEntry_Amounts", "NOT ([DebitAmount] <> 0 AND [CreditAmount] <> 0)");
             });
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Id).UseIdentityColumn();
@@ -192,6 +195,23 @@ public sealed class SzAppDbContext(DbContextOptions<SzAppDbContext> options)
                 .HasPrincipalKey(x => new { x.Id, x.CompanyId });
             entity.HasOne(x => x.Company).WithMany().HasForeignKey(x => x.CompanyId);
             entity.HasOne(x => x.LineType).WithMany().HasForeignKey(x => x.LineTypeId);
+            entity.HasIndex(x => x.InvoiceId);
+            entity.HasIndex(x => x.SupplierInvoiceId);
+            entity.HasOne<Invoice>().WithMany().HasForeignKey(x => x.InvoiceId).OnDelete(DeleteBehavior.NoAction);
+            entity.HasOne<SzApp.Data.Entities.Billing.SupplierInvoice>().WithMany().HasForeignKey(x => x.SupplierInvoiceId).OnDelete(DeleteBehavior.NoAction);
+        });
+
+        builder.Entity<PostingPeriodLock>(entity =>
+        {
+            entity.ToTable("PostingPeriodLock", "finance", table =>
+                table.HasCheckConstraint("CK_PostingPeriodLock_Period", "[PeriodYYMM] BETWEEN 1001 AND 9912 AND [PeriodYYMM] % 100 BETWEEN 1 AND 12"));
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).UseIdentityColumn();
+            entity.Property(x => x.RowVersion).IsRowVersion();
+            entity.HasIndex(x => new { x.CompanyId, x.PeriodYYMM }).IsUnique().HasFilter("[UnlockedAt] IS NULL");
+            entity.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.NoAction);
+            entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.LockedByStaffId).OnDelete(DeleteBehavior.NoAction);
+            entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.UnlockedByStaffId).OnDelete(DeleteBehavior.NoAction);
         });
 
         builder.Entity<Invoice>(entity =>
