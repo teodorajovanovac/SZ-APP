@@ -41,7 +41,6 @@ export function NoticeCostsPanel({ companyId }: { companyId: number }) {
   const [editing, setEditing] = useState<NoticeCost | 'new'>()
   const [deleting, setDeleting] = useState<NoticeCost | null>(null)
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 25 })
-  const canEdit = (row: NoticeCost) => (row.companyId === null ? isRoot : canEditCompany)
   const rows = query.data ?? []
 
   const columns = useMemo<ColumnDef<NoticeCost>[]>(
@@ -56,7 +55,7 @@ export function NoticeCostsPanel({ companyId }: { companyId: number }) {
         id: 'actions',
         header: t('noticeCosts_.actions'),
         cell: ({ row }) =>
-          canEdit(row.original) ? (
+          (row.original.companyId === null ? isRoot : canEditCompany) ? (
             <Stack direction="row" spacing={1}>
               <Button size="small" onClick={() => setEditing(row.original)}>{t('noticeCosts_.edit')}</Button>
               <Button size="small" color="error" onClick={() => setDeleting(row.original)}>{t('noticeCosts_.delete')}</Button>
@@ -64,7 +63,6 @@ export function NoticeCostsPanel({ companyId }: { companyId: number }) {
           ) : null,
       },
     ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [t, isRoot, canEditCompany],
   )
 
