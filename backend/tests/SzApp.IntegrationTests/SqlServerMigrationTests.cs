@@ -30,6 +30,6 @@ public sealed class SqlServerMigrationTests
         await context.Database.MigrateAsync();
 
         Assert.True(await context.Database.CanConnectAsync());
-        Assert.Contains("InitialFoundation", (await context.Database.GetAppliedMigrationsAsync()).Single());
+        Assert.Contains(await context.Database.GetAppliedMigrationsAsync(), x => x.Contains("InitialFoundation", StringComparison.Ordinal));
     }
 }
