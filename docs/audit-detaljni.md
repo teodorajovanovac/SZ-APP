@@ -511,24 +511,28 @@ Račun (`Racun_006`, `_007`, bez duga, zakup, benefit) · Opomena (1 aktivan ša
 - **P11 — ODLUČENO: troškovi opomene su promenljivi po pragu, ne fiksni iznos.** Vremenom su se menjali i
   ponekad postoje 2 praga istovremeno (npr. do 35.000 jedan iznos, iznad drugi; danas granica 50.000,
   ispod 5.000, na/iznad 7.500). Kad je vrsta opomene samo „obaveštenje" (bez tipa opomene koji nosi trošak),
-  nema troška. → Nova tabela `NoticeAdditionalCosts` (vremenski i po-kompaniji parametrizovani pragovi):
+  nema troška. → Nova tabela `NoticeAditionalCosts` (vremenski i po-kompaniji parametrizovani pragovi) —
+  **šef je ovo već dodao u `docs/data-model.md` (commit `1a857fd`, 2026-09-27); pazi, naziv i kolone su
+  "Aditional" sa jednim "d", ne "Additional":**
   ```sql
-  CREATE TABLE notices.NoticeAdditionalCosts (
-      Id                          INT IDENTITY PRIMARY KEY,
-      DateStart                   DATE NOT NULL,
-      DateEnd                     DATE NULL,          -- NULL = aktivan period
-      CompanyId                   INT NULL REFERENCES core.Company(Id), -- NULL = važi za sve kompanije
-      AdditionalCostsLowerLimit   DECIMAL(18,2) NOT NULL, -- prag duga (npr. 50000)
-      AdditionalCostsLowerAmount  DECIMAL(18,2) NOT NULL, -- trošak ispod praga (npr. 5000)
-      AdditionalCostsUpperAmount  DECIMAL(18,2) NOT NULL  -- trošak na/iznad praga (npr. 7500)
-  );
+  CREATE TABLE [NoticeAditionalCosts]
+   (
+      [Id]			Long Integer,
+      [DateStart]		DateTime,
+      [DateEnd]		DateTime,  -- if null its active period
+      [CompanyId]		Long Integer,  -- if null its for all companies
+      [AditionalCostsLowerAmount]	Decimal(18,2),
+      [AditionalCostsLowerLimit]	Decimal(18,2),
+      [AditionalCostsUpperAmount]	Decimal(18,2),
+   );
   ```
-  Tumačenje: dug < `LowerLimit` → trošak = `LowerAmount`; dug ≥ `LowerLimit` → trošak = `UpperAmount`.
-  `NoticeBatch` dobija kopije istih 3 kolone (`AdditionalCostsLowerLimit/LowerAmount/UpperAmount`) — snimak
-  praga koji je važio u trenutku generisanja serije opomena (istorijski trag, kao i kod fakturisanja).
-  Opomene tipa "obaveštenje" (bez naplativog troška) prolaze kroz ovu logiku ali sa troškom 0 — potrebna je
-  posebna oznaka tipa opomene koja preskače trošak, ne novi if. Ovo je van `data-model.md` (šefova šema) —
-  treba da ga doda tamo; ovde je zavedeno kao radna specifikacija dok se ne uskladi.
+  Tumačenje: dug < `AditionalCostsLowerLimit` → trošak = `AditionalCostsLowerAmount`; dug ≥
+  `AditionalCostsLowerLimit` → trošak = `AditionalCostsUpperAmount`. `NoticeBatch` je takođe već dobio
+  kopije ista 3 polja (`AditionalCostsLowerAmount/LowerLimit/UpperAmount`) — snimak praga koji je važio
+  u trenutku generisanja serije opomena (istorijski trag, kao i kod fakturisanja). Opomene tipa
+  "obaveštenje" (bez naplativog troška) prolaze kroz ovu logiku ali sa troškom 0 — potrebna je posebna
+  oznaka tipa opomene koja preskače trošak, ne novi if. EF Core šema/migracija za obe tabele još nisu
+  implementirane — sledeći korak posle ovog hotfix talasa.
 - **P15 — napomena (ne kod):** izvezene 2 zgrade (251/252) su iz iste "glavne" strukture kojih ima **11 SZ**
   (+ 1 slična struktura koja zahteva ručnu proveru jer nema ista ažuriranja, + 1 „TC" SZ sa drugačijom
   strukturom podataka). Van toga: ~80 SZ vodi eksterni MaxiUpr i ~15 SZ (Belville, starije verzije) —
