@@ -68,7 +68,10 @@ public static class MasterDataValidation
         {
             errors[nameof(request.StaffId)] = ["StaffId mora biti pozitivan."];
         }
-        if (!Enum.TryParse<StaffRole>(request.StaffRole, true, out _))
+        // SEC-05: Enum.TryParse alone accepts any integer-looking string ("99") as a "successful"
+        // parse of an undefined enum value -- it only validates syntax, not membership. IsDefined
+        // is required to actually reject garbage.
+        if (!Enum.TryParse<StaffRole>(request.StaffRole, true, out var role) || !Enum.IsDefined(role))
         {
             errors[nameof(request.StaffRole)] = ["StaffRole mora biti Upravnik, Moderator ili Review."];
         }
