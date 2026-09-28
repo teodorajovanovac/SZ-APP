@@ -21,7 +21,8 @@ public interface IBankStatementService
 public sealed class BankStatementService(
     SzAppDbContext dbContext,
     LedgerMutationScope mutationScope,
-    TimeProvider timeProvider) : IBankStatementService
+    TimeProvider timeProvider,
+    PostingPeriodGuard periodGuard) : IBankStatementService
 {
     public async Task<BankStatementResponse> ImportAsync(
         int companyId,
@@ -245,6 +246,7 @@ public sealed class BankStatementService(
                 lineSources.Add((counterLine, bankLine));
             }
 
+            await periodGuard.EnsureOpenAsync(companyId, [statement.Date], cancellationToken); // FIN-01
             journal.Balance = LedgerBankingRules.ValidateJournal(
                 journal.Lines.Select(x => new PostingAmounts(x.DebitAmount, x.CreditAmount)));
             dbContext.JournalEntries.Add(journal);

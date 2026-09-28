@@ -47,7 +47,10 @@ public sealed record PostingLine(
     int? InvoiceId = null,
     int? SupplierInvoiceId = null,
     int? CollectionPriority = null,
-    string? Note = null);
+    string? Note = null,
+    int? BankStatementLineId = null,
+    int? ClosesDocumentType = null,
+    string? Description = null);
 
 /// <summary>One invoice's share of one supplier invoice (sum of that invoice's lines for it).</summary>
 public sealed record InvoicePostingSource(
