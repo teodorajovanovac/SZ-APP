@@ -55,6 +55,10 @@ builder.Services
     .AddEntityFrameworkStores<SzAppDbContext>()
     .AddDefaultTokenProviders();
 
+// SEC-10: re-validate the cookie against the security stamp every 5 min (default 30), so a deactivated
+// user or reset password (both rotate the stamp) loses the session within minutes, not hours.
+builder.Services.Configure<SecurityStampValidatorOptions>(options => options.ValidationInterval = TimeSpan.FromMinutes(5));
+
 builder.Services.ConfigureApplicationCookie(options =>
 {
     options.Cookie.Name = cookieName;
@@ -154,6 +158,20 @@ app.Use(async (context, next) =>
     }
     await next();
 });
+// GAP-23: an account carrying a temporary (admin-set) password may only use the auth endpoints until
+// it changes the password. The claim lives in the auth cookie; change-password refreshes the sign-in.
+app.Use(async (context, next) =>
+{
+    if (StaffManagementPolicy.MustChangePassword(context.User) &&
+        context.Request.Path.StartsWithSegments("/api") &&
+        !context.Request.Path.StartsWithSegments("/api/v1/auth"))
+    {
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        await context.Response.WriteAsJsonAsync(new { title = "Potrebno je promeniti privremenu lozinku.", code = "mustChangePassword" });
+        return;
+    }
+    await next();
+});
 app.UseAuthorization();
 app.UseAntiforgery();
 
@@ -168,6 +186,7 @@ app.MapHealthChecks("/health/ready", new HealthCheckOptions
 }).AllowAnonymous();
 
 app.MapMasterDataEndpoints();
+app.MapStaffEndpoints();
 app.MapContractsOverviewEndpoints();
 app.MapBillingEndpoints();
 app.MapLedgerBankingEndpoints();
@@ -185,6 +204,7 @@ auth.MapGet("/antiforgery", (HttpContext context, IAntiforgery antiforgery) =>
 
 auth.MapPost("/login", async (
     LoginRequest request,
+    HttpContext httpContext,
     UserManager<ApplicationUser> userManager,
     SignInManager<ApplicationUser> signInManager,
     SzAppDbContext dbContext,
@@ -202,8 +222,32 @@ auth.MapPost("/login", async (
         return Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "Neispravni podaci za prijavu.");
     }
 
+    user.LastLoginAt = DateTimeOffset.UtcNow;
+    user.LastIp = httpContext.Connection.RemoteIpAddress?.ToString();
+    await userManager.UpdateAsync(user);
     return Results.Ok(await BuildCurrentUserAsync(user, userManager, dbContext, cancellationToken));
 }).AddEndpointFilter<AntiforgeryEndpointFilter>().AllowAnonymous();
+
+auth.MapPost("/change-password", async (
+    ChangePasswordRequest request,
+    ClaimsPrincipal principal,
+    UserManager<ApplicationUser> userManager,
+    SignInManager<ApplicationUser> signInManager,
+    SzAppDbContext dbContext,
+    CancellationToken cancellationToken) =>
+{
+    var user = await userManager.GetUserAsync(principal);
+    if (user is null) return Results.Unauthorized();
+    if (string.Equals(request.CurrentPassword, request.NewPassword, StringComparison.Ordinal))
+        return Results.ValidationProblem(new Dictionary<string, string[]> { ["newPassword"] = ["Nova lozinka mora biti različita od stare."] });
+    var result = await userManager.ChangePasswordAsync(user, request.CurrentPassword ?? string.Empty, request.NewPassword ?? string.Empty);
+    if (!result.Succeeded)
+        return Results.ValidationProblem(result.Errors.GroupBy(e => e.Code).ToDictionary(g => g.Key, g => g.Select(e => e.Description).ToArray()));
+    var mustChange = (await userManager.GetClaimsAsync(user)).Where(c => c.Type == StaffManagementPolicy.MustChangePasswordClaim).ToArray();
+    if (mustChange.Length > 0) await userManager.RemoveClaimsAsync(user, mustChange);
+    await signInManager.RefreshSignInAsync(user); // new cookie: new stamp, claim gone
+    return Results.Ok(await BuildCurrentUserAsync(user, userManager, dbContext, cancellationToken));
+}).AddEndpointFilter<AntiforgeryEndpointFilter>().RequireAuthorization();
 
 auth.MapPost("/logout", async (SignInManager<ApplicationUser> signInManager) =>
 {
@@ -370,7 +414,8 @@ static async Task<CurrentUserResponse> BuildCurrentUserAsync(
         user.Email ?? string.Empty,
         user.PreferredLanguage,
         roles,
-        allowedCompanies);
+        allowedCompanies,
+        (await userManager.GetClaimsAsync(user)).Any(c => c.Type == StaffManagementPolicy.MustChangePasswordClaim));
 }
 
 public partial class Program;
