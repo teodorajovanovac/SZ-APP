@@ -20,6 +20,7 @@ import { useTranslation } from 'react-i18next'
 import { ApiProblemError, apiRequest, type ProblemDetails } from '../../api/generated/client'
 import { useAuth } from '../auth/useAuth'
 import { useActiveCompany } from '../companies/useActiveCompany'
+import { useCompanyRole } from '../companies/useCompanyRole'
 import { saveBlob } from '../reports/reportsApi'
 
 interface ExportTable {
@@ -51,7 +52,8 @@ export function ExportPage() {
   const { user } = useAuth()
   const { activeCompany } = useActiveCompany()
   const isRoot = user?.roles.includes('Root') ?? false
-  const canPersonal = isRoot || (user?.roles.includes('Upravnik') ?? false)
+  const { role } = useCompanyRole()
+  const canPersonal = isRoot || role === 'Upravnik'
   const [selected, setSelected] = useState<Set<string> | null>(null)
   const [encoding, setEncoding] = useState<'cp1250' | 'utf8'>('cp1250')
   const [includePersonalData, setIncludePersonalData] = useState(false)
