@@ -61,4 +61,22 @@ public sealed class LedgerBankingModelTests
                 nameof(LedgerSourcePosting.CompanyId),
                 nameof(LedgerSourcePosting.IdempotencyKey)]));
     }
+
+    [Fact]
+    public void PostingScheme_UniqueIndexHasNoNullFilter_SoDuplicateGlobalSchemesAreRejected()
+    {
+        // FIN-08: the SQL Server provider auto-filters NULLs out of a unique index on a nullable
+        // column unless HasFilter(null) says otherwise -- that default would let multiple global
+        // (CompanyId IS NULL) schemes exist for the same SourceType. Asserting GetFilter() is null
+        // here pins down that the filter was explicitly removed, not merely absent by coincidence.
+        using var context = CreateContext();
+        var index = context.Model.FindEntityType(typeof(PostingScheme))!.GetIndexes()
+            .Single(x => x.Properties.Select(p => p.Name).SequenceEqual([
+                nameof(PostingScheme.CompanyId),
+                nameof(PostingScheme.SourceType),
+                nameof(PostingScheme.IsActive)]));
+
+        Assert.True(index.IsUnique);
+        Assert.Null(index.GetFilter());
+    }
 }

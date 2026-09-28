@@ -188,7 +188,13 @@ public sealed class PostingSchemeConfiguration : IEntityTypeConfiguration<Postin
         entity.Property(x => x.DebitAccount).HasMaxLength(10).IsUnicode(false);
         entity.Property(x => x.CreditAccount).HasMaxLength(10).IsUnicode(false);
         entity.Property(x => x.DescriptionTemplate).HasMaxLength(255);
-        entity.HasIndex(x => new { x.CompanyId, x.SourceType, x.IsActive }).IsUnique();
+        // FIN-08: without HasFilter(null), the SQL Server provider's default convention filters
+        // NULL CompanyId rows out of this unique index (to emulate ANSI multi-NULL semantics),
+        // which let multiple global (CompanyId IS NULL) active schemes exist for the same
+        // SourceType. HasFilter(null) removes that filter so SQL Server's native behaviour
+        // applies: NULL is treated as an ordinary value, so only one global scheme per
+        // (SourceType, IsActive) is allowed, same as for any specific company.
+        entity.HasIndex(x => new { x.CompanyId, x.SourceType, x.IsActive }).IsUnique().HasFilter(null);
         entity.HasOne(x => x.Company).WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.NoAction);
         entity.HasOne<ChartAccount>().WithMany().HasForeignKey(x => x.DebitAccount).OnDelete(DeleteBehavior.NoAction);
         entity.HasOne<ChartAccount>().WithMany().HasForeignKey(x => x.CreditAccount).OnDelete(DeleteBehavior.NoAction);
