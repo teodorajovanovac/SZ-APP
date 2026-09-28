@@ -19,6 +19,21 @@ export interface SupplierInvoice {
   extraordinaryInvoiceMarker: string | null
   unitTypeIds: number[]
   rowVersion: string
+  journalEntryId: number | null
+  isPostingCancelled: boolean
+}
+
+/** FIN-34: standalone posting (types 2/3) and its red storno. */
+export function useSupplierInvoicePosting(companyId: number) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, cancel }: { id: number; cancel: boolean }) =>
+      apiRequest<SupplierInvoice>(`/api/v1/companies/${companyId}/supplier-invoices/${id}/${cancel ? 'cancel' : 'post'}`, {
+        method: 'POST',
+        headers: { 'Idempotency-Key': crypto.randomUUID() },
+      }),
+    onSuccess: () => client.invalidateQueries({ queryKey: ['companies', companyId, 'supplier-invoices'] }),
+  })
 }
 
 export interface SupplierInvoiceFilters {
