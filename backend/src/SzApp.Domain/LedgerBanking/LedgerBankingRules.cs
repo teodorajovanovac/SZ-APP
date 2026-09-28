@@ -21,11 +21,11 @@ public static class LedgerBankingRules
             throw new DomainRuleException("journal.empty", "Nalog mora sadržati najmanje jednu stavku.");
         }
 
-        if (entries.Any(x => x.Debit < 0m || x.Credit < 0m ||
-                             (x.Debit == 0m && x.Credit == 0m) ||
-                             (x.Debit > 0m && x.Credit > 0m)))
+        // P9: a negative amount is a legal "red storno" on the same side; what stays illegal is a
+        // line with nothing on it or with amounts on both sides.
+        if (entries.Any(x => (x.Debit == 0m) == (x.Credit == 0m)))
         {
-            throw new DomainRuleException("journal.invalid-line", "Svaka stavka mora imati pozitivan iznos na tačno jednoj strani.");
+            throw new DomainRuleException("journal.invalid-line", "Svaka stavka mora imati iznos na tačno jednoj strani.");
         }
 
         var debit = FinanceRounding.Calculation(entries.Sum(x => x.Debit));
@@ -90,7 +90,9 @@ public static class PostingSchemeRegistry
     private static readonly HashSet<string> AllowedSourceTypes = new(StringComparer.Ordinal)
     {
         "InvoiceBatch",
+        "InvoiceCancel",
         "SupplierInvoice",
+        "SupplierInvoiceCancel",
         "BankStatement",
         "InterestStatement",
         "Notice"
