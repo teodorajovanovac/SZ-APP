@@ -8,6 +8,7 @@ public sealed record CurrentUserResponse(
     string Email,
     string PreferredLanguage,
     IReadOnlyCollection<string> Roles,
-    IReadOnlyCollection<CompanySummaryResponse> Companies);
+    IReadOnlyCollection<CompanySummaryResponse> Companies,
+    bool MustChangePassword = false);
 
 public sealed record AntiforgeryTokenResponse(string Token, string HeaderName);

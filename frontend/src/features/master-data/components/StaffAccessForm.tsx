@@ -7,13 +7,15 @@ import type { StaffAccess, StaffRole } from '../types'
 interface StaffAccessFormProps {
   companyId: number
   access?: StaffAccess
+  /** Fixed staff member (e.g. when adding a grant from the staff detail page). */
+  fixedStaffId?: number
   onSaved?: (access: StaffAccess) => void
   onCancel?: () => void
 }
 
-export function StaffAccessForm({ companyId, access, onSaved, onCancel }: StaffAccessFormProps) {
+export function StaffAccessForm({ companyId, access, fixedStaffId, onSaved, onCancel }: StaffAccessFormProps) {
   const save = useSaveStaffAccess(companyId, access?.id)
-  const [staffId, setStaffId] = useState(access?.staffId ? String(access.staffId) : '')
+  const [staffId, setStaffId] = useState(String(access?.staffId ?? fixedStaffId ?? ''))
   const [staffRole, setStaffRole] = useState<StaffRole>(access?.staffRole ?? 'Review')
 
   const submit = (event: FormEvent) => {
@@ -24,10 +26,9 @@ export function StaffAccessForm({ companyId, access, onSaved, onCancel }: StaffA
   return (
     <Stack component="form" spacing={2} onSubmit={submit}>
       {save.isError && <Alert severity="error">{getErrorMessage(save.error, 'Pristup nije sačuvan.')}</Alert>}
-      {/* ponytail: raw numeric ID — no staff-directory list endpoint is exposed yet to back
-          an Autocomplete (useStaffAccess lists existing grants, not the staff pool). Wire
-          one up once a /staff or similar lookup endpoint exists. */}
-      <TextField size="small" label="ID zaposlenog" type="number" required value={staffId} disabled={!!access} onChange={(event) => setStaffId(event.target.value)} slotProps={{ htmlInput: { min: 1 } }} />
+      {/* ponytail: raw numeric ID here; the /staff pages add grants with a fixed staff member,
+          which is the normal path. Autocomplete over GET /api/v1/staff if this form stays in use. */}
+      <TextField size="small" label="ID zaposlenog" type="number" required value={staffId} disabled={!!access || fixedStaffId !== undefined} onChange={(event) => setStaffId(event.target.value)} slotProps={{ htmlInput: { min: 1 } }} />
       <TextField size="small" select label="Uloga" value={staffRole} onChange={(event) => setStaffRole(event.target.value as StaffRole)}>
         <MenuItem value="Upravnik">Upravnik</MenuItem>
         <MenuItem value="Moderator">Moderator</MenuItem>

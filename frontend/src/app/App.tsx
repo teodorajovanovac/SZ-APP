@@ -1,8 +1,7 @@
 import { CssBaseline } from '@mui/material'
 import { ThemeProvider } from '@mui/material/styles'
-import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
-import { api } from '../api/generated/client'
 import { AuthGate } from '../features/auth/AuthGate'
 import { AuthProvider } from '../features/auth/AuthProvider'
 import { LoginPage } from '../features/auth/LoginPage'
@@ -14,8 +13,12 @@ import { NotFoundPage } from '../shared/pages/NotFoundPage'
 import { RoleGuard } from '../shared/routing/RoleGuard'
 import { AppShell } from './AppShell'
 import { theme } from './theme'
-import { useActiveCompany } from '../features/companies/useActiveCompany'
-import { AddressesPage, BuildingEntrancesPage, CompanyPage, LocationCategoriesPage, PartnersPage, StaffPage, UnitsPage } from '../features/master-data/MasterDataPages'
+import { useCompanyRole } from '../features/companies/useCompanyRole'
+import { AddressesPage, BuildingEntrancesPage, CompanyPage, LocationCategoriesPage, PartnersPage, UnitsPage } from '../features/master-data/MasterDataPages'
+import { StaffListPage } from '../features/staff/StaffListPage'
+import { StaffDetailPage } from '../features/staff/StaffDetailPage'
+import { SettingsPage } from '../features/administration/SettingsPage'
+import { ShortListsPage } from '../features/administration/ShortListsPage'
 import { BuildingEntranceDetailPage } from '../features/master-data/pages/BuildingEntranceDetailPage'
 import { PartnerDetailPage } from '../features/master-data/pages/PartnerDetailPage'
 import { UnitDetailPage } from '../features/master-data/pages/UnitDetailPage'
@@ -63,7 +66,12 @@ function AuthenticatedRoutes() {
             <Route path="partners" element={<PartnersPage />} />
             <Route path="addresses" element={<AddressesPage />} />
             <Route element={<RoleGuard allowedRoles={['Root', 'Upravnik']} />}>
-              <Route path="staff" element={<StaffPage />} />
+              <Route path="staff" element={<StaffListPage />} />
+              <Route path="staff/:staffId" element={<StaffDetailPage />} />
+              <Route path="settings" element={<SettingsPage />} />
+            </Route>
+            <Route element={<RoleGuard allowedRoles={['Root']} />}>
+              <Route path="short-lists" element={<ShortListsPage />} />
             </Route>
             <Route path="units" element={<UnitsPage />} />
             <Route path="contracts" element={<ContractsPage />} />
@@ -88,25 +96,7 @@ function AuthenticatedRoutes() {
   )
 }
 
-// SEC-02: canWrite must reflect the caller's StaffAccess role for the *active* company, not the
-// global ASP.NET Identity roles on the user (those are only ever assigned to Root -- see
-// Program.cs bootstrap -- so reading user.roles here made every non-Root staff member read-only
-// regardless of their per-company role). /companies/{id}/context returns the resolved role
-// (Root for platform admins, otherwise the StaffAccess row for that company).
-function useCompanyPermissions() {
-  const { activeCompany } = useActiveCompany()
-  const context = useQuery({
-    queryKey: ['companies', activeCompany.id, 'context'],
-    queryFn: () => api.companies.context(activeCompany.id),
-  })
-  const role = context.data?.role
-  return {
-    companyId: activeCompany.id,
-    canWrite: role === 'Root' || role === 'Upravnik' || role === 'Moderator',
-    // P13: only Upravnik/Root may unlock a posting period.
-    canAdmin: role === 'Root' || role === 'Upravnik',
-  }
-}
+const useCompanyPermissions = useCompanyRole
 function AdministrationRoute() { const { companyId } = useCompanyPermissions(); return <PlatformAdministrationPage companyId={companyId} /> }
 function BillingRoute() { const { companyId, canWrite } = useCompanyPermissions(); return <BillingWorkspace companyId={companyId} canPost={canWrite} /> }
 function SupplierRoute() { const { companyId, canWrite } = useCompanyPermissions(); return <SupplierInvoiceList companyId={companyId} canPost={canWrite} /> }

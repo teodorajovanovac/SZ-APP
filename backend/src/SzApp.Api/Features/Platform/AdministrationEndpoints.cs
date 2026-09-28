@@ -10,8 +10,6 @@ namespace SzApp.Api.Features.Platform;
 
 internal static class AdministrationEndpoints
 {
-    private static readonly string[] SecretFragments = ["password", "secret", "token", "credential", "clientsecret", "apikey", "connectionstring"];
-
     public static RouteGroupBuilder MapAdministrationEndpoints(this RouteGroupBuilder group)
     {
         group.MapGet("/settings", ListSettingsAsync); group.MapPut("/settings/{key}", PutSettingAsync);
@@ -22,6 +20,7 @@ internal static class AdministrationEndpoints
         group.MapGet("/languages", ListLanguagesAsync); group.MapPut("/languages/{code}", PutLanguageAsync);
         group.MapGet("/translations", ListTranslationsAsync); group.MapPost("/translations", SaveTranslationAsync);
         group.MapGet("/short-lists/{tableName}", ListShortListAsync); group.MapPost("/short-lists", SaveShortListAsync);
+        group.MapGet("/short-lists", ListShortListTablesAsync); group.MapPut("/short-lists/{id:int}", UpdateShortListAsync); group.MapDelete("/short-lists/{id:int}", DeleteShortListAsync);
         return group;
     }
 
@@ -29,24 +28,38 @@ internal static class AdministrationEndpoints
     {
         var items = await db.Set<Setting>().AsNoTracking().Where(x => x.CompanyId == companyId || x.CompanyId == null)
             .OrderBy(x => x.Category).ThenBy(x => x.Name)
-            .Select(x => new SettingResponse(x.Id, x.CompanyId, x.Name, x.Key, x.Value, x.Description, x.Category, x.ValueMax, Convert.ToBase64String(x.RowVersion))).ToArrayAsync(ct);
-        return Results.Ok(items);
+            .Select(x => new SettingResponse(x.Id, x.CompanyId, x.Name, x.Key, x.Value, x.Description, x.Category, x.ValueMax, Convert.ToBase64String(x.RowVersion), false)).ToArrayAsync(ct);
+        return Results.Ok(items.Select(Masked));
     }
 
-    private static async Task<IResult> PutSettingAsync(int companyId, string key, SaveSettingRequest request, ClaimsPrincipal principal, SzAppDbContext db, CancellationToken ct)
+    // Global rows (CompanyId null, ?global=true): Root only. Company rows: Root or that company's Upravnik.
+    // Secret-looking keys are refused (SEC-15): secrets live in environment/config, never plaintext in the DB.
+    private static async Task<IResult> PutSettingAsync(int companyId, string key, bool? global, SaveSettingRequest request, ClaimsPrincipal principal, SzAppDbContext db, CancellationToken ct)
     {
-        if (!await PlatformEndpointHelpers.CanWriteAsync(principal, companyId, db, ct)) return Results.Forbid();
+        var isRoot = principal.IsInRole(SecurityConstants.RootRole);
         var normalized = key.Trim();
-        if (normalized.Length is 0 or > 50 || SecretFragments.Any(x => normalized.Contains(x, StringComparison.OrdinalIgnoreCase)))
-            return PlatformEndpointHelpers.Unprocessable("Tajni ili neispravan ključ podešavanja nije dozvoljen u bazi.");
-        var item = await db.Set<Setting>().SingleOrDefaultAsync(x => x.CompanyId == companyId && x.Key == normalized, ct);
-        if (item is null) { item = new Setting { CompanyId = companyId, Key = normalized }; db.Add(item); }
+        var secret = StaffManagementPolicy.IsSecretSettingKey(normalized);
+        if (secret && !string.IsNullOrEmpty(request.Value))
+            return PlatformEndpointHelpers.Unprocessable("Tajne (lozinke, tokeni, ključevi) se ne čuvaju u podešavanjima — podešavaju se kroz konfiguraciju servera.");
+        var allowed = global == true || secret
+            ? isRoot
+            : (await PlatformEndpointHelpers.RoleAsync(principal, companyId, db, ct)) is SecurityConstants.RootRole or SecurityConstants.UpravnikRole;
+        if (!allowed) return Results.Forbid();
+        if (normalized.Length is 0 or > 50) return PlatformEndpointHelpers.Unprocessable("Neispravan ključ podešavanja.");
+        if (string.IsNullOrWhiteSpace(request.Name)) return PlatformEndpointHelpers.Unprocessable("Naziv podešavanja je obavezan.");
+        int? scope = global == true ? null : companyId;
+        var item = await db.Set<Setting>().SingleOrDefaultAsync(x => x.CompanyId == scope && x.Key == normalized, ct);
+        if (item is null) { item = new Setting { CompanyId = scope, Key = normalized }; db.Add(item); }
         else if (!TryVersion(request.RowVersion, out var version)) return Results.Problem(statusCode: 428, title: "RowVersion je obavezan za izmenu.");
         else db.Entry(item).Property(x => x.RowVersion).OriginalValue = version;
-        item.Name = request.Name.Trim(); item.Value = request.Value?.Trim(); item.Description = request.Description?.Trim(); item.Category = request.Category?.Trim(); item.ValueMax = request.ValueMax;
+        item.Name = request.Name.Trim(); item.Description = request.Description?.Trim(); item.Category = request.Category?.Trim();
+        if (!secret || !string.IsNullOrEmpty(request.Value)) { item.Value = request.Value?.Trim(); item.ValueMax = request.ValueMax; }
         try { await db.SaveChangesAsync(ct); } catch (DbUpdateConcurrencyException) { return PlatformEndpointHelpers.Conflict(); }
-        return Results.Ok(new SettingResponse(item.Id, item.CompanyId, item.Name, item.Key, item.Value, item.Description, item.Category, item.ValueMax, Convert.ToBase64String(item.RowVersion)));
+        return Results.Ok(Masked(new SettingResponse(item.Id, item.CompanyId, item.Name, item.Key, item.Value, item.Description, item.Category, item.ValueMax, Convert.ToBase64String(item.RowVersion))));
     }
+
+    private static SettingResponse Masked(SettingResponse x) =>
+        StaffManagementPolicy.IsSecretSettingKey(x.Key) ? x with { Value = null, ValueMax = null, IsSecret = true } : x;
 
     private static async Task<IResult> ListImportsAsync(int companyId, SzAppDbContext db, CancellationToken ct)
     {
@@ -122,7 +135,37 @@ internal static class AdministrationEndpoints
     private static async Task<IResult> SaveShortListAsync(int companyId, SaveShortListRequest request, ClaimsPrincipal principal, SzAppDbContext db, CancellationToken ct)
     {
         if (!principal.IsInRole(SecurityConstants.RootRole)) return Results.Forbid(); if (string.IsNullOrWhiteSpace(request.TableName) || string.IsNullOrWhiteSpace(request.Caption)) return Results.ValidationProblem(new Dictionary<string, string[]> { ["shortList"] = ["TableName i Caption su obavezni."] });
-        var item = new ShortList { TableName = request.TableName.Trim(), Caption = request.Caption.Trim(), ShortName = request.ShortName, Description = request.Description, IndexValue = request.IndexValue, IndexSort = request.IndexSort, IndexKey = request.IndexKey }; db.Add(item); await db.SaveChangesAsync(ct); return Results.Created($"/api/v1/companies/{companyId}/short-lists/{item.TableName}", new ShortListResponse(item.Id, item.TableName, item.Caption, item.ShortName, item.Description, item.IndexValue, item.IndexSort, item.IndexKey));
+        var item = new ShortList { TableName = request.TableName.Trim(), Caption = request.Caption.Trim(), ShortName = request.ShortName, Description = request.Description, IndexValue = request.IndexValue, IndexSort = request.IndexSort, IndexKey = request.IndexKey }; db.Add(item);
+        try { await db.SaveChangesAsync(ct); } catch (DbUpdateException) { return Results.Conflict(new { message = "IndexValue već postoji u ovoj listi." }); }
+        return Results.Created($"/api/v1/companies/{companyId}/short-lists/{item.TableName}", new ShortListResponse(item.Id, item.TableName, item.Caption, item.ShortName, item.Description, item.IndexValue, item.IndexSort, item.IndexKey));
+    }
+
+    private static async Task<IResult> ListShortListTablesAsync(int companyId, SzAppDbContext db, CancellationToken ct) =>
+        Results.Ok(await db.ShortLists.AsNoTracking().Select(x => x.TableName).Distinct().OrderBy(x => x).ToArrayAsync(ct));
+
+    private static async Task<IResult> UpdateShortListAsync(int companyId, int id, SaveShortListRequest request, ClaimsPrincipal principal, SzAppDbContext db, CancellationToken ct)
+    {
+        if (!principal.IsInRole(SecurityConstants.RootRole)) return Results.Forbid();
+        if (string.IsNullOrWhiteSpace(request.Caption)) return Results.ValidationProblem(new Dictionary<string, string[]> { ["shortList"] = ["Caption je obavezan."] });
+        var item = await db.ShortLists.SingleOrDefaultAsync(x => x.Id == id, ct);
+        if (item is null) return Results.NotFound();
+        // TableName/IndexValue are what other tables and code key on -- not editable after creation.
+        item.Caption = request.Caption.Trim(); item.ShortName = request.ShortName; item.Description = request.Description; item.IndexSort = request.IndexSort; item.IndexKey = request.IndexKey;
+        await db.SaveChangesAsync(ct);
+        return Results.Ok(new ShortListResponse(item.Id, item.TableName, item.Caption, item.ShortName, item.Description, item.IndexValue, item.IndexSort, item.IndexKey));
+    }
+
+    // ponytail: ShortList has no IsActive column, so no soft-deactivate; the NoAction FK constraints refuse
+    // deleting a referenced row and we answer 409. Add IsActive + migration if "retired but kept" rows are needed.
+    private static async Task<IResult> DeleteShortListAsync(int companyId, int id, ClaimsPrincipal principal, SzAppDbContext db, CancellationToken ct)
+    {
+        if (!principal.IsInRole(SecurityConstants.RootRole)) return Results.Forbid();
+        var item = await db.ShortLists.SingleOrDefaultAsync(x => x.Id == id, ct);
+        if (item is null) return Results.NotFound();
+        db.Remove(item);
+        try { await db.SaveChangesAsync(ct); }
+        catch (DbUpdateException) { return Results.Conflict(new { message = "Stavka se koristi u podacima i ne može se obrisati." }); }
+        return Results.NoContent();
     }
 
     private static ImportDefinitionResponse ToResponse(ImportDefinition x) => new(x.Id, x.Name, x.Code, x.FileMask, x.ImportSourceId, x.FilePath, x.TargetHeaderTable, x.TargetLineTable, x.IsActive, x.SortIndex, Convert.ToBase64String(x.RowVersion));
