@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Alert, Button, Divider, Grid, Stack, TextField, Typography } from '@mui/material'
 import { useForm } from 'react-hook-form'
+import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
 import { getErrorMessage } from '../../../api/problemDetails'
 import { useSavePartner } from '../useMasterData'
@@ -28,11 +29,12 @@ interface PartnerFormProps {
 }
 
 export function PartnerForm({ companyId, partner, onSaved, onCancel }: PartnerFormProps) {
+  const { t } = useTranslation()
   const save = useSavePartner(companyId, partner?.id)
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, dirtyFields },
   } = useForm<PartnerFormValue>({
     resolver: zodResolver(partnerSchema),
     defaultValues: {
@@ -49,8 +51,15 @@ export function PartnerForm({ companyId, partner, onSaved, onCancel }: PartnerFo
   })
 
   const submit = (value: PartnerFormValue) => {
+    // idCardNumber/jmbg come back from the API masked (e.g. "***1234"), so this form can
+    // never preload the real value — it always starts blank. Sending that blank back as ''
+    // would make the backend erase the stored value on every unrelated edit. Only send
+    // these two fields when the user actually typed into them (dirtyFields), so an
+    // untouched field is omitted from the request and the backend leaves it alone.
     const request: SavePartner = {
       ...value,
+      idCardNumber: dirtyFields.idCardNumber ? value.idCardNumber : undefined,
+      jmbg: dirtyFields.jmbg ? value.jmbg : undefined,
       partnerTypeId: partner?.partnerTypeId ?? null,
     }
     save.mutate(request, { onSuccess: onSaved })
@@ -79,10 +88,26 @@ export function PartnerForm({ companyId, partner, onSaved, onCancel }: PartnerFo
 
         <Section>Lični podaci</Section>
         <Grid size={{ xs: 12, sm: 4 }}>
-          <TextField fullWidth size="small" label="Broj lične karte" {...register('idCardNumber')} error={!!errors.idCardNumber} helperText={errors.idCardNumber?.message} />
+          <TextField
+            fullWidth
+            size="small"
+            label="Broj lične karte"
+            placeholder={partner?.maskedIdCardNumber ?? undefined}
+            {...register('idCardNumber')}
+            error={!!errors.idCardNumber}
+            helperText={errors.idCardNumber?.message ?? (partner?.maskedIdCardNumber ? t('partners_.maskedFieldHint', { value: partner.maskedIdCardNumber }) : undefined)}
+          />
         </Grid>
         <Grid size={{ xs: 12, sm: 4 }}>
-          <TextField fullWidth size="small" label="JMBG" {...register('jmbg')} error={!!errors.jmbg} helperText={errors.jmbg?.message} />
+          <TextField
+            fullWidth
+            size="small"
+            label="JMBG"
+            placeholder={partner?.maskedJmbg ?? undefined}
+            {...register('jmbg')}
+            error={!!errors.jmbg}
+            helperText={errors.jmbg?.message ?? (partner?.maskedJmbg ? t('partners_.maskedFieldHint', { value: partner.maskedJmbg }) : undefined)}
+          />
         </Grid>
         <Grid size={{ xs: 12, sm: 4 }}>
           <TextField fullWidth size="small" label="Jezik" required {...register('language')} error={!!errors.language} helperText={errors.language?.message} />

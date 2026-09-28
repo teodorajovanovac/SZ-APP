@@ -247,6 +247,7 @@ export const resources = {
         new: 'Novi partner', newTitle: 'Novi partner', editTitle: 'Izmena partnera',
         detailTitle: 'Podaci o partneru',
         empty: 'Nema unetih partnera. Dodajte prvog dugmetom „Novi partner“.',
+        maskedFieldHint: 'Trenutno: {{value}}. Ostavite prazno da zadržite.',
       },
       addresses_: {
         new: 'Nova adresa', newTitle: 'Nova adresa', editTitle: 'Izmena adrese',
@@ -578,6 +579,7 @@ export const resources = {
         new: 'Нови партнер', newTitle: 'Нови партнер', editTitle: 'Измена партнера',
         detailTitle: 'Подаци о партнеру',
         empty: 'Нема унетих партнера. Додајте првог дугметом „Нови партнер“.',
+        maskedFieldHint: 'Тренутно: {{value}}. Оставите празно да задржите.',
       },
       addresses_: {
         new: 'Нова адреса', newTitle: 'Нова адреса', editTitle: 'Измена адресе',
@@ -909,6 +911,7 @@ export const resources = {
         new: 'New partner', newTitle: 'New partner', editTitle: 'Edit partner',
         detailTitle: 'Partner details',
         empty: 'No partners yet. Add the first one with “New partner”.',
+        maskedFieldHint: 'Currently: {{value}}. Leave blank to keep it.',
       },
       addresses_: {
         new: 'New address', newTitle: 'New address', editTitle: 'Edit address',
