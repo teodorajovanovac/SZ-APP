@@ -37,3 +37,54 @@ export function useNoticeCommand(companyId: number) {
     onSuccess: () => client.invalidateQueries({ queryKey: ['companies', companyId, 'notices'] }),
   })
 }
+
+/** P11 NoticeAditionalCosts row (boss's spelling). companyId null = global (Root only). */
+export interface NoticeCost {
+  id: number
+  dateStart: string
+  dateEnd: string | null
+  companyId: number | null
+  aditionalCostsLowerAmount: number
+  aditionalCostsLowerLimit: number
+  aditionalCostsUpperAmount: number
+  rowVersion: string
+}
+
+export interface SaveNoticeCost {
+  dateStart: string
+  dateEnd: string | null
+  isGlobal: boolean
+  aditionalCostsLowerAmount: number
+  aditionalCostsLowerLimit: number
+  aditionalCostsUpperAmount: number
+  rowVersion: string | null
+}
+
+const noticeCostsKey = (companyId: number) => ['companies', companyId, 'notice-additional-costs'] as const
+
+export function useNoticeCosts(companyId: number) {
+  return useQuery({
+    queryKey: noticeCostsKey(companyId),
+    queryFn: () => apiRequest<NoticeCost[]>(`/api/v1/companies/${companyId}/notice-additional-costs`),
+  })
+}
+
+export function useSaveNoticeCost(companyId: number) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, request }: { id?: number; request: SaveNoticeCost }) =>
+      apiRequest<NoticeCost>(`/api/v1/companies/${companyId}/notice-additional-costs${id ? `/${id}` : ''}`, {
+        method: id ? 'PUT' : 'POST',
+        body: JSON.stringify(request),
+      }),
+    onSuccess: () => client.invalidateQueries({ queryKey: noticeCostsKey(companyId) }),
+  })
+}
+
+export function useDeleteNoticeCost(companyId: number) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => apiRequest<void>(`/api/v1/companies/${companyId}/notice-additional-costs/${id}`, { method: 'DELETE' }),
+    onSuccess: () => client.invalidateQueries({ queryKey: noticeCostsKey(companyId) }),
+  })
+}
