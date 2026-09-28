@@ -206,14 +206,34 @@ public sealed class BillingService(
             return new(batchId, true, preview.Fingerprint, existingIds);
         }
 
+        // SEC-06: SupplierInvoiceId comes from the client per line (SetLineShadows below) -- validate
+        // up front, in one query, that every referenced supplier invoice belongs to this company.
+        var supplierInvoiceIds = request.Invoices.SelectMany(x => x.Lines)
+            .Select(x => x.SupplierInvoiceId).Where(id => id is not null).Select(id => id!.Value).Distinct().ToArray();
+        if (supplierInvoiceIds.Length > 0)
+        {
+            var validSupplierInvoiceCount = await db.Set<SupplierInvoice>().AsNoTracking()
+                .CountAsync(x => supplierInvoiceIds.Contains(x.Id) && x.CompanyId == companyId, ct);
+            if (validSupplierInvoiceCount != supplierInvoiceIds.Length)
+            {
+                throw new DomainRuleException("billing.supplier-invoice-not-found", "Ulazni račun u stavci ne pripada aktivnoj kompaniji.");
+            }
+        }
+
         var invoiceIds = new List<int>();
         foreach (var seed in request.Invoices.OrderBy(x => x.SortIndex).ThenBy(x => x.SequenceNumber, StringComparer.Ordinal))
         {
             var contractPartners = await db.Set<Contract>().AsNoTracking()
                 .Where(x => seed.ContractIds.Contains(x.Id) && x.CompanyId == companyId)
                 .Select(x => new { x.Id, x.InvoicePartnerId, x.OwnerPartnerId, x.TenantPartnerId }).ToArrayAsync(ct);
+            // SEC-06: an empty ContractIds list makes both checks below vacuously true (0 == 0,
+            // Any() on empty is false), which used to let seed.PartnerId through unchecked -- i.e.
+            // an invoice could be generated for another company's partner. Partner can be shared
+            // across companies (Partner.CompanyId == null), so that's still allowed.
             if (contractPartners.Length != seed.ContractIds.Distinct().Count() ||
-                contractPartners.Any(x => seed.PartnerId != (x.InvoicePartnerId ?? x.OwnerPartnerId ?? x.TenantPartnerId)))
+                contractPartners.Any(x => seed.PartnerId != (x.InvoicePartnerId ?? x.OwnerPartnerId ?? x.TenantPartnerId)) ||
+                !await db.Set<Partner>().AsNoTracking()
+                    .AnyAsync(x => x.Id == seed.PartnerId && (x.CompanyId == companyId || x.CompanyId == null), ct))
             {
                 throw new DomainRuleException("billing.contract-tenant-mismatch", "Ugovor ili primalac računa ne pripada aktivnoj kompaniji.");
             }
@@ -474,6 +494,9 @@ public sealed class BillingService(
         await shortLists.EnsureTypeAsync(request.NoticeTypeId, "NoticeType", ct);
         if (!await db.Set<NoticeTemplate>().AnyAsync(x => x.Id == request.NoticeTemplateId && x.CompanyId == companyId && x.IsActive, ct))
             throw new DomainRuleException("notice.template-not-found", "Aktivan šablon opomene ne postoji.");
+        if (request.InvoiceBatchId is not null &&
+            !await db.Set<InvoiceBatch>().AnyAsync(x => x.Id == request.InvoiceBatchId && x.CompanyId == companyId, ct))
+            throw new DomainRuleException("notice.invoice-batch-not-found", "Serija računa ne pripada aktivnoj kompaniji.");
         var entity = new NoticeBatch
         {
             CompanyId = companyId,
@@ -508,6 +531,18 @@ public sealed class BillingService(
         {
             if (batch.GenerationFingerprint != fingerprint) throw new DomainRuleException("notice.batch-input-changed", "Opomene su već generisane sa drugačijim ulazom.");
             return new(batchId, true, batch.Notices.OrderBy(x => x.Id).Select(x => x.Id).ToArray());
+        }
+
+        // SEC-06: NoticeLine.InvoiceId comes from the client -- validate every referenced invoice
+        // belongs to this company before it's written (one query, not per-line).
+        var noticeInvoiceIds = normalized.SelectMany(x => x.Lines)
+            .Select(x => x.InvoiceId).Where(id => id is not null).Select(id => id!.Value).Distinct().ToArray();
+        if (noticeInvoiceIds.Length > 0)
+        {
+            var validInvoiceCount = await db.Invoices.AsNoTracking()
+                .CountAsync(x => noticeInvoiceIds.Contains(x.Id) && x.CompanyId == companyId, ct);
+            if (validInvoiceCount != noticeInvoiceIds.Length)
+                throw new DomainRuleException("notice.invoice-not-found", "Račun u stavci opomene ne pripada aktivnoj kompaniji.");
         }
 
         foreach (var seed in normalized.Where(x => x.UnpaidInvoiceCount >= batch.MinUnpaidInvoiceCount && x.Debt > batch.DebtTolerance))

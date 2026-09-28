@@ -88,8 +88,15 @@ builder.Services.AddAntiforgery(options =>
 
 builder.Services.AddAuthorizationBuilder()
     .AddPolicy(SecurityConstants.CompanyAccessPolicy, policy =>
-        policy.RequireAuthenticatedUser().AddRequirements(new CompanyAccessRequirement()));
+        policy.RequireAuthenticatedUser().AddRequirements(new CompanyAccessRequirement()))
+    .AddPolicy(SecurityConstants.CompanyWritePolicy, policy =>
+        policy.RequireAuthenticatedUser().AddRequirements(new CompanyRoleRequirement(StaffRole.Moderator)))
+    .AddPolicy(SecurityConstants.CompanyPostPolicy, policy =>
+        policy.RequireAuthenticatedUser().AddRequirements(new CompanyRoleRequirement(StaffRole.Moderator)))
+    .AddPolicy(SecurityConstants.CompanyAdminPolicy, policy =>
+        policy.RequireAuthenticatedUser().AddRequirements(new CompanyRoleRequirement(StaffRole.Upravnik)));
 builder.Services.AddScoped<IAuthorizationHandler, CompanyAccessHandler>();
+builder.Services.AddScoped<IAuthorizationHandler, CompanyRoleHandler>();
 
 builder.Services.AddProblemDetails(options =>
 {
