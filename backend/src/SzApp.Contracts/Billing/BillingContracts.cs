@@ -35,7 +35,9 @@ public sealed record SupplierInvoiceResponse(
     int DocumentTypeId,
     string? ExtraordinaryInvoiceMarker,
     IReadOnlyList<int> UnitTypeIds,
-    string RowVersion);
+    string RowVersion,
+    int? JournalEntryId = null,
+    bool IsPostingCancelled = false);
 
 public sealed record CreateSupplierInvoiceRequest(
     int InvoiceNo,
