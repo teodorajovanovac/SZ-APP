@@ -152,8 +152,21 @@ public static class MasterDataExtendedFeatureExtensions
             ? source.OrderByDescending(item => item.SortingNumber).ThenByDescending(item => item.Id)
             : source.OrderBy(item => item.SortingNumber).ThenBy(item => item.Id);
         var total = await source.CountAsync(cancellationToken);
-        var items = await source.Skip(query.Skip).Take(query.NormalizedPageSize)
-            .Select(item => ToResponse(item)).ToArrayAsync(cancellationToken);
+        // Single query with the active contract's dates joined in (PERF-02): the list used to come back
+        // bare and the page then fired one /contracts request per row to find the active one.
+        var page = await source.Skip(query.Skip).Take(query.NormalizedPageSize)
+            .Select(item => new
+            {
+                Unit = item,
+                ActiveContract = db.Set<Contract>()
+                    .Where(c => c.Id == item.ContractId)
+                    .Select(c => new { c.ContractDate, c.ContractEndDate })
+                    .FirstOrDefault()
+            })
+            .ToArrayAsync(cancellationToken);
+        var items = page
+            .Select(row => ToResponse(row.Unit, row.ActiveContract?.ContractDate, row.ActiveContract?.ContractEndDate))
+            .ToArray();
         return Results.Ok(new PagedResponse<UnitResponse>(items, query.NormalizedPage, query.NormalizedPageSize, total));
     }
 
@@ -574,10 +587,10 @@ public static class MasterDataExtendedFeatureExtensions
         item.Id, item.CompanyId, item.BuildingName, item.EntranceName, item.AddressId,
         item.BuildingLabel, item.Description, item.SortIndex, Convert.ToBase64String(item.RowVersion));
 
-    private static UnitResponse ToResponse(Unit item) => new(
+    private static UnitResponse ToResponse(Unit item, DateOnly? activeContractDate = null, DateOnly? activeContractEndDate = null) => new(
         item.Id, item.CompanyId, item.Name, item.ContractId, item.UnitTypeId, item.BuildingEntranceId,
         item.Note, item.SortingNumber, item.K1, item.K2, item.K3, item.K4, item.K5, item.FloorNumber,
-        Convert.ToBase64String(item.RowVersion));
+        activeContractDate, activeContractEndDate, Convert.ToBase64String(item.RowVersion));
 
     private static ContractResponse ToResponse(Contract item) => new(
         item.Id, item.UnitId, item.AccountNumber, item.OwnerPartnerId, item.InvoicePartnerId,
