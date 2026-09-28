@@ -21,6 +21,7 @@ public sealed record ExportTable(
     ExportGroup Group,
     string? ImportTable,
     IReadOnlyList<ExportColumn> Columns,
+    Func<SzAppDbContext, int[], IQueryable> Query,
     Func<SzAppDbContext, int[], CancellationToken, IAsyncEnumerable<object>> Rows,
     Func<object, bool>? RowFilter = null);
 
@@ -140,7 +141,7 @@ public static class ExportCatalog
             .Where(p => only is null ? !SecretFragments.Any(f => p.Name.Contains(f, StringComparison.OrdinalIgnoreCase)) : only.Contains(p.Name))
             .Select(p => new ExportColumn(rename?.GetValueOrDefault(p.Name) ?? p.Name, p, PersonalColumns.Contains(p.Name)))
             .ToArray();
-        return new ExportTable(name, group, importTable, columns, (db, ids, ct) => Stream(query(db, ids).AsNoTracking(), ct), rowFilter);
+        return new ExportTable(name, group, importTable, columns, (db, ids) => query(db, ids), (db, ids, ct) => Stream(query(db, ids).AsNoTracking(), ct), rowFilter);
     }
 
     private static async IAsyncEnumerable<object> Stream<T>(IQueryable<T> query, [EnumeratorCancellation] CancellationToken ct) where T : class
