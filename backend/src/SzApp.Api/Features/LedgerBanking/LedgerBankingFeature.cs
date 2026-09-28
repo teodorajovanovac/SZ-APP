@@ -22,7 +22,6 @@ public sealed class LedgerBankingOptions
 
 public sealed class LedgerPostingGateway(
     IJournalPostingService journalPostingService,
-    SzAppDbContext dbContext,
     IHttpContextAccessor httpContextAccessor,
     IOptions<LedgerBankingOptions> options) : ILedgerPostingGateway
 {
@@ -33,32 +32,6 @@ public sealed class LedgerPostingGateway(
             ? currentUserId
             : options.Value.SystemUserId ?? throw new InvalidOperationException("LedgerBanking:SystemUserId je obavezan za pozadinska knjiženja.");
         return journalPostingService.PostSourceAsync(request, staffId, cancellationToken);
-    }
-
-    public async Task<LedgerPostingResult> ReverseAsync(
-        LedgerReversalRequest request,
-        CancellationToken cancellationToken)
-    {
-        var claim = httpContextAccessor.HttpContext?.User.FindFirstValue(ClaimTypes.NameIdentifier);
-        var staffId = int.TryParse(claim, out var currentUserId)
-            ? currentUserId
-            : options.Value.SystemUserId ?? throw new InvalidOperationException("LedgerBanking:SystemUserId je obavezan za pozadinska knjiženja.");
-
-        var sourcePosting = await dbContext.Set<LedgerSourcePosting>().AsNoTracking()
-            .SingleOrDefaultAsync(x => x.CompanyId == request.CompanyId &&
-                                       x.SourceType == request.SourceType &&
-                                       x.SourceId == request.SourceId &&
-                                       x.JournalEntryId == request.JournalEntryId, cancellationToken)
-            ?? throw new InvalidOperationException("Izvorno knjiženje nije pronađeno.");
-        var journal = await dbContext.JournalEntries.AsNoTracking()
-            .SingleAsync(x => x.Id == sourcePosting.JournalEntryId, cancellationToken);
-        var result = await journalPostingService.ReverseAsync(
-            request.CompanyId,
-            journal.Id,
-            staffId,
-            journal.RowVersion,
-            cancellationToken);
-        return new LedgerPostingResult(result.JournalEntryId, result.AlreadyPosted);
     }
 }
 
@@ -72,6 +45,8 @@ public static class LedgerBankingFeature
         services.TryAddSingleton(TimeProvider.System);
         services.AddHttpContextAccessor();
         services.AddScoped<LedgerMutationScope>();
+        services.AddSingleton<IBusinessClock, BelgradeBusinessClock>();
+        services.AddScoped<PostingPeriodGuard>();
         services.AddScoped<LedgerMutationGuardInterceptor>();
         services.AddScoped<IJournalPostingService, JournalPostingService>();
         services.AddScoped<IBankStatementService, BankStatementService>();
@@ -88,6 +63,7 @@ public static class LedgerBankingFeature
             .RequireAuthorization(SecurityConstants.CompanyAccessPolicy);
 
         MapJournalEndpoints(group);
+        MapPostingPeriodEndpoints(group);
         MapBankingEndpoints(group);
         MapCatalogueEndpoints(group);
         return endpoints;
@@ -127,9 +103,24 @@ public static class LedgerBankingFeature
             SzAppDbContext db,
             CancellationToken cancellationToken) =>
         {
-            var journal = await db.JournalEntries.AsNoTracking().Include(x => x.Lines)
-                .SingleOrDefaultAsync(x => x.Id == id && x.CompanyId == companyId, cancellationToken);
-            return journal is null ? Results.NotFound() : Results.Ok(MapJournal(journal, db));
+            var header = await db.JournalEntries.AsNoTracking()
+                .Where(x => x.Id == id && x.CompanyId == companyId)
+                .Select(x => new JournalEntrySummaryResponse(
+                    x.Id, x.PostingDate, x.Description, x.Currency, x.Balance, x.IsPosted,
+                    x.PostedAt, x.ReversalOfId, Convert.ToBase64String(x.RowVersion)))
+                .SingleOrDefaultAsync(cancellationToken);
+            if (header is null) return Results.NotFound();
+
+            // FIN-22: shadow properties must be read in the SQL projection -- db.Entry() on an
+            // AsNoTracking entity is detached and always returned null partner/sub-account.
+            var lines = await db.LedgerEntries.AsNoTracking()
+                .Where(x => x.JournalEntryId == id && x.CompanyId == companyId)
+                .OrderBy(x => x.Priority)
+                .Select(x => new LedgerEntryResponse(
+                    x.Id, x.Account, x.PostingDate, x.DueDate, x.DebitAmount, x.CreditAmount, x.DocumentRef,
+                    EF.Property<string?>(x, "SubAccountId"), EF.Property<int?>(x, "PartnerAccountId"), x.Note))
+                .ToArrayAsync(cancellationToken);
+            return Results.Ok(new JournalEntryResponse(header, lines));
         });
 
         group.MapPost("/journal-entries", async (
@@ -166,6 +157,25 @@ public static class LedgerBankingFeature
             .AddEndpointFilter<IdempotencyKeyEndpointFilter>()
             .AddEndpointFilter<AntiforgeryEndpointFilter>()
             .RequireAuthorization(SecurityConstants.CompanyPostPolicy);
+    }
+
+    // P13: lock = anyone who may post (CompanyPost); unlock = Upravnik/Root only (CompanyAdmin).
+    private static void MapPostingPeriodEndpoints(RouteGroupBuilder group)
+    {
+        group.MapGet("/posting-periods", (int companyId, PostingPeriodGuard guard, CancellationToken ct) =>
+            guard.ListAsync(companyId, ct));
+
+        group.MapPost("/posting-periods/{periodYYMM:int}/lock", (
+                int companyId, int periodYYMM, ClaimsPrincipal principal, PostingPeriodGuard guard, CancellationToken ct) =>
+                guard.LockAsync(companyId, periodYYMM, GetStaffId(principal), ct))
+            .AddEndpointFilter<AntiforgeryEndpointFilter>()
+            .RequireAuthorization(SecurityConstants.CompanyPostPolicy);
+
+        group.MapPost("/posting-periods/{periodYYMM:int}/unlock", (
+                int companyId, int periodYYMM, ClaimsPrincipal principal, PostingPeriodGuard guard, CancellationToken ct) =>
+                guard.UnlockAsync(companyId, periodYYMM, GetStaffId(principal), ct))
+            .AddEndpointFilter<AntiforgeryEndpointFilter>()
+            .RequireAuthorization(SecurityConstants.CompanyAdminPolicy);
     }
 
     private static void MapBankingEndpoints(RouteGroupBuilder group)
@@ -337,17 +347,4 @@ public static class LedgerBankingFeature
             throw new BadHttpRequestException("RowVersion nije ispravan Base64.", exception);
         }
     }
-
-    private static JournalEntryResponse MapJournal(JournalEntry journal, SzAppDbContext db) => new(
-        new JournalEntrySummaryResponse(
-            journal.Id, journal.PostingDate, journal.Description, journal.Currency, journal.Balance,
-            journal.IsPosted, journal.PostedAt, journal.ReversalOfId, Convert.ToBase64String(journal.RowVersion)),
-        journal.Lines.OrderBy(x => x.Priority).Select(x =>
-        {
-            var entry = db.Entry(x);
-            return new LedgerEntryResponse(
-                x.Id, x.Account, x.PostingDate, x.DueDate, x.DebitAmount, x.CreditAmount,
-                x.DocumentRef, entry.Property<string?>("SubAccountId").CurrentValue,
-                entry.Property<int?>("PartnerAccountId").CurrentValue, x.Note);
-        }).ToArray());
 }

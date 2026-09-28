@@ -138,9 +138,6 @@ public static class BillingFeatureExtensions
     {
         public Task<LedgerPostingResult> PostAsync(LedgerPostingRequest request, CancellationToken cancellationToken) =>
             throw new DomainRuleException("billing.ledger-unavailable", "Servis glavne knjige nije povezan.");
-
-        public Task<LedgerPostingResult> ReverseAsync(LedgerReversalRequest request, CancellationToken cancellationToken) =>
-            throw new DomainRuleException("billing.ledger-unavailable", "Servis glavne knjige nije povezan.");
     }
 
     private sealed class UnavailableNoticeWorkflowGateway : INoticeWorkflowGateway
