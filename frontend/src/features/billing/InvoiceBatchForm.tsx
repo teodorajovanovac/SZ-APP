@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
 import { getErrorMessage } from '../../api/problemDetails'
 import { ControlledTextField } from '../../shared/components/ControlledTextField'
+import { MoneyField } from '../../shared/components/MoneyField'
 import { currentPeriodYYMM, MonthYearField } from '../../shared/components/MonthYearField'
 import { useCreateInvoiceBatch } from './billingApi'
 
@@ -24,7 +25,7 @@ const schema = z.object({
   serviceDateTo: z.string().min(1),
   transactionDate: z.string().min(1),
   dueDate: z.string().min(1),
-  exchangeRateNbs: z.number().positive(),
+  exchangeRateNbs: z.number({ error: 'Kurs mora biti broj.' }).positive('Kurs mora biti pozitivan broj.'),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -89,7 +90,7 @@ export function InvoiceBatchForm({ companyId, onCreated }: { companyId: number; 
           <ControlledTextField control={control} name="dueDate" label={t('billing_.form.dueDate')} type="date" required />
         </Grid>
         <Grid size={{ xs: 12, sm: 6 }}>
-          <ControlledTextField control={control} name="exchangeRateNbs" label={t('billing_.form.exchangeRate')} type="number" required />
+          <MoneyField control={control} name="exchangeRateNbs" label={t('billing_.form.exchangeRate')} required />
         </Grid>
       </Grid>
       <Stack direction="row" justifyContent="flex-end">

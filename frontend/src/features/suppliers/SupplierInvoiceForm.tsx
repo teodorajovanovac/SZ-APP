@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
 import { getErrorMessage } from '../../api/problemDetails'
 import { ControlledTextField } from '../../shared/components/ControlledTextField'
+import { MoneyField } from '../../shared/components/MoneyField'
 import { currentPeriodYYMM, MonthYearField } from '../../shared/components/MonthYearField'
 import { usePartnerAccounts } from '../master-data/useMasterData'
 import { useCreateSupplierInvoice } from './supplierApi'
@@ -15,7 +16,7 @@ const schema = z.object({
   periodYYMM: z.number().int().min(1001).max(9912).refine((value) => { const month = value % 100; return month >= 1 && month <= 12 }, {
     message: 'Mesec (poslednje dve cifre) mora biti između 01 i 12.',
   }),
-  amountRsd: z.number().nonnegative(), documentTypeId: z.number().int().positive(),
+  amountRsd: z.number({ error: 'Iznos mora biti broj.' }).nonnegative('Iznos ne sme biti negativan.'), documentTypeId: z.number().int().positive(),
   invoiceDate: z.string().min(1), transactionDate: z.string().min(1),
 })
 type Values = z.infer<typeof schema>
@@ -83,7 +84,7 @@ export function SupplierInvoiceForm({ companyId, onSaved }: { companyId: number;
           <MonthYearField control={control} name="periodYYMM" label={t('suppliers_.form.period')} required />
         </Grid>
         <Grid size={{ xs: 12, sm: 3 }}>
-          <ControlledTextField control={control} name="amountRsd" label={t('suppliers_.form.amount')} type="number" required />
+          <MoneyField control={control} name="amountRsd" label={t('suppliers_.form.amount')} required />
         </Grid>
         <Grid size={{ xs: 12, sm: 3 }}>
           <ControlledTextField control={control} name="calculationTypeId" label={t('suppliers_.form.calculationType')} type="number" required />
