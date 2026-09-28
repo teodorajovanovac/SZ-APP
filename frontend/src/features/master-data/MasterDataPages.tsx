@@ -2,7 +2,7 @@ import { Alert, Paper, Stack, Table, TableBody, TableCell, TableContainer, Table
 import { useTranslation } from 'react-i18next'
 import { useActiveCompany } from '../companies/useActiveCompany'
 import { formatDate } from '../../shared/format/date'
-import { AddressList, PartnerList, StaffAccessList } from './index'
+import { AddressList, PartnerList } from './index'
 import { BuildingEntranceList } from './components/BuildingEntranceList'
 import { LocationCategoryList } from './components/LocationCategoryList'
 import { useUnits } from './useMasterData'
@@ -13,7 +13,6 @@ export function BuildingEntrancesPage() { const { activeCompany } = useActiveCom
 export function LocationCategoriesPage() { const { activeCompany } = useActiveCompany(); return <LocationCategoryList companyId={activeCompany.id} /> }
 export function PartnersPage() { const { activeCompany } = useActiveCompany(); return <PartnerList companyId={activeCompany.id} /> }
 export function AddressesPage() { const { activeCompany } = useActiveCompany(); return <AddressList companyId={activeCompany.id} /> }
-export function StaffPage() { const { activeCompany } = useActiveCompany(); return <StaffAccessList companyId={activeCompany.id} /> }
 
 export function UnitsPage() {
   const { t } = useTranslation()

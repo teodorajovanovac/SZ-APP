@@ -30,6 +30,15 @@ public sealed class ApiFoundationTests : IClassFixture<WebApplicationFactory<Pro
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    [Theory]
+    [InlineData("/api/v1/staff")]
+    [InlineData("/api/v1/staff/1")]
+    public async Task StaffAdministration_RequiresAuthentication(string path)
+    {
+        var response = await _client.GetAsync(path);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
     [Fact]
     public async Task OpenApiDocument_IsAvailable()
     {

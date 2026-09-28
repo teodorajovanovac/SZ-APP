@@ -1,3 +1,4 @@
+import LockResetIcon from '@mui/icons-material/LockReset'
 import LogoutIcon from '@mui/icons-material/Logout'
 import MenuIcon from '@mui/icons-material/Menu'
 import {
@@ -30,6 +31,8 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../features/auth/useAuth'
+import { ChangePasswordForm } from '../features/auth/ChangePasswordForm'
+import { FormDialog } from '../shared/components/FormDialog'
 import type { CompanyScope } from '../features/companies/companyScope'
 import { useActiveCompany } from '../features/companies/useActiveCompany'
 import { useCompanyScope } from '../features/companies/useCompanyScope'
@@ -70,6 +73,7 @@ export function AppShell() {
   const theme = useTheme()
   const isDesktop = useMediaQuery(theme.breakpoints.up('lg'))
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [changingPassword, setChangingPassword] = useState(false)
   const { t, i18n } = useTranslation()
   const { user, logout } = useAuth()
   const { companies, activeCompany } = useActiveCompany()
@@ -305,11 +309,19 @@ export function AppShell() {
               {languageSelect}
             </Stack>
           )}
+          <Tooltip title={t('staffAdmin_.changePassword')}>
+            <IconButton color="inherit" onClick={() => setChangingPassword(true)} aria-label={t('staffAdmin_.changePassword')}>
+              <LockResetIcon />
+            </IconButton>
+          </Tooltip>
           <Tooltip title={t('logout')}>
             <IconButton color="inherit" onClick={() => void logout()} aria-label={t('logout')}>
               <LogoutIcon />
             </IconButton>
           </Tooltip>
+          <FormDialog open={changingPassword} title={t('staffAdmin_.changePassword')} onClose={() => setChangingPassword(false)} maxWidth="xs">
+            {changingPassword && <ChangePasswordForm onDone={() => setChangingPassword(false)} onCancel={() => setChangingPassword(false)} />}
+          </FormDialog>
         </Toolbar>
       </AppBar>
       <Box component="aside" sx={{ width: { lg: drawerWidth }, flexShrink: { lg: 0 } }}>

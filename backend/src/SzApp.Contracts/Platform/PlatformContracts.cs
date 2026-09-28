@@ -6,7 +6,7 @@ public sealed record CreateDocumentMetadata(int? DocumentTypeId, string? SourceT
 public sealed record SentEmailResponse(long Id, string Subject, string ToAddress, string? Cc, string? Bcc, string BodyHtml, DateTimeOffset CreatedAt, DateTimeOffset? SentAt, string Status, string? SendDescription, int AttemptCount, IReadOnlyCollection<long> DocumentIds, string RowVersion);
 public sealed record CreateSentEmailRequest(string Subject, string ToAddress, string? Cc, string? Bcc, string BodyHtml, IReadOnlyCollection<long>? DocumentIds);
 
-public sealed record SettingResponse(long Id, int? CompanyId, string Name, string Key, string? Value, string? Description, string? Category, string? ValueMax, string RowVersion);
+public sealed record SettingResponse(long Id, int? CompanyId, string Name, string Key, string? Value, string? Description, string? Category, string? ValueMax, string RowVersion, bool IsSecret = false);
 public sealed record SaveSettingRequest(string Name, string Key, string? Value, string? Description, string? Category, string? ValueMax, string? RowVersion);
 
 public sealed record PlatformEventResponse(long Id, int CompanyId, DateTimeOffset RequestedAt, DateTimeOffset? DecidedAt, DateTimeOffset? ExecutedAt, int RequestedByStaffId, int? DecidedByStaffId, int? ExecutedByStaffId, int? ContractId, int? PartnerId, int? UnitId, string Description, string? PreviousValue, string? NewValue, string? FieldsRelated, int? RequestTypeId, string? RequestBy, string? RequestThrough, string Status, string? DecisionReason, bool EmergencyOverride, string RowVersion);
