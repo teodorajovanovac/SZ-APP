@@ -4,20 +4,8 @@ import { useTranslation } from 'react-i18next'
 import { getErrorMessage } from '../../api/problemDetails'
 import { ControlledTextField } from '../../shared/components/ControlledTextField'
 import { formatDate } from '../../shared/format/date'
-import { useInterestPeriodPresets, type InterestPresetKey } from './billingApi'
+import { resolveInterestPeriod, useInterestPeriodPresets, type InterestPresetKey } from './billingApi'
 import type { InvoiceBatchFormValues } from './InvoiceBatchForm'
-
-/** Resolves the period the run will use: a preset's dates, or the edited custom dates. */
-export function resolveInterestPeriod(
-  values: Pick<InvoiceBatchFormValues, 'interestPreset' | 'interestStart' | 'interestEnd'>,
-  presets: { key: InterestPresetKey; start: string; end: string }[] | undefined,
-  defaultPreset: InterestPresetKey | undefined,
-) {
-  const key = values.interestPreset || defaultPreset || 'fromPreviousDueDate'
-  if (key === 'custom') return { key, start: values.interestStart, end: values.interestEnd }
-  const preset = presets?.find((p) => p.key === key)
-  return { key, start: preset?.start ?? '', end: preset?.end ?? '' }
-}
 
 const validPeriod = (value: number) => value >= 1001 && value <= 9912 && value % 100 >= 1 && value % 100 <= 12
 

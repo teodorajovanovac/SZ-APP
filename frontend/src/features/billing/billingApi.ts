@@ -99,6 +99,18 @@ export function useInterestPeriodPresets(companyId: number, params: InterestPres
   return useQuery({ ...interestPresetsQuery(companyId, params), enabled })
 }
 
+/** Resolves the period the run will use: a preset's dates, or the edited custom dates. */
+export function resolveInterestPeriod(
+  values: { interestPreset: InterestPresetKey | ''; interestStart: string; interestEnd: string },
+  presets: { key: InterestPresetKey; start: string; end: string }[] | undefined,
+  defaultPreset: InterestPresetKey | undefined,
+) {
+  const key = values.interestPreset || defaultPreset || 'fromPreviousDueDate'
+  if (key === 'custom') return { key, start: values.interestStart, end: values.interestEnd }
+  const preset = presets?.find((p) => p.key === key)
+  return { key, start: preset?.start ?? '', end: preset?.end ?? '' }
+}
+
 /** Idempotent per batch: re-running replaces the batch's interest rows. */
 export function useRunInterest(companyId: number) {
   return useMutation({

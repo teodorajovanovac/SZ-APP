@@ -9,8 +9,8 @@ import { MoneyField } from '../../shared/components/MoneyField'
 import { currentPeriodYYMM, MonthYearField } from '../../shared/components/MonthYearField'
 import { useQueryClient } from '@tanstack/react-query'
 import { formatMoney } from '../../shared/format/money'
-import { interestPresetsQuery, useCreateInvoiceBatch, useRunInterest } from './billingApi'
-import { InterestPeriodFields, resolveInterestPeriod } from './InterestPeriodFields'
+import { interestPresetsQuery, resolveInterestPeriod, useCreateInvoiceBatch, useRunInterest } from './billingApi'
+import { InterestPeriodFields } from './InterestPeriodFields'
 
 const schema = z.object({
   periodYYMM: z
