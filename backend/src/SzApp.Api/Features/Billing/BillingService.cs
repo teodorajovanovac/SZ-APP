@@ -782,7 +782,7 @@ public sealed class BillingService(
 
     public async Task<NoticeBatchResponse> CreateNoticeBatchAsync(int companyId, CreateNoticeBatchRequest request, CancellationToken ct)
     {
-        await shortLists.EnsureTypeAsync(request.NoticeTypeId, "NoticeType", ct);
+        await shortLists.EnsureTypeAsync(request.NoticeTypeId, NoticeTypes.ShortListTable, ct);
         if (!await db.Set<NoticeTemplate>().AnyAsync(x => x.Id == request.NoticeTemplateId && x.CompanyId == companyId && x.IsActive, ct))
             throw new DomainRuleException("notice.template-not-found", "Aktivan šablon opomene ne postoji.");
         if (request.InvoiceBatchId is not null &&
@@ -803,9 +803,23 @@ public sealed class BillingService(
             InvoiceBatchId = request.InvoiceBatchId,
             CustomCaptionOnSlip = Trim(request.CustomCaptionOnSlip, 255)
         };
+        // P11: snapshot the cost thresholds in force on the batch date (company row beats global).
+        var thresholds = NoticeCostCalculator.Snapshot(NoticeCostCalculator.Applicable(await LoadNoticeCostRulesAsync(companyId, ct), companyId, request.Date));
+        entity.AditionalCostsLowerAmount = thresholds?.LowerAmount;
+        entity.AditionalCostsLowerLimit = thresholds?.LowerLimit;
+        entity.AditionalCostsUpperAmount = thresholds?.UpperAmount;
         db.Add(entity);
         await db.SaveChangesAsync(ct);
-        return new(entity.Id, entity.Title, entity.Date, entity.NoticeTemplateId, entity.NoticeTypeId, Convert.ToBase64String(entity.RowVersion));
+        return new(entity.Id, entity.Title, entity.Date, entity.NoticeTemplateId, entity.NoticeTypeId,
+            entity.AditionalCostsLowerAmount, entity.AditionalCostsLowerLimit, entity.AditionalCostsUpperAmount, Convert.ToBase64String(entity.RowVersion));
+    }
+
+    internal async Task<NoticeCostRule[]> LoadNoticeCostRulesAsync(int? companyId, CancellationToken ct) =>
+        await db.Set<NoticeAditionalCost>().AsNoTracking()
+            .Where(x => x.CompanyId == null || x.CompanyId == companyId)
+            .Select(x => new NoticeCostRule(x.Id, x.DateStart, x.DateEnd, x.CompanyId,
+                x.AditionalCostsLowerAmount, x.AditionalCostsLowerLimit, x.AditionalCostsUpperAmount))
+            .ToArrayAsync(ct);
     }
 
     public Task<NoticeGenerationResponse> GenerateNoticesAsync(int companyId, int batchId, GenerateNoticesRequest request, CancellationToken ct) =>
@@ -836,8 +850,16 @@ public sealed class BillingService(
                 throw new DomainRuleException("notice.invoice-not-found", "Račun u stavci opomene ne pripada aktivnoj kompaniji.");
         }
 
+        var noticeTypeCode = await db.ShortLists.AsNoTracking().Where(x => x.Id == batch.NoticeTypeId).Select(x => x.IndexValue).SingleAsync(ct);
+        var carriesCost = NoticeTypes.CarriesCost(noticeTypeCode);
+        NoticeCostThresholds? thresholds = batch.AditionalCostsLowerAmount is { } lowerAmount
+            && batch.AditionalCostsLowerLimit is { } lowerLimit && batch.AditionalCostsUpperAmount is { } upperAmount
+            ? new(lowerAmount, lowerLimit, upperAmount)
+            : null;
         foreach (var seed in normalized.Where(x => x.UnpaidInvoiceCount >= batch.MinUnpaidInvoiceCount && x.Debt > batch.DebtTolerance))
         {
+            // P11: the cost is computed here from the batch snapshot, never taken from the client.
+            var cost = NoticeCostCalculator.Cost(FinanceRounding.Money(seed.Debt), thresholds, carriesCost);
             if (!await db.Set<PartnerAccount>().AnyAsync(x => x.Id == seed.PartnerAccountId && x.CompanyId == companyId, ct))
                 throw new DomainRuleException("notice.partner-account-not-found", "Konto partnera ne pripada aktivnoj kompaniji.");
             var notice = new Notice
@@ -848,8 +870,8 @@ public sealed class BillingService(
                 Debt = FinanceRounding.Money(seed.Debt),
                 InvoiceText = Trim(seed.InvoiceText, 255),
                 PaymentReference = Required(seed.PaymentReference, 50, "Poziv na broj"),
-                AdditionalCosts = FinanceRounding.Money(seed.AdditionalCosts),
-                Total = BillingCalculator.CalculateNoticeTotal(seed.Debt, seed.AdditionalCosts)
+                AdditionalCosts = cost,
+                Total = BillingCalculator.CalculateNoticeTotal(FinanceRounding.Money(seed.Debt), cost)
             };
             foreach (var line in seed.Lines)
             {
