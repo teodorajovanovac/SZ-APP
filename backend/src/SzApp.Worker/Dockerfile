@@ -7,7 +7,10 @@ RUN dotnet publish backend/src/SzApp.Worker/SzApp.Worker.csproj -c Release -o /a
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 COPY --from=build /app/publish .
-RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && mkdir -p /data/documents /data/imports /data/reports \
+    && chown -R "$APP_UID:$APP_UID" /data \
+    && rm -rf /var/lib/apt/lists/*
 USER $APP_UID
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 CMD ["curl", "--fail", "http://127.0.0.1:8080/health/ready"]

@@ -22,6 +22,12 @@ var builder = WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("SzApp")
     ?? throw new InvalidOperationException("Connection string 'SzApp' is required.");
 var requireHttps = builder.Configuration.GetValue("Security:RequireHttps", !builder.Environment.IsDevelopment());
+var configuredCookieName = builder.Configuration["Authentication:CookieName"]?.Trim();
+var cookieName = string.IsNullOrWhiteSpace(configuredCookieName) ? "szapp.session" : configuredCookieName;
+if (requireHttps && !cookieName.StartsWith("__Host-", StringComparison.Ordinal))
+{
+    cookieName = $"__Host-{cookieName}";
+}
 
 builder.Services.AddDbContext<SzAppDbContext>(options =>
     options.UseSqlServer(connectionString, sql => sql.EnableRetryOnFailure()));
@@ -51,7 +57,7 @@ builder.Services
 
 builder.Services.ConfigureApplicationCookie(options =>
 {
-    options.Cookie.Name = requireHttps ? "__Host-szapp-auth" : "szapp-auth";
+    options.Cookie.Name = cookieName;
     options.Cookie.HttpOnly = true;
     options.Cookie.SecurePolicy = requireHttps ? CookieSecurePolicy.Always : CookieSecurePolicy.SameAsRequest;
     options.Cookie.SameSite = SameSiteMode.Strict;
@@ -73,7 +79,7 @@ builder.Services.ConfigureApplicationCookie(options =>
 builder.Services.AddAntiforgery(options =>
 {
     options.HeaderName = "X-CSRF-TOKEN";
-    options.Cookie.Name = requireHttps ? "__Host-szapp-csrf" : "szapp-csrf";
+    options.Cookie.Name = $"{cookieName}.csrf";
     options.Cookie.HttpOnly = true;
     options.Cookie.SecurePolicy = requireHttps ? CookieSecurePolicy.Always : CookieSecurePolicy.SameAsRequest;
     options.Cookie.SameSite = SameSiteMode.Strict;

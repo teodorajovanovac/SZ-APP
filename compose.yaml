@@ -43,6 +43,7 @@ services:
       - documents:/data/documents
       - imports:/data/imports
       - reports:/data/reports
+      - data-protection:/home/app/.aspnet/DataProtection-Keys
     depends_on:
       sqlserver:
         condition: service_healthy
@@ -98,3 +99,4 @@ volumes:
   documents:
   imports:
   reports:
+  data-protection:
