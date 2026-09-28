@@ -25,6 +25,8 @@ export interface CurrentUser {
   email: string
   roles: UserRole[]
   companies: CompanySummary[]
+  /** Signed in with an admin-set temporary password; every non-auth API call is 403 until changed. */
+  mustChangePassword?: boolean
 }
 
 export interface LoginRequest {
@@ -119,6 +121,11 @@ export const api = {
       })
     },
     me: () => apiRequest<CurrentUser>('/api/v1/auth/me'),
+    changePassword: (currentPassword: string, newPassword: string) =>
+      apiRequest<CurrentUser>('/api/v1/auth/change-password', {
+        method: 'POST',
+        body: JSON.stringify({ currentPassword, newPassword }),
+      }),
     logout: async () => {
       const csrf = await apiRequest<AntiforgeryToken>('/api/v1/auth/antiforgery')
       return apiRequest<void>('/api/v1/auth/logout', {
