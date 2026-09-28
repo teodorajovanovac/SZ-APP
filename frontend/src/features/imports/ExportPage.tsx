@@ -35,7 +35,7 @@ const groups = ['CodeLists', 'MasterData', 'Transactions'] as const
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
 
 // apiRequest parses JSON; the ZIP needs the raw Response, so fetch it directly (GET, no CSRF).
-export async function downloadExport(path: string): Promise<{ blob: Blob; fileName: string }> {
+async function downloadExport(path: string): Promise<{ blob: Blob; fileName: string }> {
   const response = await fetch(`${API_BASE_URL}${path}`, { credentials: 'include', headers: { Accept: 'application/zip' } })
   if (!response.ok) {
     let problem: ProblemDetails = { status: response.status, title: response.statusText }
