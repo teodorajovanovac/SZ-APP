@@ -37,8 +37,10 @@ public sealed class LegacyCsvWriterTests
     public void Cp1250_CountsUnrepresentableCharacters()
     {
         var fallback = new CountingReplacementFallback();
-        var bytes = LegacyCsvWriter.ResolveEncoding("cp1250", fallback).GetBytes("Жš");
-        Assert.Equal(new byte[] { (byte)'?', 0x9A }, bytes);
+        using var buffer = new MemoryStream();
+        using (var text = new StreamWriter(buffer, LegacyCsvWriter.ResolveEncoding("cp1250", fallback), leaveOpen: true))
+            text.Write("Жš");
+        Assert.Equal(new byte[] { (byte)'?', 0x9A }, buffer.ToArray());
         Assert.Equal(1, fallback.Count);
     }
 
