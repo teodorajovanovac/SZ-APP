@@ -243,6 +243,11 @@ export const resources = {
         close: 'Zatvori', actions: 'Akcije', edit: 'Izmeni', view: 'Detalji',
         scrollHint: 'Tabelu možete pomerati levo i desno.',
       },
+      formDialog: {
+        discardTitle: 'Odbaciti unete izmene?',
+        discardBody: 'Imate nesačuvane izmene u ovom obrascu. Ako zatvorite, biće izgubljene.',
+        discardConfirm: 'Odbaci izmene',
+      },
       partners_: {
         new: 'Novi partner', newTitle: 'Novi partner', editTitle: 'Izmena partnera',
         detailTitle: 'Podaci o partneru',
@@ -575,6 +580,11 @@ export const resources = {
         close: 'Затвори', actions: 'Акције', edit: 'Измени', view: 'Детаљи',
         scrollHint: 'Табелу можете померати лево и десно.',
       },
+      formDialog: {
+        discardTitle: 'Одбацити унете измене?',
+        discardBody: 'Имате несачуване измене у овом обрасцу. Ако затворите, биће изгубљене.',
+        discardConfirm: 'Одбаци измене',
+      },
       partners_: {
         new: 'Нови партнер', newTitle: 'Нови партнер', editTitle: 'Измена партнера',
         detailTitle: 'Подаци о партнеру',
@@ -906,6 +916,11 @@ export const resources = {
       ui: {
         close: 'Close', actions: 'Actions', edit: 'Edit', view: 'Details',
         scrollHint: 'The table scrolls horizontally.',
+      },
+      formDialog: {
+        discardTitle: 'Discard your changes?',
+        discardBody: 'This form has unsaved changes. Closing it now will lose them.',
+        discardConfirm: 'Discard changes',
       },
       partners_: {
         new: 'New partner', newTitle: 'New partner', editTitle: 'Edit partner',
