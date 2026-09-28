@@ -27,6 +27,8 @@ import {
 import { useTranslation } from 'react-i18next'
 import { getErrorMessage } from '../../api/problemDetails'
 import { useActiveCompany } from '../companies/useActiveCompany'
+import { formatDate } from '../../shared/format/date'
+import { formatNumber } from '../../shared/format/money'
 import {
   openPrintableHtml,
   saveBlob,
@@ -218,6 +220,17 @@ function Section({
   )
 }
 
+// Column type metadata isn't exposed by the API — only the raw values are, so numbers are
+// formatted using the JSON value's own type and ISO-looking date strings are detected by
+// shape. Anything else prints as-is.
+const isoDatePattern = /^\d{4}-\d{2}-\d{2}(T|$)/
+function formatCell(cell: unknown): string {
+  if (cell === null || cell === undefined) return ''
+  if (typeof cell === 'number') return formatNumber(cell)
+  if (typeof cell === 'string' && isoDatePattern.test(cell)) return formatDate(cell)
+  return String(cell)
+}
+
 function ReportResult({ table }: { table: ReportTable }) {
   const { t } = useTranslation()
   return (
@@ -247,7 +260,7 @@ function ReportResult({ table }: { table: ReportTable }) {
                       align={typeof cell === 'number' ? 'right' : 'left'}
                       sx={typeof cell === 'number' ? { fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' } : undefined}
                     >
-                      {String(cell ?? '')}
+                      {formatCell(cell)}
                     </TableCell>
                   ))}
                 </TableRow>

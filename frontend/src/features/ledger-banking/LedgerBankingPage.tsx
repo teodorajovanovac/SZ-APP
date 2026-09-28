@@ -20,6 +20,7 @@ import { useTranslation } from 'react-i18next'
 import { useLocation } from 'react-router-dom'
 import { ApiProblemError } from '../../api/generated/client'
 import { useActiveCompany } from '../companies/useActiveCompany'
+import { formatDate } from '../../shared/format/date'
 import { ServerDataTable } from '../../shared/components/ServerDataTable'
 import { ledgerBankingApi } from './ledgerBankingApi'
 import { canPostJournal, canPostStatement, formatMoney } from './ledgerBankingFormat'
@@ -88,7 +89,11 @@ function JournalPanel({ companyId, canPost }: { companyId: number; canPost: bool
   const columns = useMemo<ColumnDef<JournalEntrySummary>[]>(
     () => [
       { accessorKey: 'id', header: t('ledgerBanking.journalColumns.number') },
-      { accessorKey: 'postingDate', header: t('ledgerBanking.journalColumns.date') },
+      {
+        accessorKey: 'postingDate',
+        header: t('ledgerBanking.journalColumns.date'),
+        cell: ({ getValue }) => formatDate(getValue<string>()),
+      },
       {
         accessorKey: 'description',
         header: t('ledgerBanking.journalColumns.description'),
@@ -211,7 +216,11 @@ function StatementPanel({ companyId, canPost }: { companyId: number; canPost: bo
   const columns = useMemo<ColumnDef<BankStatementSummary>[]>(
     () => [
       { accessorKey: 'statementNumber', header: t('ledgerBanking.statementColumns.number') },
-      { accessorKey: 'date', header: t('ledgerBanking.statementColumns.date') },
+      {
+        accessorKey: 'date',
+        header: t('ledgerBanking.statementColumns.date'),
+        cell: ({ getValue }) => formatDate(getValue<string>()),
+      },
       { accessorKey: 'previousBalance', header: t('ledgerBanking.statementColumns.previousBalance'), cell: ({ getValue }) => formatMoney(getValue<number>()) },
       { accessorKey: 'debit', header: t('ledgerBanking.statementColumns.debit'), cell: ({ getValue }) => formatMoney(getValue<number>()) },
       { accessorKey: 'credit', header: t('ledgerBanking.statementColumns.credit'), cell: ({ getValue }) => formatMoney(getValue<number>()) },

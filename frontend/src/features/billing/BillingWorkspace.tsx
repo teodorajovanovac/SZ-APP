@@ -3,6 +3,7 @@ import { Alert, Box, Button, Link, Paper, Stack, Typography } from '@mui/materia
 import type { ColumnDef, PaginationState, SortingState } from '@tanstack/react-table'
 import { useTranslation } from 'react-i18next'
 import { getErrorMessage } from '../../api/problemDetails'
+import { formatDate } from '../../shared/format/date'
 import { formatMoney } from '../../shared/format/money'
 import { FormDialog } from '../../shared/components/FormDialog'
 import { ServerDataTable } from '../../shared/components/ServerDataTable'
@@ -59,7 +60,12 @@ export function BillingWorkspace({ companyId, canPost }: { companyId: number; ca
         ),
       },
       { accessorKey: 'partnerName', header: t('billing_.columns.partner'), enableSorting: false, meta: { ellipsis: true } },
-      { accessorKey: 'issueDate', header: t('billing_.columns.date'), enableSorting: false },
+      {
+        accessorKey: 'issueDate',
+        header: t('billing_.columns.date'),
+        enableSorting: false,
+        cell: ({ getValue }) => formatDate(getValue<string>()),
+      },
       {
         accessorKey: 'invoiceTotal',
         header: t('billing_.columns.total'),

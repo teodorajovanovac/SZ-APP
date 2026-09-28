@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { apiRequest } from '../../api/generated/client'
 import { getErrorMessage } from '../../api/problemDetails'
+import { formatDate } from '../../shared/format/date'
 import { formatMoney } from '../../shared/format/money'
 import type { InvoiceSummary } from './types'
 
@@ -24,7 +25,7 @@ export function InvoiceDetail({ companyId, invoiceId }: { companyId: number; inv
         </Stack>
         <Typography>{invoice.partnerName}</Typography>
         <Typography color="text.secondary">{invoice.address}, {invoice.postalCode} {invoice.city}</Typography>
-        <Typography>{t('billing_.detail.dueDate')}: {invoice.dueDate}</Typography>
+        <Typography>{t('billing_.detail.dueDate')}: {formatDate(invoice.dueDate)}</Typography>
         <Typography fontWeight={700}>{t('billing_.detail.total')}: {formatMoney(invoice.invoiceTotal, invoice.currency)}</Typography>
       </Stack>
     </Paper>
