@@ -1,0 +1,127 @@
+using SzApp.Domain;
+using SzApp.Domain.LedgerBanking;
+
+namespace SzApp.UnitTests.LedgerBanking;
+
+public sealed class DocumentPostingRulesTests
+{
+    private static readonly DateOnly Turnover = new(2026, 8, 31);
+    private static readonly DateOnly Due = new(2026, 9, 15);
+
+    // 10 = type 1 "predviđeni" (fond, gets 4350/5590), 20 = type 2 (4900 only in the batch).
+    private static readonly Dictionary<int, SupplierPostingInfo> Suppliers = new()
+    {
+        [10] = new SupplierPostingInfo(10, SupplierDocumentTypes.Planned, 900, "4350", "10001", 5, "97-123-45", "Održavanje"),
+        [20] = new SupplierPostingInfo(20, SupplierDocumentTypes.Actual, 901, "4350", "10002", 2, null, "Čišćenje")
+    };
+
+    private static InvoicePostingSource Line(int invoiceId, int? supplierId, decimal amount) =>
+        new(invoiceId, 500 + invoiceId, "2040", Due, $"97-{invoiceId}-26", supplierId, amount);
+
+    private static IReadOnlyList<PostingLine> Batch() => DocumentPostingRules.BuildInvoiceBatch(Turnover, "R-2608",
+    [
+        Line(1, 10, 1000m), Line(1, 10, 200.50m), Line(1, 20, 300m),
+        Line(2, 10, 800m), Line(2, 20, 0m),
+        Line(3, 20, 0m) // zero-only invoice: skipped entirely
+    ], Suppliers);
+
+    private static void AssertBalanced(IEnumerable<PostingLine> lines) =>
+        LedgerBankingRules.ValidateJournal(lines.Select(x => new PostingAmounts(x.Debit, x.Credit)));
+
+    [Fact]
+    public void InvoiceBatch_Posts2040PerInvoiceAndSupplierInvoice_AndBalances()
+    {
+        var lines = Batch();
+        AssertBalanced(lines);
+
+        var customer = lines.Where(x => x.Account == "2040").ToArray();
+        Assert.Equal(3, customer.Length); // (1,10) (1,20) (2,10); zero groups skipped
+        Assert.All(customer, x =>
+        {
+            Assert.Equal(LedgerLineTypes.Invoice, x.LineType);
+            Assert.Equal(Turnover, x.PostingDate);
+            Assert.Equal(Due, x.DueDate);
+            Assert.Equal("R-2608", x.DocumentRef);
+            Assert.True(x.Debit > 0m && x.Credit == 0m);
+            Assert.NotNull(x.InvoiceId);
+            Assert.DoesNotContain("-", x.Parameters);
+        });
+        var first = customer.Single(x => x.InvoiceId == 1 && x.SupplierInvoiceId == 10);
+        Assert.Equal(1200.50m, first.Debit);
+        Assert.Equal(501, first.PartnerAccountId);
+        Assert.Equal("10001", first.SubAccountId);
+        Assert.Equal(5, first.CollectionPriority);
+        Assert.Equal("97126", first.Parameters);
+
+        var revenue = lines.Where(x => x.Account == "4900").ToDictionary(x => x.SupplierInvoiceId!.Value);
+        Assert.Equal(2000.50m, revenue[10].Credit);
+        Assert.Equal(300m, revenue[20].Credit);
+
+        // Only the type-1 supplier invoice gets the fond pair 4350 C (partner = supplier) / 5590 D, type 4.
+        var fond = lines.Single(x => x.Account == "4350");
+        Assert.Equal((10, 900, 2000.50m, LedgerLineTypes.SupplierInvoice), (fond.SupplierInvoiceId!.Value, fond.PartnerAccountId!.Value, fond.Credit, fond.LineType));
+        Assert.Equal(2000.50m, lines.Single(x => x.Account == "5590").Debit);
+    }
+
+    [Fact]
+    public void InvoiceStorno_IsRedStornoOnSameSide_AndNetsInvoiceToZero()
+    {
+        var single = DocumentPostingRules.BuildInvoiceBatch(Turnover, "R-2608", [Line(1, 10, 1200.50m), Line(1, 20, 300m)], Suppliers);
+        var stornoDate = new DateOnly(2026, 9, 28);
+        var storno = DocumentPostingRules.BuildInvoiceStorno(stornoDate, single.Where(x => x.Account == "2040"), Suppliers);
+
+        AssertBalanced(storno);
+        Assert.All(storno, x =>
+        {
+            Assert.Equal(LedgerLineTypes.Storno, x.LineType);
+            Assert.Equal(stornoDate, x.PostingDate);
+            Assert.True(x.Debit <= 0m && x.Credit <= 0m); // negative, never flipped to the other side
+        });
+        foreach (var account in single.Concat(storno).GroupBy(x => (x.Account, x.SupplierInvoiceId, x.InvoiceId)))
+        {
+            Assert.Equal(0m, account.Sum(x => x.Debit));
+            Assert.Equal(0m, account.Sum(x => x.Credit));
+        }
+    }
+
+    [Fact]
+    public void SupplierInvoice_Type2CreditsSupplier_Type3SwapsSidesAsStorno()
+    {
+        var actual = new SupplierPostingInfo(30, SupplierDocumentTypes.Actual, 902, "4350", "10003", 1, "12-34", "Lift",
+            "RT-7", 1500m, new DateOnly(2026, 8, 10), new DateOnly(2026, 9, 10));
+
+        var posted = DocumentPostingRules.BuildSupplierInvoice(actual);
+        AssertBalanced(posted);
+        var supplier = posted.Single(x => x.Account == "4350");
+        Assert.Equal((0m, 1500m, 902, LedgerLineTypes.SupplierInvoice), (supplier.Debit, supplier.Credit, supplier.PartnerAccountId!.Value, supplier.LineType));
+        Assert.Equal(1500m, posted.Single(x => x.Account == "5590").Debit);
+
+        var credit = DocumentPostingRules.BuildSupplierInvoice(actual with { DocumentType = SupplierDocumentTypes.CreditNote });
+        AssertBalanced(credit);
+        Assert.Equal(1500m, credit.Single(x => x.Account == "4350").Debit);
+        Assert.Equal(1500m, credit.Single(x => x.Account == "5590").Credit);
+        Assert.All(credit, x => Assert.Equal(LedgerLineTypes.Storno, x.LineType));
+
+        Assert.Equal("5800", DocumentPostingRules.BuildSupplierInvoice(actual with { ClosesAccount = "5800" })[1].Account);
+        Assert.Equal("posting.supplier-document-type", Assert.Throws<DomainRuleException>(() =>
+            DocumentPostingRules.BuildSupplierInvoice(actual with { DocumentType = SupplierDocumentTypes.Planned })).Code);
+    }
+
+    [Fact]
+    public void ValidateJournal_AcceptsRedStornoNegatives()
+    {
+        Assert.Equal(-50m, LedgerBankingRules.ValidateJournal([new PostingAmounts(-50m, 0m), new PostingAmounts(0m, -50m)]));
+    }
+
+    [Fact]
+    public void PostingPeriod_LockedMonthRejects_OpenMonthPasses()
+    {
+        var locked = new HashSet<int> { 2608 };
+        var ex = Assert.Throws<PostingPeriodLockedException>(() =>
+            PostingPeriod.EnsureOpen([new DateOnly(2026, 9, 1), new DateOnly(2026, 8, 31)], locked));
+        Assert.Equal(2608, ex.PeriodYYMM);
+
+        PostingPeriod.EnsureOpen([new DateOnly(2026, 9, 1), new DateOnly(2025, 8, 31)], locked);
+        Assert.Throws<DomainRuleException>(() => PostingPeriod.EnsureValid(2613));
+    }
+}
