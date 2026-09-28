@@ -767,6 +767,62 @@ public sealed class BillingService(
             .ToArray();
     }
 
+    public async Task<IReadOnlyList<NoticeAditionalCostResponse>> ListNoticeCostsAsync(int companyId, CancellationToken ct) =>
+        await db.Set<NoticeAditionalCost>().AsNoTracking()
+            .Where(x => x.CompanyId == null || x.CompanyId == companyId)
+            .OrderBy(x => x.CompanyId == null).ThenByDescending(x => x.DateStart)
+            .Select(x => ToNoticeCostResponse(x))
+            .ToArrayAsync(ct);
+
+    /// <summary>P11 rule create (id null) / edit. Global rows are Root-only; the scope of an existing row never changes.</summary>
+    public Task<NoticeAditionalCostResponse> SaveNoticeCostAsync(int companyId, int? id, SaveNoticeAditionalCostRequest request, bool isRoot, CancellationToken ct) =>
+        ExecuteSerializableAsync(async () =>
+        {
+            NoticeAditionalCost entity;
+            if (id is null)
+            {
+                entity = new NoticeAditionalCost { CompanyId = request.IsGlobal ? null : companyId };
+                db.Add(entity);
+            }
+            else
+            {
+                entity = await FindNoticeCostAsync(companyId, id.Value, ct);
+                db.Entry(entity).Property(x => x.RowVersion).OriginalValue =
+                    DecodeRowVersion(request.RowVersion ?? throw new DomainRuleException("concurrency.row-version-required", "RowVersion je obavezan za izmenu."));
+            }
+            if (entity.CompanyId is null && !isRoot)
+                throw new UnauthorizedAccessException("Globalne troškove opomena menja samo Root.");
+
+            var rule = new NoticeCostRule(entity.Id, request.DateStart, request.DateEnd, entity.CompanyId,
+                FinanceRounding.Money(request.AditionalCostsLowerAmount), FinanceRounding.Money(request.AditionalCostsLowerLimit),
+                FinanceRounding.Money(request.AditionalCostsUpperAmount));
+            NoticeCostCalculator.EnsureValid(rule, await LoadNoticeCostRulesAsync(entity.CompanyId, ct));
+            entity.DateStart = rule.DateStart;
+            entity.DateEnd = rule.DateEnd;
+            entity.AditionalCostsLowerAmount = rule.LowerAmount;
+            entity.AditionalCostsLowerLimit = rule.LowerLimit;
+            entity.AditionalCostsUpperAmount = rule.UpperAmount;
+            await db.SaveChangesAsync(ct);
+            return ToNoticeCostResponse(entity);
+        }, ct);
+
+    public async Task DeleteNoticeCostAsync(int companyId, int id, bool isRoot, CancellationToken ct)
+    {
+        var entity = await FindNoticeCostAsync(companyId, id, ct);
+        if (entity.CompanyId is null && !isRoot)
+            throw new UnauthorizedAccessException("Globalne troškove opomena briše samo Root.");
+        db.Remove(entity);
+        await db.SaveChangesAsync(ct);
+    }
+
+    private async Task<NoticeAditionalCost> FindNoticeCostAsync(int companyId, int id, CancellationToken ct) =>
+        await db.Set<NoticeAditionalCost>().SingleOrDefaultAsync(x => x.Id == id && (x.CompanyId == null || x.CompanyId == companyId), ct)
+            ?? throw new DomainRuleException("notice-costs.not-found", "Red troškova opomena ne postoji.");
+
+    private static NoticeAditionalCostResponse ToNoticeCostResponse(NoticeAditionalCost x) =>
+        new(x.Id, x.DateStart, x.DateEnd, x.CompanyId, x.AditionalCostsLowerAmount, x.AditionalCostsLowerLimit,
+            x.AditionalCostsUpperAmount, Convert.ToBase64String(x.RowVersion));
+
     public async Task<IReadOnlyList<NoticeTemplateResponse>> ListNoticeTemplatesAsync(int companyId, CancellationToken ct) =>
         await db.Set<NoticeTemplate>().AsNoTracking().Where(x => x.CompanyId == companyId)
             .OrderBy(x => x.Name).Select(x => new NoticeTemplateResponse(x.Id, x.Name, x.Body, x.IsActive, Convert.ToBase64String(x.RowVersion)))
