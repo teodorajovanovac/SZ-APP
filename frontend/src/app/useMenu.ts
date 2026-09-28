@@ -4,16 +4,21 @@ import BadgeIcon from '@mui/icons-material/Badge'
 import BusinessIcon from '@mui/icons-material/Business'
 import CreditCardIcon from '@mui/icons-material/CreditCard'
 import DashboardIcon from '@mui/icons-material/Dashboard'
+import DoorFrontIcon from '@mui/icons-material/DoorFront'
+import FileDownloadIcon from '@mui/icons-material/FileDownload'
 import GavelIcon from '@mui/icons-material/Gavel'
 import GroupsIcon from '@mui/icons-material/Groups'
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline'
 import ImportExportIcon from '@mui/icons-material/ImportExport'
+import ListAltIcon from '@mui/icons-material/ListAlt'
 import LocalShippingIcon from '@mui/icons-material/LocalShipping'
 import NotificationsIcon from '@mui/icons-material/Notifications'
 import PaymentsIcon from '@mui/icons-material/Payments'
+import PlaceIcon from '@mui/icons-material/Place'
 import QueryStatsIcon from '@mui/icons-material/QueryStats'
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong'
 import SettingsIcon from '@mui/icons-material/Settings'
+import TuneIcon from '@mui/icons-material/Tune'
 import type { SvgIconComponent } from '@mui/icons-material'
 import { useQuery } from '@tanstack/react-query'
 import { apiRequest } from '../api/generated/client'
@@ -28,15 +33,20 @@ const iconsByName: Record<string, SvgIconComponent> = {
   Business: BusinessIcon,
   CreditCard: CreditCardIcon,
   Dashboard: DashboardIcon,
+  DoorFront: DoorFrontIcon,
+  FileDownload: FileDownloadIcon,
   Gavel: GavelIcon,
   Groups: GroupsIcon,
   ImportExport: ImportExportIcon,
+  ListAlt: ListAltIcon,
   LocalShipping: LocalShippingIcon,
   Notifications: NotificationsIcon,
   Payments: PaymentsIcon,
+  Place: PlaceIcon,
   QueryStats: QueryStatsIcon,
   ReceiptLong: ReceiptLongIcon,
   Settings: SettingsIcon,
+  Tune: TuneIcon,
 }
 
 export function iconForName(name: string | null | undefined): SvgIconComponent {
