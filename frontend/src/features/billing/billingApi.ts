@@ -66,6 +66,46 @@ export function usePostInvoiceBatch(companyId: number) {
   })
 }
 
+export type InterestPresetKey = 'fromPreviousDueDate' | 'wholeMonth' | 'dueToDue' | 'custom'
+export interface InterestPeriodPresets {
+  defaultPreset: InterestPresetKey
+  lastRunEnd: string | null
+  presets: { key: InterestPresetKey; start: string; end: string }[]
+}
+export interface InterestRun {
+  invoiceBatchId: number
+  periodStart: string
+  periodEnd: string
+  rowCount: number
+  totalInterest: number
+  totals: { partnerAccountId: number; subAccountId: string; interest: number }[]
+}
+
+/** P10: suggested interest periods for a billing period; the run always takes explicit dates. */
+export function useInterestPeriodPresets(
+  companyId: number,
+  params: { periodYYMM: number; previousValueDate?: string; balanceAsOfDate?: string; dueDate?: string },
+  enabled: boolean,
+) {
+  const search = new URLSearchParams({ periodYYMM: String(params.periodYYMM) })
+  if (params.previousValueDate) search.set('previousValueDate', params.previousValueDate)
+  if (params.balanceAsOfDate) search.set('balanceAsOfDate', params.balanceAsOfDate)
+  if (params.dueDate) search.set('dueDate', params.dueDate)
+  return useQuery({
+    queryKey: ['companies', companyId, 'interest-presets', search.toString()],
+    queryFn: () => apiRequest<InterestPeriodPresets>(`/api/v1/companies/${companyId}/interest/period-presets?${search.toString()}`),
+    enabled,
+  })
+}
+
+/** Idempotent per batch: re-running replaces the batch's interest rows. */
+export function useRunInterest(companyId: number) {
+  return useMutation({
+    mutationFn: (request: { invoiceBatchId: number; periodStart: string; periodEnd: string }) =>
+      mutate<InterestRun>(`/api/v1/companies/${companyId}/interest/runs`, request),
+  })
+}
+
 /** FIN-02: per-invoice red storno (negative amounts, same side, type 7). */
 export function useCancelInvoice(companyId: number, invoiceId: number) {
   const queryClient = useQueryClient()
