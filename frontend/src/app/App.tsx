@@ -14,7 +14,11 @@ import { RoleGuard } from '../shared/routing/RoleGuard'
 import { AppShell } from './AppShell'
 import { theme } from './theme'
 import { useCompanyRole } from '../features/companies/useCompanyRole'
-import { AddressesPage, BuildingEntrancesPage, CompanyPage, LocationCategoriesPage, PartnersPage, StaffPage, UnitsPage } from '../features/master-data/MasterDataPages'
+import { AddressesPage, BuildingEntrancesPage, CompanyPage, LocationCategoriesPage, PartnersPage, UnitsPage } from '../features/master-data/MasterDataPages'
+import { StaffListPage } from '../features/staff/StaffListPage'
+import { StaffDetailPage } from '../features/staff/StaffDetailPage'
+import { SettingsPage } from '../features/administration/SettingsPage'
+import { ShortListsPage } from '../features/administration/ShortListsPage'
 import { BuildingEntranceDetailPage } from '../features/master-data/pages/BuildingEntranceDetailPage'
 import { PartnerDetailPage } from '../features/master-data/pages/PartnerDetailPage'
 import { UnitDetailPage } from '../features/master-data/pages/UnitDetailPage'
@@ -60,7 +64,12 @@ function AuthenticatedRoutes() {
             <Route path="partners" element={<PartnersPage />} />
             <Route path="addresses" element={<AddressesPage />} />
             <Route element={<RoleGuard allowedRoles={['Root', 'Upravnik']} />}>
-              <Route path="staff" element={<StaffPage />} />
+              <Route path="staff" element={<StaffListPage />} />
+              <Route path="staff/:staffId" element={<StaffDetailPage />} />
+              <Route path="settings" element={<SettingsPage />} />
+            </Route>
+            <Route element={<RoleGuard allowedRoles={['Root']} />}>
+              <Route path="short-lists" element={<ShortListsPage />} />
             </Route>
             <Route path="units" element={<UnitsPage />} />
             <Route path="contracts" element={<ContractsPage />} />
