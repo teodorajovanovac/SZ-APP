@@ -116,17 +116,26 @@ public static class MasterDataFeatureExtensions
         Apply(company, request);
         dbContext.Companies.Add(company);
 
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
-        await dbContext.Database.ExecuteSqlRawAsync("SET IDENTITY_INSERT core.Company ON", cancellationToken);
-        try
+        // FIN-10: the DbContext is registered with EnableRetryOnFailure (Program.cs), so a
+        // manually-scoped BeginTransactionAsync here throws InvalidOperationException the moment
+        // SaveChangesAsync runs inside it -- EF's retrying execution strategy refuses to wrap a
+        // user-owned transaction it doesn't control. Must go through CreateExecutionStrategy the
+        // same way BillingService.ExecuteSerializableAsync does (BillingService.cs:661-671).
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
         {
-            await dbContext.SaveChangesAsync(cancellationToken);
-        }
-        finally
-        {
-            await dbContext.Database.ExecuteSqlRawAsync("SET IDENTITY_INSERT core.Company OFF", cancellationToken);
-        }
-        await transaction.CommitAsync(cancellationToken);
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+            await dbContext.Database.ExecuteSqlRawAsync("SET IDENTITY_INSERT core.Company ON", cancellationToken);
+            try
+            {
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
+            finally
+            {
+                await dbContext.Database.ExecuteSqlRawAsync("SET IDENTITY_INSERT core.Company OFF", cancellationToken);
+            }
+            await transaction.CommitAsync(cancellationToken);
+        });
 
         SetETag(httpContext, company.RowVersion);
         return Results.Created($"/api/v1/companies/{company.Id}", ToResponse(company));

@@ -313,47 +313,55 @@ public static class MasterDataExtendedFeatureExtensions
             ContractPeriodPolicy.Overlaps(request.EffectiveFrom, null, item.ContractDate, item.ContractEndDate));
         if (overlapsFuture) return Unprocessable("Period novog ugovora preklapa se sa postojećom istorijom.");
 
-        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        try
+        // FIN-10: same reasoning as MasterDataFeatureExtensions.CreateCompanyAsync -- the DbContext
+        // has EnableRetryOnFailure, so a manually-scoped BeginTransactionAsync throws
+        // InvalidOperationException on SaveChangesAsync unless run through the execution strategy
+        // returned by CreateExecutionStrategy (reference: BillingService.cs:661-671).
+        var strategy = db.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
-            if (current is not null)
+            await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+            try
             {
-                current.ContractEndDate = request.EffectiveFrom.AddDays(-1);
-                current.IsActive = false;
+                if (current is not null)
+                {
+                    current.ContractEndDate = request.EffectiveFrom.AddDays(-1);
+                    current.IsActive = false;
+                }
+                var next = new Contract
+                {
+                    CompanyId = companyId,
+                    UnitId = unitId,
+                    AccountNumber = request.AccountNumber,
+                    OwnerPartnerId = request.OwnerPartnerId,
+                    InvoicePartnerId = request.InvoicePartnerId ?? request.OwnerPartnerId,
+                    TenantPartnerId = request.TenantPartnerId,
+                    ContractDate = request.EffectiveFrom,
+                    InvoiceStartDate = request.InvoiceStartDate,
+                    InvoiceEndDate = request.InvoiceEndDate,
+                    IsActive = true,
+                    Note = request.Note,
+                    InvoiceDeliveryLocation = request.InvoiceDeliveryLocation,
+                    InvoiceDeliveryUnitId = request.InvoiceDeliveryUnitId,
+                    IsPrintInvoiceMandatory = request.IsPrintInvoiceMandatory,
+                    IsPrintInvoiceToPostOffice = request.IsPrintInvoiceToPostOffice,
+                    IsPrintInvoiceSkipped = request.IsPrintInvoiceSkipped,
+                    ExportExternalAccount = request.ExportExternalAccount
+                };
+                db.Set<Contract>().Add(next);
+                await db.SaveChangesAsync(cancellationToken);
+                unit.ContractId = next.Id;
+                await db.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+                SetETag(context, next.RowVersion);
+                return Results.Created($"/api/v1/companies/{companyId}/contracts/{next.Id}", ToResponse(next));
             }
-            var next = new Contract
+            catch (DbUpdateConcurrencyException)
             {
-                CompanyId = companyId,
-                UnitId = unitId,
-                AccountNumber = request.AccountNumber,
-                OwnerPartnerId = request.OwnerPartnerId,
-                InvoicePartnerId = request.InvoicePartnerId ?? request.OwnerPartnerId,
-                TenantPartnerId = request.TenantPartnerId,
-                ContractDate = request.EffectiveFrom,
-                InvoiceStartDate = request.InvoiceStartDate,
-                InvoiceEndDate = request.InvoiceEndDate,
-                IsActive = true,
-                Note = request.Note,
-                InvoiceDeliveryLocation = request.InvoiceDeliveryLocation,
-                InvoiceDeliveryUnitId = request.InvoiceDeliveryUnitId,
-                IsPrintInvoiceMandatory = request.IsPrintInvoiceMandatory,
-                IsPrintInvoiceToPostOffice = request.IsPrintInvoiceToPostOffice,
-                IsPrintInvoiceSkipped = request.IsPrintInvoiceSkipped,
-                ExportExternalAccount = request.ExportExternalAccount
-            };
-            db.Set<Contract>().Add(next);
-            await db.SaveChangesAsync(cancellationToken);
-            unit.ContractId = next.Id;
-            await db.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-            SetETag(context, next.RowVersion);
-            return Results.Created($"/api/v1/companies/{companyId}/contracts/{next.Id}", ToResponse(next));
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            return ConcurrencyConflict();
-        }
+                await transaction.RollbackAsync(cancellationToken);
+                return ConcurrencyConflict();
+            }
+        });
     }
 
     private static async Task<IResult> ListPartnerAccountsAsync(
