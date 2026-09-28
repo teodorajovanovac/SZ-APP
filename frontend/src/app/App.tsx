@@ -98,12 +98,17 @@ function useCompanyPermissions() {
     queryFn: () => api.companies.context(activeCompany.id),
   })
   const role = context.data?.role
-  return { companyId: activeCompany.id, canWrite: role === 'Root' || role === 'Upravnik' || role === 'Moderator' }
+  return {
+    companyId: activeCompany.id,
+    canWrite: role === 'Root' || role === 'Upravnik' || role === 'Moderator',
+    // P13: only Upravnik/Root may unlock a posting period.
+    canAdmin: role === 'Root' || role === 'Upravnik',
+  }
 }
 function AdministrationRoute() { const { companyId } = useCompanyPermissions(); return <PlatformAdministrationPage companyId={companyId} /> }
 function BillingRoute() { const { companyId, canWrite } = useCompanyPermissions(); return <BillingWorkspace companyId={companyId} canPost={canWrite} /> }
-function SupplierRoute() { const { companyId } = useCompanyPermissions(); return <SupplierInvoiceList companyId={companyId} /> }
-function LedgerRoute() { const { canWrite } = useCompanyPermissions(); return <LedgerBankingPage canPost={canWrite} /> }
+function SupplierRoute() { const { companyId, canWrite } = useCompanyPermissions(); return <SupplierInvoiceList companyId={companyId} canPost={canWrite} /> }
+function LedgerRoute() { const { canWrite, canAdmin } = useCompanyPermissions(); return <LedgerBankingPage canPost={canWrite} canUnlock={canAdmin} /> }
 function NoticesRoute() { const { companyId, canWrite } = useCompanyPermissions(); return <NoticeList companyId={companyId} canWrite={canWrite} /> }
 function DocumentsRoute() { const { companyId } = useCompanyPermissions(); return <DocumentsPage companyId={companyId} /> }
 function EmailRoute() { const { companyId } = useCompanyPermissions(); return <EmailPage companyId={companyId} /> }

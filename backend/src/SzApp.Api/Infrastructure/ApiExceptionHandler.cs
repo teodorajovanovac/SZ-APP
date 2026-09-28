@@ -20,6 +20,8 @@ public sealed class ApiExceptionHandler(
         {
             AntiforgeryValidationException =>
                 (StatusCodes.Status400BadRequest, "CSRF token nije ispravan", "security.invalid-antiforgery-token"),
+            SzApp.Domain.LedgerBanking.PostingPeriodLockedException =>
+                (StatusCodes.Status409Conflict, "Period je zaključan", SzApp.Domain.LedgerBanking.PostingPeriodLockedException.Code),
             DomainRuleException domainException =>
                 (StatusCodes.Status422UnprocessableEntity, "Poslovno pravilo nije zadovoljeno", domainException.Code),
             DbUpdateConcurrencyException =>

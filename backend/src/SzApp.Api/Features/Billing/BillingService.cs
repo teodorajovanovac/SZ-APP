@@ -6,6 +6,9 @@ using SzApp.Data.Entities;
 using SzApp.Data.Entities.Billing;
 using SzApp.Domain;
 using SzApp.Domain.Billing;
+using SzApp.Domain.LedgerBanking;
+using SzApp.Api.Features.LedgerBanking;
+using SzApp.Data.Entities.LedgerBanking;
 using Invoice = SzApp.Data.Entities.Invoice;
 using InvoiceLine = SzApp.Data.Entities.InvoiceLine;
 
@@ -16,8 +19,12 @@ public sealed class BillingService(
     IShortListValidator shortLists,
     ILedgerPostingGateway ledger,
     INoticeWorkflowGateway noticeWorkflow,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IBusinessClock clock)
 {
+    private const string SupplierInvoiceSource = "SupplierInvoice";
+    private const string SupplierInvoiceCancelSource = "SupplierInvoiceCancel";
+
     private static readonly HashSet<string> SupplierAmountRules = ["FixedRsd", "FixedEur", "SupplierTotal"];
     private static readonly HashSet<string> AllocationRules = ["Equal", "ByArea", "ByUnit", "ByCoefficient"];
     private static readonly HashSet<string> QuantityRules = ["One", "UnitArea", "UnitCount", "Coefficient"];
@@ -67,7 +74,8 @@ public sealed class BillingService(
                 x.InvoiceTotalCalculationAmountEur, x.InvoiceTotalCalculationAmountRsd, x.PostedInvoiceAmount,
                 x.InvoiceDate, x.TransactionDate, x.SupplierPartnerAccountId, x.DocumentTypeId, x.ExtraordinaryInvoiceMarker,
                 x.UnitTypes.OrderBy(y => y.UnitTypeId).Select(y => y.UnitTypeId).ToArray(),
-                Convert.ToBase64String(x.RowVersion)))
+                Convert.ToBase64String(x.RowVersion), x.JournalEntryId,
+                db.Set<LedgerSourcePosting>().Any(p => p.CompanyId == x.CompanyId && p.SourceType == SupplierInvoiceCancelSource && p.SourceId == x.Id)))
             .ToArrayAsync(ct);
         return new(items, page, pageSize, total);
     }
@@ -318,26 +326,64 @@ public sealed class BillingService(
         return new(batchId, false, preview.Fingerprint, invoiceIds);
     }
 
-    public async Task<InvoiceBatchResponse> PostBatchAsync(int companyId, int batchId, string idempotencyKey, CancellationToken ct)
-    {
-        var batch = await GetBatchAsync(companyId, batchId, true, ct);
-        if (batch.Status == BillingBatchStatus.Posted) return ToBatchResponse(batch);
-        if (batch.Status != BillingBatchStatus.Generated)
-            throw new DomainRuleException("billing.batch-not-generated", "Samo generisana serija može biti knjižena.");
+    /// <summary>
+    /// FIN-05/FIN-11: 9.2 batch posting -- one journal, 2040 per invoice × supplier invoice,
+    /// 4900 (+4350/5590 for type 1) per supplier invoice, atomic with the batch status change
+    /// and the PostedInvoiceAmount write-back (FIN-31).
+    /// </summary>
+    public Task<InvoiceBatchResponse> PostBatchAsync(int companyId, int batchId, string idempotencyKey, CancellationToken ct) =>
+        ExecuteSerializableAsync(async () =>
+        {
+            await LockInvoiceBatchAsync(batchId, ct);
+            var batch = await GetBatchAsync(companyId, batchId, true, ct);
+            if (batch.Status == BillingBatchStatus.Posted) return ToBatchResponse(batch);
+            if (batch.Status != BillingBatchStatus.Generated)
+                throw new DomainRuleException("billing.batch-not-generated", "Samo generisana serija može biti knjižena.");
 
-        var invoices = db.Invoices.Where(x => x.CompanyId == companyId && EF.Property<int?>(x, "InvoiceBatchId") == batchId && !x.IsCancelled);
-        var count = await invoices.CountAsync(ct);
-        if (count == 0) throw new DomainRuleException("billing.batch-empty", "Serija nema aktivne račune.");
-        var amount = FinanceRounding.Money(await invoices.SumAsync(x => x.InvoiceTotal, ct));
-        var result = await ledger.PostAsync(new LedgerPostingRequest(
-            companyId, "InvoiceBatch", batchId, batch.TransactionDate,
-            $"INV-{batch.PeriodYYMM}-{batch.Id}", amount, "RSD", idempotencyKey), ct);
-        batch.JournalEntryId = result.JournalEntryId;
-        batch.Status = BillingBatchStatus.Posted;
-        batch.PostedAt = timeProvider.GetUtcNow();
-        await db.SaveChangesAsync(ct);
-        return ToBatchResponse(batch);
-    }
+            var invoices = await db.Invoices.AsNoTracking()
+                .Where(x => x.CompanyId == companyId && EF.Property<int?>(x, "InvoiceBatchId") == batchId && !x.IsCancelled)
+                .Select(x => new InvoiceHead(x.Id, x.PartnerId, x.PartnerName, x.DueDate, x.InvoiceTotal, EF.Property<string?>(x, "PaymentReference")))
+                .ToArrayAsync(ct);
+            if (invoices.Length == 0) throw new DomainRuleException("billing.batch-empty", "Serija nema aktivne račune.");
+
+            var lineSums = await db.InvoiceLines.AsNoTracking()
+                .Where(x => x.CompanyId == companyId && EF.Property<int?>(x, "InvoiceBatchId") == batchId && !x.Invoice.IsCancelled)
+                .GroupBy(x => new { x.InvoiceId, SupplierInvoiceId = EF.Property<int?>(x, "SupplierInvoiceId") })
+                .Select(g => new { g.Key.InvoiceId, g.Key.SupplierInvoiceId, Amount = g.Sum(x => x.TotalAmount) })
+                .ToArrayAsync(ct);
+
+            var customerAccounts = await ResolveCustomerAccountsAsync(companyId, invoices, ct);
+            var sources = new List<InvoicePostingSource>();
+            foreach (var invoice in invoices)
+            {
+                var account = customerAccounts[invoice.Id];
+                var own = lineSums.Where(x => x.InvoiceId == invoice.Id).ToArray();
+                sources.AddRange(own.Select(x => new InvoicePostingSource(
+                    invoice.Id, account.Id, account.Account, invoice.DueDate, invoice.PaymentReference, x.SupplierInvoiceId, x.Amount)));
+                // Invoice-level amounts that aren't on a line (benefit reduction, interest,
+                // rounding) still belong to the customer's debt: posted without a supplier invoice.
+                var residual = FinanceRounding.Money(invoice.InvoiceTotal - own.Sum(x => x.Amount));
+                if (residual != 0m)
+                {
+                    sources.Add(new InvoicePostingSource(
+                        invoice.Id, account.Id, account.Account, invoice.DueDate, invoice.PaymentReference, null, residual));
+                }
+            }
+
+            var supplierIds = sources.Where(x => x.SupplierInvoiceId is not null).Select(x => x.SupplierInvoiceId!.Value).Distinct().ToArray();
+            var suppliers = await LoadSupplierPostingInfoAsync(companyId, supplierIds, ct);
+            var documentRef = DocumentPostingRules.InvoiceDocumentRef(batch.PeriodYYMM);
+            var lines = DocumentPostingRules.BuildInvoiceBatch(batch.TransactionDate, documentRef, sources, suppliers);
+            var result = await ledger.PostAsync(new LedgerPostingRequest(
+                companyId, "InvoiceBatch", batchId, batch.TransactionDate, $"SZ RACUNI {documentRef}", "RSD", idempotencyKey, lines), ct);
+
+            await AdjustPostedSupplierAmountsAsync(companyId, lines, ct);
+            batch.JournalEntryId = result.JournalEntryId;
+            batch.Status = BillingBatchStatus.Posted;
+            batch.PostedAt = timeProvider.GetUtcNow();
+            await db.SaveChangesAsync(ct);
+            return ToBatchResponse(batch);
+        }, ct);
 
     public async Task<BillingPage<InvoiceResponse>> ListInvoicesAsync(int companyId, int page, int pageSize, CancellationToken ct)
     {
@@ -363,30 +409,212 @@ public sealed class BillingService(
         return ToInvoiceResponse(invoice, db.Entry(invoice).Property<int?>("InvoiceBatchId").CurrentValue, lines);
     }
 
-    public async Task<InvoiceResponse> CancelInvoiceAsync(int companyId, int invoiceId, CancelInvoiceRequest request, string idempotencyKey, CancellationToken ct)
-    {
-        var invoice = await db.Invoices.SingleOrDefaultAsync(x => x.CompanyId == companyId && x.Id == invoiceId, ct)
-            ?? throw new DomainRuleException("billing.invoice-not-found", "Račun ne postoji.");
-        if (invoice.IsCancelled) return ToInvoiceResponse(invoice, db.Entry(invoice).Property<int?>("InvoiceBatchId").CurrentValue, null);
-        db.Entry(invoice).Property(x => x.RowVersion).OriginalValue = DecodeRowVersion(request.RowVersion);
-
-        var batchId = db.Entry(invoice).Property<int?>("InvoiceBatchId").CurrentValue;
-        if (batchId is not null)
+    /// <summary>
+    /// FIN-02 / P9: storno of ONE invoice -- a new journal with this invoice's 2040 lines negated on
+    /// the same side plus the matching negative 4900 (+4350/5590), type 7, dated today (Belgrade).
+    /// </summary>
+    public Task<InvoiceResponse> CancelInvoiceAsync(int companyId, int invoiceId, CancelInvoiceRequest request, string idempotencyKey, CancellationToken ct) =>
+        ExecuteSerializableAsync(async () =>
         {
-            var batch = await db.Set<InvoiceBatch>().SingleAsync(x => x.CompanyId == companyId && x.Id == batchId, ct);
-            if (batch.Status == BillingBatchStatus.Posted && batch.JournalEntryId is not null)
+            var invoice = await db.Invoices.SingleOrDefaultAsync(x => x.CompanyId == companyId && x.Id == invoiceId, ct)
+                ?? throw new DomainRuleException("billing.invoice-not-found", "Račun ne postoji.");
+            if (invoice.IsCancelled) return ToInvoiceResponse(invoice, db.Entry(invoice).Property<int?>("InvoiceBatchId").CurrentValue, null);
+            db.Entry(invoice).Property(x => x.RowVersion).OriginalValue = DecodeRowVersion(request.RowVersion);
+            var reason = Required(request.Reason, 500, "Razlog storna");
+
+            var batchId = db.Entry(invoice).Property<int?>("InvoiceBatchId").CurrentValue;
+            var batch = batchId is null ? null : await db.Set<InvoiceBatch>().SingleAsync(x => x.CompanyId == companyId && x.Id == batchId, ct);
+            if (batch is { Status: BillingBatchStatus.Posted, JournalEntryId: { } journalId })
             {
-                await ledger.ReverseAsync(new LedgerReversalRequest(companyId, "Invoice", invoiceId, batch.JournalEntryId.Value,
-                    DateOnly.FromDateTime(timeProvider.GetLocalNow().DateTime), invoice.InvoiceTotal, invoice.Currency,
-                    Required(request.Reason, 500, "Razlog storna"), idempotencyKey), ct);
+                var posted = (await db.LedgerEntries.AsNoTracking()
+                        .Where(x => x.CompanyId == companyId && x.JournalEntryId == journalId && x.InvoiceId == invoiceId)
+                        .OrderBy(x => x.Priority)
+                        .Select(x => new
+                        {
+                            x.Account, x.DebitAmount, x.CreditAmount, x.PostingDate, x.DueDate, x.DocumentRef, x.Parameters,
+                            x.SupplierInvoiceId, x.CollectionPriority, x.Note,
+                            PartnerAccountId = EF.Property<int?>(x, "PartnerAccountId"),
+                            SubAccountId = EF.Property<string?>(x, "SubAccountId")
+                        })
+                        .ToArrayAsync(ct))
+                    .Select(x => new PostingLine(x.Account, x.DebitAmount, x.CreditAmount, LedgerLineTypes.Invoice, x.PostingDate,
+                        x.PartnerAccountId, x.SubAccountId, x.DueDate, x.DocumentRef, x.Parameters, invoiceId,
+                        x.SupplierInvoiceId, x.CollectionPriority, x.Note))
+                    .ToArray();
+                if (posted.Length == 0)
+                {
+                    // Batches posted before per-document posting existed carry no InvoiceId on their lines.
+                    throw new DomainRuleException("billing.invoice-not-posted-per-document",
+                        "Serija je proknjižena zbirno (stari način); storno pojedinačnog računa nije moguć automatski.");
+                }
+
+                var supplierIds = posted.Where(x => x.SupplierInvoiceId is not null).Select(x => x.SupplierInvoiceId!.Value).Distinct().ToArray();
+                var suppliers = await LoadSupplierPostingInfoAsync(companyId, supplierIds, ct);
+                var stornoDate = clock.Today;
+                var lines = DocumentPostingRules.BuildInvoiceStorno(stornoDate, posted, suppliers);
+                await ledger.PostAsync(new LedgerPostingRequest(
+                    companyId, "InvoiceCancel", invoiceId, stornoDate, $"STORNO računa {invoice.SequenceNumber}", invoice.Currency, idempotencyKey, lines), ct);
+                await AdjustPostedSupplierAmountsAsync(companyId, lines, ct);
             }
+
+            invoice.IsCancelled = true;
+            invoice.CancelledAt = timeProvider.GetUtcNow();
+            db.Entry(invoice).Property("CancelReason").CurrentValue = reason;
+            await db.SaveChangesAsync(ct);
+            return ToInvoiceResponse(invoice, batchId, null);
+        }, ct);
+
+    /// <summary>FIN-34: standalone posting of a supplier invoice (types 2 and 3), legacy GK_KnjizenjeRacunaTroska.</summary>
+    public Task<SupplierInvoiceResponse> PostSupplierInvoiceAsync(int companyId, int supplierInvoiceId, string idempotencyKey, CancellationToken ct) =>
+        ExecuteSerializableAsync(async () =>
+        {
+            await LockSupplierInvoiceAsync(supplierInvoiceId, ct);
+            var entity = await GetSupplierInvoiceAsync(companyId, supplierInvoiceId, ct);
+            if (entity.JournalEntryId is null)
+            {
+                var info = (await LoadSupplierPostingInfoAsync(companyId, [supplierInvoiceId], ct))[supplierInvoiceId];
+                var lines = DocumentPostingRules.BuildSupplierInvoice(info);
+                var result = await ledger.PostAsync(new LedgerPostingRequest(
+                    companyId, SupplierInvoiceSource, supplierInvoiceId, info.InvoiceDate,
+                    $"Račun RT {entity.CodeName}", "RSD", idempotencyKey, lines), ct);
+                entity.JournalEntryId = result.JournalEntryId;
+                await db.SaveChangesAsync(ct);
+            }
+            return await GetSupplierInvoiceResponseAsync(companyId, supplierInvoiceId, ct);
+        }, ct);
+
+    /// <summary>
+    /// Red storno of a posted supplier invoice. Terminal: a corrected document is entered as a new
+    /// supplier invoice (legacy Previous/NewSupplierInvoiceId), it can't be re-posted.
+    /// </summary>
+    public Task<SupplierInvoiceResponse> CancelSupplierInvoicePostingAsync(int companyId, int supplierInvoiceId, string idempotencyKey, CancellationToken ct) =>
+        ExecuteSerializableAsync(async () =>
+        {
+            await LockSupplierInvoiceAsync(supplierInvoiceId, ct);
+            var entity = await GetSupplierInvoiceAsync(companyId, supplierInvoiceId, ct);
+            if (entity.JournalEntryId is not { } journalId)
+                throw new DomainRuleException("billing.supplier-invoice-not-posted", "Ulazni račun nije proknjižen.");
+
+            var posted = (await db.LedgerEntries.AsNoTracking()
+                    .Where(x => x.CompanyId == companyId && x.JournalEntryId == journalId)
+                    .OrderBy(x => x.Priority)
+                    .Select(x => new
+                    {
+                        x.Account, x.DebitAmount, x.CreditAmount, x.PostingDate, x.DueDate, x.DocumentRef, x.Parameters,
+                        x.SupplierInvoiceId, x.CollectionPriority, x.Note,
+                        PartnerAccountId = EF.Property<int?>(x, "PartnerAccountId"),
+                        SubAccountId = EF.Property<string?>(x, "SubAccountId")
+                    })
+                    .ToArrayAsync(ct))
+                .Select(x => new PostingLine(x.Account, x.DebitAmount, x.CreditAmount, LedgerLineTypes.SupplierInvoice, x.PostingDate,
+                    x.PartnerAccountId, x.SubAccountId, x.DueDate, x.DocumentRef, x.Parameters, null,
+                    x.SupplierInvoiceId, x.CollectionPriority, x.Note))
+                .ToArray();
+            var stornoDate = clock.Today;
+            await ledger.PostAsync(new LedgerPostingRequest(
+                companyId, SupplierInvoiceCancelSource, supplierInvoiceId, stornoDate,
+                $"STORNO Račun RT {entity.CodeName}", "RSD", idempotencyKey, DocumentPostingRules.Negate(posted, stornoDate)), ct);
+            return await GetSupplierInvoiceResponseAsync(companyId, supplierInvoiceId, ct);
+        }, ct);
+
+    private sealed record InvoiceHead(int Id, int PartnerId, string PartnerName, DateOnly DueDate, decimal InvoiceTotal, string? PaymentReference);
+
+    /// <summary>
+    /// Customer's 2040 partner account per invoice: the partner's 2040 account in this company,
+    /// preferring one tied to a contract billed on the invoice, then a company-specific one.
+    /// </summary>
+    private async Task<Dictionary<int, (int Id, string Account)>> ResolveCustomerAccountsAsync(int companyId, IReadOnlyCollection<InvoiceHead> invoices, CancellationToken ct)
+    {
+        var partnerIds = invoices.Select(x => x.PartnerId).Distinct().ToArray();
+        var invoiceIds = invoices.Select(x => x.Id).ToArray();
+        var accounts = await db.Set<PartnerAccount>().AsNoTracking()
+            .Where(x => partnerIds.Contains(x.PartnerId) && x.Account == LedgerAccounts.Customers && (x.CompanyId == companyId || x.CompanyId == null))
+            .Select(x => new { x.Id, x.PartnerId, x.ContractId, x.CompanyId, x.Account })
+            .ToArrayAsync(ct);
+        var contracts = (await db.Set<InvoiceUnit>().AsNoTracking()
+                .Where(x => x.CompanyId == companyId && invoiceIds.Contains(x.InvoiceId))
+                .Select(x => new { x.InvoiceId, x.ContractId })
+                .ToArrayAsync(ct))
+            .ToLookup(x => x.InvoiceId, x => x.ContractId);
+
+        var result = new Dictionary<int, (int, string)>();
+        foreach (var invoice in invoices)
+        {
+            var billed = contracts[invoice.Id].ToHashSet();
+            var account = accounts.Where(x => x.PartnerId == invoice.PartnerId)
+                .OrderByDescending(x => x.ContractId is { } c && billed.Contains(c))
+                .ThenByDescending(x => x.CompanyId == companyId)
+                .ThenBy(x => x.Id)
+                .FirstOrDefault()
+                ?? throw new DomainRuleException("billing.customer-account-missing", $"Kupac '{invoice.PartnerName}' nema konto {LedgerAccounts.Customers}.");
+            result[invoice.Id] = (account.Id, account.Account);
         }
-        invoice.IsCancelled = true;
-        invoice.CancelledAt = timeProvider.GetUtcNow();
-        db.Entry(invoice).Property("CancelReason").CurrentValue = Required(request.Reason, 500, "Razlog storna");
-        await db.SaveChangesAsync(ct);
-        return ToInvoiceResponse(invoice, batchId, null);
+        return result;
     }
+
+    private async Task<Dictionary<int, SupplierPostingInfo>> LoadSupplierPostingInfoAsync(int companyId, IReadOnlyCollection<int> ids, CancellationToken ct)
+    {
+        if (ids.Count == 0) return [];
+        var rows = await (
+                from s in db.Set<SupplierInvoice>().AsNoTracking()
+                join type in db.ShortLists.AsNoTracking() on s.DocumentTypeId equals type.Id
+                join supplier in db.Set<PartnerAccount>().AsNoTracking() on s.SupplierPartnerAccountId equals supplier.Id
+                where s.CompanyId == companyId && ids.Contains(s.Id)
+                select new
+                {
+                    s.Id, DocumentType = type.IndexValue, s.SupplierPartnerAccountId, SupplierAccount = supplier.Account, s.SubAccountId,
+                    s.PaymentPriority, s.PaymentReference, s.Caption, s.CodeName, s.InvoiceTotalCalculationAmountRsd,
+                    s.InvoiceDate, s.PaymentDate, s.ClosesAccount
+                })
+            .ToArrayAsync(ct);
+        if (rows.Length != ids.Count)
+            throw new DomainRuleException("billing.supplier-invoice-not-found", "Ulazni račun ne pripada aktivnoj kompaniji ili nema tip dokumenta / konto dobavljača.");
+        return rows.ToDictionary(x => x.Id, x => new SupplierPostingInfo(
+            x.Id, x.DocumentType, x.SupplierPartnerAccountId, x.SupplierAccount, x.SubAccountId, x.PaymentPriority,
+            x.PaymentReference, x.Caption, x.CodeName, x.InvoiceTotalCalculationAmountRsd, x.InvoiceDate, x.PaymentDate, x.ClosesAccount));
+    }
+
+    /// <summary>FIN-31 (legacy DobavljacInfoKnjizenogIznosa): PostedInvoiceAmount follows what 4900 received per supplier invoice.</summary>
+    private async Task AdjustPostedSupplierAmountsAsync(int companyId, IEnumerable<PostingLine> lines, CancellationToken ct)
+    {
+        var deltas = lines.Where(x => x.Account == LedgerAccounts.Revenue && x.SupplierInvoiceId is not null)
+            .GroupBy(x => x.SupplierInvoiceId!.Value)
+            .ToDictionary(g => g.Key, g => FinanceRounding.Money(g.Sum(x => x.Credit)));
+        if (deltas.Count == 0) return;
+        var ids = deltas.Keys.ToArray();
+        foreach (var supplier in await db.Set<SupplierInvoice>().Where(x => x.CompanyId == companyId && ids.Contains(x.Id)).ToArrayAsync(ct))
+        {
+            supplier.PostedInvoiceAmount = FinanceRounding.Money(supplier.PostedInvoiceAmount + deltas[supplier.Id]);
+        }
+    }
+
+    private async Task<SupplierInvoice> GetSupplierInvoiceAsync(int companyId, int supplierInvoiceId, CancellationToken ct)
+    {
+        var entity = await db.Set<SupplierInvoice>().SingleOrDefaultAsync(x => x.CompanyId == companyId && x.Id == supplierInvoiceId, ct)
+            ?? throw new DomainRuleException("billing.supplier-invoice-not-found", "Ulazni račun ne postoji.");
+        if (await db.Set<LedgerSourcePosting>().AnyAsync(x => x.CompanyId == companyId && x.SourceType == SupplierInvoiceCancelSource && x.SourceId == supplierInvoiceId, ct))
+            throw new DomainRuleException("billing.supplier-invoice-cancelled", "Knjiženje ulaznog računa je već stornirano; ispravku unesite kao novi ulazni račun.");
+        return entity;
+    }
+
+    private async Task<SupplierInvoiceResponse> GetSupplierInvoiceResponseAsync(int companyId, int supplierInvoiceId, CancellationToken ct) =>
+        (await ListSupplierInvoicesByIdAsync(companyId, supplierInvoiceId, ct)).Single();
+
+    private Task<SupplierInvoiceResponse[]> ListSupplierInvoicesByIdAsync(int companyId, int supplierInvoiceId, CancellationToken ct) =>
+        db.Set<SupplierInvoice>().AsNoTracking().Where(x => x.CompanyId == companyId && x.Id == supplierInvoiceId)
+            .Select(x => new SupplierInvoiceResponse(
+                x.Id, x.InvoiceNo, x.CodeName, x.Caption, x.CalculationTypeId, x.PeriodYYMM,
+                x.InvoiceTotalCalculationAmountEur, x.InvoiceTotalCalculationAmountRsd, x.PostedInvoiceAmount,
+                x.InvoiceDate, x.TransactionDate, x.SupplierPartnerAccountId, x.DocumentTypeId, x.ExtraordinaryInvoiceMarker,
+                x.UnitTypes.OrderBy(y => y.UnitTypeId).Select(y => y.UnitTypeId).ToArray(),
+                Convert.ToBase64String(x.RowVersion), x.JournalEntryId,
+                db.Set<LedgerSourcePosting>().Any(p => p.CompanyId == x.CompanyId && p.SourceType == SupplierInvoiceCancelSource && p.SourceId == x.Id)))
+            .ToArrayAsync(ct);
+
+    private Task LockSupplierInvoiceAsync(int supplierInvoiceId, CancellationToken ct) =>
+        db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT 1 FROM [billing].[SupplierInvoice] WITH (UPDLOCK, HOLDLOCK) WHERE [Id] = {supplierInvoiceId}",
+            ct);
 
     public async Task<IReadOnlyList<BenefitResponse>> ListBenefitsAsync(int companyId, int period, CancellationToken ct) =>
         await db.Set<Benefit>().AsNoTracking().Where(x => x.CompanyId == companyId && x.PeriodYYMM == period)

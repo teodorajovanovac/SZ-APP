@@ -64,3 +64,12 @@ export interface PostingResult {
   alreadyPosted: boolean
   rowVersion: string
 }
+
+export interface PostingPeriodLock {
+  id: number
+  periodYYMM: number
+  lockedAt: string
+  lockedByStaffId: number
+  unlockedAt: string | null
+  unlockedByStaffId: number | null
+}

@@ -39,9 +39,33 @@ public sealed class LedgerEntry : ICompanyOwned
     public string? Parameters { get; set; }
     public string? Description { get; set; }
     public int Priority { get; set; }
+    // FIN-29 / data-model: legacy GK.RACID, GK.RDOB.
+    public int? InvoiceId { get; set; }
+    public int? SupplierInvoiceId { get; set; }
+    // Legacy GK.PRIORITET = collection priority of the supplier invoice. NOT the same as Priority
+    // (which is the line's ordinal inside the journal) -- 9.2 explicitly says don't mix them.
+    public int? CollectionPriority { get; set; }
+    // Legacy KNzaTIP: document type a payment line closes (3 invoice, 4 supplier invoice).
+    public int? ClosesDocumentType { get; set; }
     public JournalEntry JournalEntry { get; set; } = null!;
     public Company Company { get; set; } = null!;
     public ShortList? LineType { get; set; }
+}
+
+/// <summary>
+/// P13 month lock. A period is locked while a row with UnlockedAt == null exists; unlocking
+/// stamps the row (history is kept, a re-lock inserts a new row).
+/// </summary>
+public sealed class PostingPeriodLock : ICompanyOwned
+{
+    public int Id { get; set; }
+    public int CompanyId { get; set; }
+    public int PeriodYYMM { get; set; }
+    public DateTimeOffset LockedAt { get; set; }
+    public int LockedByStaffId { get; set; }
+    public DateTimeOffset? UnlockedAt { get; set; }
+    public int? UnlockedByStaffId { get; set; }
+    public byte[] RowVersion { get; set; } = [];
 }
 
 public sealed class Invoice : ICompanyOwned

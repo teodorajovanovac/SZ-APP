@@ -22,7 +22,9 @@ public sealed class JournalPostingService(
     SzAppDbContext dbContext,
     LedgerMutationScope mutationScope,
     IShortListValidator shortLists,
-    TimeProvider timeProvider) : IJournalPostingService
+    TimeProvider timeProvider,
+    PostingPeriodGuard periodGuard,
+    IBusinessClock clock) : IJournalPostingService
 {
     public async Task<JournalEntryResponse> CreateDraftAsync(
         int companyId,
@@ -112,38 +114,31 @@ public sealed class JournalPostingService(
                 return new PostingResultResponse(existing.Id, true, Convert.ToBase64String(existing.RowVersion));
             }
 
+            // FIN-07: a journal that belongs to a source document (invoice batch, supplier invoice,
+            // bank statement) must be reversed through that document so its status is reset too.
+            var hasSource = await dbContext.Set<LedgerSourcePosting>().AnyAsync(x => x.JournalEntryId == original.Id, cancellationToken) ||
+                            await dbContext.Set<BankStatement>().AnyAsync(x => x.JournalEntryId == original.Id, cancellationToken);
+            if (hasSource)
+            {
+                throw new DomainRuleException("journal.reverse-via-source", "Nalog dokumenta se stornira preko samog dokumenta (npr. storno računa).");
+            }
+
+            // P9 / FIN-06: red storno -- same lines, negative amounts on the same side, type 7,
+            // every document link (partner, sub-account, statement line, invoice) copied.
+            var stornoDate = clock.Today;
             var reversal = new JournalEntry
             {
                 CompanyId = companyId,
-                PostingDate = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime),
+                PostingDate = stornoDate,
                 DueDate = original.DueDate,
-                Description = $"STORNO {original.Id}: {original.Description}",
+                Description = Clip($"STORNO {original.Id}: {original.Description}", 255),
                 Currency = original.Currency,
                 JournalEntryTypeId = original.JournalEntryTypeId,
                 ReversalOfId = original.Id,
                 IsPosted = false
             };
-
-            foreach (var line in original.Lines.OrderBy(x => x.Priority))
-            {
-                reversal.Lines.Add(new LedgerEntry
-                {
-                    CompanyId = companyId,
-                    Account = line.Account,
-                    PostingDate = reversal.PostingDate,
-                    DueDate = line.DueDate,
-                    DebitAmount = line.CreditAmount,
-                    CreditAmount = line.DebitAmount,
-                    LineTypeId = line.LineTypeId,
-                    DocumentRef = line.DocumentRef,
-                    Parameters = line.Parameters,
-                    Description = $"STORNO: {line.Description}",
-                    Note = line.Note,
-                    Priority = line.Priority
-                });
-            }
-
-            dbContext.JournalEntries.Add(reversal);
+            var lines = DocumentPostingRules.Negate(original.Lines.OrderBy(x => x.Priority).Select(ToPostingLine), stornoDate);
+            await AddLinesAsync(reversal, lines, cancellationToken);
             await dbContext.SaveChangesAsync(cancellationToken);
             await PostTrackedJournalAsync(reversal, staffId, cancellationToken);
             return new PostingResultResponse(reversal.Id, false, Convert.ToBase64String(reversal.RowVersion));
@@ -156,9 +151,9 @@ public sealed class JournalPostingService(
         ExecuteSerializableAsync(async () =>
         {
             PostingSchemeRegistry.EnsureAllowedSource(request.SourceType);
-            if (request.Amount <= 0m)
+            if (request.Lines.Count == 0)
             {
-                throw new DomainRuleException("posting.invalid-amount", "Iznos za knjiženje mora biti pozitivan.");
+                throw new DomainRuleException("posting.empty", "Dokument nema stavki za knjiženje.");
             }
 
             var prior = await dbContext.Set<LedgerSourcePosting>().AsNoTracking()
@@ -178,48 +173,20 @@ public sealed class JournalPostingService(
                 throw new DomainRuleException("idempotency.key-reused", "Idempotency-Key je već iskorišćen za drugu komandu.");
             }
 
-            // FIN-08: a company-specific scheme AND a global fallback scheme for the same
-            // SourceType is a valid, expected configuration (company overrides global) -- it used
-            // to throw here because SingleOrDefaultAsync rejects more than one match regardless of
-            // the ordering. FirstOrDefault picks the company-specific one first thanks to the
-            // OrderByDescending below (true sorts after false).
-            var scheme = await dbContext.Set<PostingScheme>().AsNoTracking()
-                .Where(x => x.IsActive && x.SourceType == request.SourceType &&
-                            (x.CompanyId == request.CompanyId || x.CompanyId == null))
-                .OrderByDescending(x => x.CompanyId == request.CompanyId)
-                .FirstOrDefaultAsync(cancellationToken)
-                ?? throw new DomainRuleException("posting.scheme-missing", "Nije definisana šema knjiženja za izvor.");
-
-            await EnsurePostingAccountsAsync([scheme.DebitAccount, scheme.CreditAccount], cancellationToken);
-            var amount = FinanceRounding.Money(request.Amount);
+            // Lines are built by DocumentPostingRules (9.2) in the calling module; this only
+            // validates references and posts them as one journal.
+            await EnsurePostingAccountsAsync(request.Lines.Select(x => x.Account), cancellationToken);
+            await EnsurePartnerAccountsAsync(request.CompanyId, request.Lines.Select(x => x.PartnerAccountId), cancellationToken);
+            await EnsureSubAccountsAsync(request.Lines.Select(x => x.SubAccountId), cancellationToken);
             var journal = new JournalEntry
             {
                 CompanyId = request.CompanyId,
                 PostingDate = request.PostingDate,
-                Description = scheme.DescriptionTemplate ?? $"{request.SourceType} {request.DocumentReference}",
+                Description = Clip(request.Description, 255),
                 Currency = request.Currency.ToUpperInvariant(),
                 IsPosted = false
             };
-            journal.Lines.Add(new LedgerEntry
-            {
-                CompanyId = request.CompanyId,
-                Account = scheme.DebitAccount,
-                PostingDate = request.PostingDate,
-                DebitAmount = amount,
-                DocumentRef = request.DocumentReference,
-                Priority = 1
-            });
-            journal.Lines.Add(new LedgerEntry
-            {
-                CompanyId = request.CompanyId,
-                Account = scheme.CreditAccount,
-                PostingDate = request.PostingDate,
-                CreditAmount = amount,
-                DocumentRef = request.DocumentReference,
-                Priority = 2
-            });
-
-            dbContext.JournalEntries.Add(journal);
+            await AddLinesAsync(journal, request.Lines, cancellationToken);
             await dbContext.SaveChangesAsync(cancellationToken);
             await PostTrackedJournalAsync(journal, staffId, cancellationToken);
             dbContext.Set<LedgerSourcePosting>().Add(new LedgerSourcePosting
@@ -237,6 +204,8 @@ public sealed class JournalPostingService(
 
     private async Task PostTrackedJournalAsync(JournalEntry journal, int staffId, CancellationToken cancellationToken)
     {
+        await periodGuard.EnsureOpenAsync(
+            journal.CompanyId, journal.Lines.Select(x => x.PostingDate).Append(journal.PostingDate).ToArray(), cancellationToken);
         journal.Balance = LedgerBankingRules.ValidateJournal(
             journal.Lines.Select(x => new PostingAmounts(x.DebitAmount, x.CreditAmount)));
         journal.IsPosted = true;
@@ -257,6 +226,13 @@ public sealed class JournalPostingService(
 
     private async Task<T> ExecuteSerializableAsync<T>(Func<Task<T>> operation, CancellationToken cancellationToken)
     {
+        // Document posting (invoice batch, supplier invoice, storno) runs inside the caller's
+        // transaction so the journal and the source status change commit or roll back together.
+        if (dbContext.Database.CurrentTransaction is not null)
+        {
+            return await operation();
+        }
+
         var strategy = dbContext.Database.CreateExecutionStrategy();
         return await strategy.ExecuteAsync(async () =>
         {
@@ -350,6 +326,81 @@ public sealed class JournalPostingService(
             Note = request.Note?.Trim(),
             Priority = journal.Lines.Count + 1
         };
+
+    private async Task AddLinesAsync(JournalEntry journal, IEnumerable<PostingLine> lines, CancellationToken cancellationToken)
+    {
+        var source = lines.ToArray();
+        var lineTypeIds = await ResolveLineTypeIdsAsync(source.Select(x => x.LineType), cancellationToken);
+        var created = new List<(LedgerEntry Entry, PostingLine Source)>();
+        foreach (var line in source)
+        {
+            var entry = new LedgerEntry
+            {
+                JournalEntry = journal,
+                CompanyId = journal.CompanyId,
+                Account = line.Account,
+                PostingDate = line.PostingDate,
+                DueDate = line.DueDate,
+                DebitAmount = FinanceRounding.Calculation(line.Debit),
+                CreditAmount = FinanceRounding.Calculation(line.Credit),
+                LineTypeId = lineTypeIds[line.LineType],
+                DocumentRef = line.DocumentRef,
+                Parameters = line.Parameters,
+                Note = line.Note,
+                Description = line.Description,
+                InvoiceId = line.InvoiceId,
+                SupplierInvoiceId = line.SupplierInvoiceId,
+                CollectionPriority = line.CollectionPriority,
+                ClosesDocumentType = line.ClosesDocumentType,
+                Priority = journal.Lines.Count + 1
+            };
+            journal.Lines.Add(entry);
+            created.Add((entry, line));
+        }
+
+        dbContext.JournalEntries.Add(journal);
+        foreach (var (entry, line) in created)
+        {
+            SetOptionalLedgerProperties(entry, line.SubAccountId, line.PartnerAccountId, line.BankStatementLineId);
+        }
+    }
+
+    private async Task<Dictionary<int, int>> ResolveLineTypeIdsAsync(IEnumerable<int> codes, CancellationToken cancellationToken)
+    {
+        var wanted = codes.Distinct().ToArray();
+        var map = await dbContext.ShortLists.AsNoTracking()
+            .Where(x => x.TableName == LedgerLineTypes.ShortListTable && wanted.Contains(x.IndexValue))
+            .ToDictionaryAsync(x => x.IndexValue, x => x.Id, cancellationToken);
+        var missing = wanted.Where(x => !map.ContainsKey(x)).ToArray();
+        if (missing.Length > 0)
+        {
+            throw new DomainRuleException("posting.line-type-missing", $"Tip stavke GK nije definisan u šifarniku: {string.Join(", ", missing)}.");
+        }
+
+        return map;
+    }
+
+    /// <summary>Tracked ledger line → PostingLine (shadow links read through the change tracker).</summary>
+    private PostingLine ToPostingLine(LedgerEntry line)
+    {
+        var entry = dbContext.Entry(line);
+        return new PostingLine(
+            line.Account, line.DebitAmount, line.CreditAmount, 0, line.PostingDate,
+            PartnerAccountId: entry.Property<int?>("PartnerAccountId").CurrentValue,
+            SubAccountId: entry.Property<string?>("SubAccountId").CurrentValue,
+            DueDate: line.DueDate,
+            DocumentRef: line.DocumentRef,
+            Parameters: line.Parameters,
+            InvoiceId: line.InvoiceId,
+            SupplierInvoiceId: line.SupplierInvoiceId,
+            CollectionPriority: line.CollectionPriority,
+            Note: line.Note,
+            BankStatementLineId: entry.Property<int?>("BankStatementLineId").CurrentValue,
+            ClosesDocumentType: line.ClosesDocumentType,
+            Description: line.Description is null ? null : Clip($"STORNO: {line.Description}", 255));
+    }
+
+    private static string Clip(string value, int maxLength) => value.Length <= maxLength ? value : value[..maxLength];
 
     private void SetOptionalLedgerProperties(
         LedgerEntry line,

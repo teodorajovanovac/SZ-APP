@@ -37,6 +37,14 @@ public static class BillingFeatureExtensions
         suppliers.MapPost("/", (int companyId, CreateSupplierInvoiceRequest request, BillingService service, CancellationToken ct) =>
                 service.CreateSupplierInvoiceAsync(companyId, request, ct))
             .RequireAuthorization(SecurityConstants.CompanyWritePolicy).AddEndpointFilter<AntiforgeryEndpointFilter>();
+        suppliers.MapPost("/{supplierInvoiceId:int}/post", (int companyId, int supplierInvoiceId, HttpContext context, BillingService service, CancellationToken ct) =>
+                service.PostSupplierInvoiceAsync(companyId, supplierInvoiceId, IdempotencyKey(context), ct))
+            .RequireAuthorization(SecurityConstants.CompanyPostPolicy)
+            .AddEndpointFilter<AntiforgeryEndpointFilter>().AddEndpointFilter<IdempotencyKeyEndpointFilter>();
+        suppliers.MapPost("/{supplierInvoiceId:int}/cancel", (int companyId, int supplierInvoiceId, HttpContext context, BillingService service, CancellationToken ct) =>
+                service.CancelSupplierInvoicePostingAsync(companyId, supplierInvoiceId, IdempotencyKey(context), ct))
+            .RequireAuthorization(SecurityConstants.CompanyPostPolicy)
+            .AddEndpointFilter<AntiforgeryEndpointFilter>().AddEndpointFilter<IdempotencyKeyEndpointFilter>();
 
         var batches = root.MapGroup("/invoice-batches").WithTags("Billing - Invoice batches");
         batches.MapGet("/", (int companyId, int page, int pageSize, BillingService service, CancellationToken ct) =>
@@ -137,9 +145,6 @@ public static class BillingFeatureExtensions
     private sealed class UnavailableLedgerPostingGateway : ILedgerPostingGateway
     {
         public Task<LedgerPostingResult> PostAsync(LedgerPostingRequest request, CancellationToken cancellationToken) =>
-            throw new DomainRuleException("billing.ledger-unavailable", "Servis glavne knjige nije povezan.");
-
-        public Task<LedgerPostingResult> ReverseAsync(LedgerReversalRequest request, CancellationToken cancellationToken) =>
             throw new DomainRuleException("billing.ledger-unavailable", "Servis glavne knjige nije povezan.");
     }
 

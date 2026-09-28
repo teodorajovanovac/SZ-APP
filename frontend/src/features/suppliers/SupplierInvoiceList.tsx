@@ -4,6 +4,7 @@ import {
   Alert,
   Autocomplete,
   Button,
+  Chip,
   FormControl,
   InputLabel,
   MenuItem,
@@ -17,12 +18,16 @@ import type { ColumnDef, PaginationState, SortingState } from '@tanstack/react-t
 import { useTranslation } from 'react-i18next'
 import { getErrorMessage } from '../../api/problemDetails'
 import { formatMoney } from '../../shared/format/money'
+import { ConfirmDialog } from '../../shared/components/ConfirmDialog'
 import { FormDialog } from '../../shared/components/FormDialog'
 import { ServerDataTable } from '../../shared/components/ServerDataTable'
 import { usePartnerAccounts } from '../master-data/useMasterData'
 import { useShortList } from '../master-data/useShortList'
 import { SupplierInvoiceForm } from './SupplierInvoiceForm'
-import { useSupplierInvoices, type SupplierInvoice } from './supplierApi'
+import { useSupplierInvoicePosting, useSupplierInvoices, type SupplierInvoice } from './supplierApi'
+
+// Legacy TipDokumenta codes that are posted on their own (type 1 goes with the invoice batch).
+const STANDALONE_POSTING_TYPES = new Set([2, 3])
 
 const MARKER_FILTER_ALL = 'all'
 const MARKER_FILTER_WITH = 'with'
@@ -35,11 +40,13 @@ function formatPeriodLabel(periodYYMM: number, locale: string) {
   return new Date(year, month - 1, 1).toLocaleDateString(locale, { month: 'long', year: 'numeric' })
 }
 
-export function SupplierInvoiceList({ companyId }: { companyId: number }) {
+export function SupplierInvoiceList({ companyId, canPost = false }: { companyId: number; canPost?: boolean }) {
   const { t, i18n } = useTranslation()
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 25 })
   const [sorting, setSorting] = useState<SortingState>([])
   const [creating, setCreating] = useState(false)
+  const [pendingPosting, setPendingPosting] = useState<{ invoice: SupplierInvoice; cancel: boolean } | null>(null)
+  const posting = useSupplierInvoicePosting(companyId)
 
   const [periodYYMM, setPeriodYYMM] = useState<number | undefined>(undefined)
   const [supplierPartnerAccountId, setSupplierPartnerAccountId] = useState<number | undefined>(undefined)
@@ -78,6 +85,10 @@ export function SupplierInvoiceList({ companyId }: { companyId: number }) {
     const map = new Map(documentTypes.data?.map((item) => [item.id, item.caption]))
     return map
   }, [documentTypes.data])
+  const documentTypeCodeById = useMemo(
+    () => new Map(documentTypes.data?.map((item) => [item.id, item.indexValue])),
+    [documentTypes.data],
+  )
 
   const columns = useMemo<ColumnDef<SupplierInvoice>[]>(
     () => [
@@ -105,8 +116,31 @@ export function SupplierInvoiceList({ companyId }: { companyId: number }) {
       // amountRsd shown at 2 decimals like every other money value (no sub-cent precision requirement found).
       { accessorKey: 'amountRsd', header: t('suppliers_.columns.rsd'), enableSorting: false, meta: { numeric: true }, cell: ({ getValue }) => formatMoney(getValue<number>()) },
       { accessorKey: 'postedAmount', header: t('suppliers_.columns.posted'), enableSorting: false, meta: { numeric: true }, cell: ({ getValue }) => formatMoney(getValue<number>()) },
+      {
+        id: 'posting',
+        header: t('posting_.colPosting'),
+        enableSorting: false,
+        cell: ({ row }) => {
+          const invoice = row.original
+          if (invoice.isPostingCancelled) return <Chip size="small" label={t('posting_.supplierCancelled')} />
+          if (invoice.journalEntryId != null) {
+            return canPost ? (
+              <Button size="small" variant="outlined" color="warning" disabled={posting.isPending}
+                onClick={() => setPendingPosting({ invoice, cancel: true })}>
+                {t('posting_.cancelSupplier')}
+              </Button>
+            ) : <Chip size="small" color="success" label={t('posting_.supplierPosted')} />
+          }
+          return canPost && STANDALONE_POSTING_TYPES.has(documentTypeCodeById.get(invoice.documentTypeId) ?? 0) ? (
+            <Button size="small" variant="contained" disabled={posting.isPending}
+              onClick={() => setPendingPosting({ invoice, cancel: false })}>
+              {t('posting_.postSupplier')}
+            </Button>
+          ) : null
+        },
+      },
     ],
-    [t, partnerAccountById, documentTypeById],
+    [t, partnerAccountById, documentTypeById, documentTypeCodeById, canPost, posting.isPending],
   )
 
   return (
@@ -189,6 +223,7 @@ export function SupplierInvoiceList({ companyId }: { companyId: number }) {
       </Stack>
 
       {query.error ? <Alert severity="error">{getErrorMessage(query.error, t('suppliers_.notLoaded'))}</Alert> : null}
+      {posting.error ? <Alert severity="error">{getErrorMessage(posting.error, t('posting_.postSupplier'))}</Alert> : null}
       <ServerDataTable
         ariaLabel={t('suppliers_.title')}
         rows={query.data?.items ?? []}
@@ -202,6 +237,23 @@ export function SupplierInvoiceList({ companyId }: { companyId: number }) {
         emptyMessage={t('suppliersUi.empty')}
         getRowId={(row) => String(row.id)}
         minWidth={960}
+      />
+
+      <ConfirmDialog
+        open={pendingPosting !== null}
+        title={pendingPosting?.cancel ? t('posting_.cancelSupplierTitle') : t('posting_.postSupplierTitle')}
+        description={t(pendingPosting?.cancel ? 'posting_.cancelSupplierBody' : 'posting_.postSupplierBody', {
+          code: pendingPosting?.invoice.codeName,
+          amount: formatMoney(pendingPosting?.invoice.amountRsd ?? 0),
+        })}
+        confirmLabel={pendingPosting?.cancel ? t('posting_.cancelSupplier') : t('posting_.postSupplier')}
+        destructive={pendingPosting?.cancel}
+        pending={posting.isPending}
+        onClose={() => setPendingPosting(null)}
+        onConfirm={() => {
+          if (pendingPosting) posting.mutate({ id: pendingPosting.invoice.id, cancel: pendingPosting.cancel })
+          setPendingPosting(null)
+        }}
       />
 
       <FormDialog open={creating} title={t('suppliersUi.newTitle')} onClose={() => setCreating(false)} maxWidth="md">

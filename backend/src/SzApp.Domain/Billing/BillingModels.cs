@@ -39,33 +39,25 @@ public sealed record InterestPeriodResult(
     decimal Coefficient,
     decimal Interest);
 
+/// <summary>
+/// A fully built, balanced document posting (lines from <see cref="LedgerBanking.DocumentPostingRules"/>).
+/// Posted as one journal, recorded once per (SourceType, SourceId).
+/// </summary>
 public sealed record LedgerPostingRequest(
     int CompanyId,
     string SourceType,
     int SourceId,
     DateOnly PostingDate,
-    string DocumentReference,
-    decimal Amount,
+    string Description,
     string Currency,
-    string IdempotencyKey);
+    string IdempotencyKey,
+    IReadOnlyList<LedgerBanking.PostingLine> Lines);
 
 public sealed record LedgerPostingResult(int JournalEntryId, bool AlreadyPosted);
-
-public sealed record LedgerReversalRequest(
-    int CompanyId,
-    string SourceType,
-    int SourceId,
-    int JournalEntryId,
-    DateOnly PostingDate,
-    decimal Amount,
-    string Currency,
-    string Reason,
-    string IdempotencyKey);
 
 public interface ILedgerPostingGateway
 {
     Task<LedgerPostingResult> PostAsync(LedgerPostingRequest request, CancellationToken cancellationToken);
-    Task<LedgerPostingResult> ReverseAsync(LedgerReversalRequest request, CancellationToken cancellationToken);
 }
 
 public interface INoticeWorkflowGateway

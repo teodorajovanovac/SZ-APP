@@ -4,6 +4,7 @@ import type {
   BankStatementSummary,
   JournalEntrySummary,
   PageResponse,
+  PostingPeriodLock,
   PostingResult,
 } from './types'
 
@@ -47,5 +48,12 @@ export const ledgerBankingApi = {
       mutationRequest<PostingResult>(companyPath(companyId, `/bank-statements/${statement.id}/post`), 'POST', {
         rowVersion: statement.rowVersion,
       }),
+  },
+  postingPeriods: {
+    list: (companyId: number) => apiRequest<PostingPeriodLock[]>(companyPath(companyId, '/posting-periods')),
+    lock: (companyId: number, periodYYMM: number) =>
+      apiRequest<PostingPeriodLock>(companyPath(companyId, `/posting-periods/${periodYYMM}/lock`), { method: 'POST' }),
+    unlock: (companyId: number, periodYYMM: number) =>
+      apiRequest<PostingPeriodLock>(companyPath(companyId, `/posting-periods/${periodYYMM}/unlock`), { method: 'POST' }),
   },
 }

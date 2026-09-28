@@ -65,3 +65,13 @@ export function usePostInvoiceBatch(companyId: number) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: billingKeys.batches(companyId) }),
   })
 }
+
+/** FIN-02: per-invoice red storno (negative amounts, same side, type 7). */
+export function useCancelInvoice(companyId: number, invoiceId: number) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ reason, rowVersion }: { reason: string; rowVersion: string }) =>
+      mutate<InvoiceSummary>(`/api/v1/companies/${companyId}/invoices/${invoiceId}/cancel`, { reason, rowVersion }, true),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: billingKeys.invoices(companyId) }),
+  })
+}
