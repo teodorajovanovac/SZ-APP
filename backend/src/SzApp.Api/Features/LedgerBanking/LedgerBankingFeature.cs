@@ -66,6 +66,7 @@ public static class LedgerBankingFeature
         MapPostingPeriodEndpoints(group);
         MapBankingEndpoints(group);
         MapCatalogueEndpoints(group);
+        LedgerCardQueries.MapLedgerCardEndpoints(group);
         return endpoints;
     }
 
