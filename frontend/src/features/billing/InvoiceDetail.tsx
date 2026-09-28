@@ -1,16 +1,22 @@
-import { Alert, Chip, Paper, Stack, Typography } from '@mui/material'
+import { useState } from 'react'
+import { Alert, Button, Chip, Paper, Stack, TextField, Typography } from '@mui/material'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { apiRequest } from '../../api/generated/client'
 import { getErrorMessage } from '../../api/problemDetails'
+import { ConfirmDialog } from '../../shared/components/ConfirmDialog'
 import { formatDate } from '../../shared/format/date'
 import { formatMoney } from '../../shared/format/money'
+import { billingKeys, useCancelInvoice } from './billingApi'
 import type { InvoiceSummary } from './types'
 
-export function InvoiceDetail({ companyId, invoiceId }: { companyId: number; invoiceId: number }) {
+export function InvoiceDetail({ companyId, invoiceId, canPost = false }: { companyId: number; invoiceId: number; canPost?: boolean }) {
   const { t } = useTranslation()
+  const [confirming, setConfirming] = useState(false)
+  const [reason, setReason] = useState('')
+  const cancel = useCancelInvoice(companyId, invoiceId)
   const query = useQuery({
-    queryKey: ['companies', companyId, 'invoices', invoiceId],
+    queryKey: [...billingKeys.invoices(companyId), invoiceId],
     queryFn: () => apiRequest<InvoiceSummary>(`/api/v1/companies/${companyId}/invoices/${invoiceId}`),
   })
   if (query.error) return <Alert severity="error">{getErrorMessage(query.error, t('billing_.detail.notLoaded'))}</Alert>
@@ -27,7 +33,40 @@ export function InvoiceDetail({ companyId, invoiceId }: { companyId: number; inv
         <Typography color="text.secondary">{invoice.address}, {invoice.postalCode} {invoice.city}</Typography>
         <Typography>{t('billing_.detail.dueDate')}: {formatDate(invoice.dueDate)}</Typography>
         <Typography fontWeight={700}>{t('billing_.detail.total')}: {formatMoney(invoice.invoiceTotal, invoice.currency)}</Typography>
+        {cancel.error ? <Alert severity="error">{getErrorMessage(cancel.error, t('posting_.cancelInvoice'))}</Alert> : null}
+        {canPost && !invoice.isCancelled ? (
+          <Stack direction="row">
+            <Button variant="outlined" color="warning" disabled={cancel.isPending} onClick={() => setConfirming(true)}>
+              {t('posting_.cancelInvoice')}
+            </Button>
+          </Stack>
+        ) : null}
       </Stack>
+      <ConfirmDialog
+        open={confirming}
+        title={t('posting_.cancelInvoiceTitle')}
+        description={
+          <Stack spacing={2}>
+            <span>{t('posting_.cancelInvoiceBody', { number: invoice.sequenceNumber, amount: formatMoney(invoice.invoiceTotal, invoice.currency) })}</span>
+            <TextField
+              size="small"
+              required
+              label={t('posting_.cancelReason')}
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+              slotProps={{ htmlInput: { maxLength: 500 } }}
+            />
+          </Stack>
+        }
+        confirmLabel={t('posting_.cancelInvoice')}
+        destructive
+        pending={cancel.isPending || reason.trim().length === 0}
+        onClose={() => setConfirming(false)}
+        onConfirm={() => {
+          cancel.mutate({ reason: reason.trim(), rowVersion: invoice.rowVersion })
+          setConfirming(false)
+        }}
+      />
     </Paper>
   )
 }

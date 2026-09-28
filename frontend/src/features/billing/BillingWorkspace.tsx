@@ -124,7 +124,7 @@ export function BillingWorkspace({ companyId, canPost }: { companyId: number; ca
         title={t('billing_.invoicesTitle')}
         onClose={() => setOpenInvoiceId(undefined)}
       >
-        {openInvoiceId !== undefined ? <InvoiceDetail companyId={companyId} invoiceId={openInvoiceId} /> : null}
+        {openInvoiceId !== undefined ? <InvoiceDetail companyId={companyId} invoiceId={openInvoiceId} canPost={canPost} /> : null}
       </FormDialog>
 
       <ConfirmDialog
