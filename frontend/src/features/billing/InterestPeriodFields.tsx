@@ -5,21 +5,11 @@ import { getErrorMessage } from '../../api/problemDetails'
 import { ControlledTextField } from '../../shared/components/ControlledTextField'
 import { formatDate } from '../../shared/format/date'
 import { useInterestPeriodPresets, type InterestPresetKey } from './billingApi'
-
-export interface InterestFormValues {
-  periodYYMM: number
-  dueDate: string
-  interestEnabled: boolean
-  previousValueDate: string
-  balanceAsOfDate: string
-  interestPreset: InterestPresetKey | ''
-  interestStart: string
-  interestEnd: string
-}
+import type { InvoiceBatchFormValues } from './InvoiceBatchForm'
 
 /** Resolves the period the run will use: a preset's dates, or the edited custom dates. */
 export function resolveInterestPeriod(
-  values: Pick<InterestFormValues, 'interestPreset' | 'interestStart' | 'interestEnd'>,
+  values: Pick<InvoiceBatchFormValues, 'interestPreset' | 'interestStart' | 'interestEnd'>,
   presets: { key: InterestPresetKey; start: string; end: string }[] | undefined,
   defaultPreset: InterestPresetKey | undefined,
 ) {
@@ -32,18 +22,16 @@ export function resolveInterestPeriod(
 const validPeriod = (value: number) => value >= 1001 && value <= 9912 && value % 100 >= 1 && value % 100 <= 12
 
 // P10: interest period is a per-run parameter; presets are suggestions computed by the server.
-export function InterestPeriodFields<T extends InterestFormValues>({
+export function InterestPeriodFields({
   companyId,
-  control,
-  setValue,
+  control: c,
+  setValue: set,
 }: {
   companyId: number
-  control: Control<T>
-  setValue: UseFormSetValue<T>
+  control: Control<InvoiceBatchFormValues>
+  setValue: UseFormSetValue<InvoiceBatchFormValues>
 }) {
   const { t } = useTranslation()
-  const c = control as unknown as Control<InterestFormValues>
-  const set = setValue as unknown as UseFormSetValue<InterestFormValues>
   const [periodYYMM, dueDate, enabled, previousValueDate, balanceAsOfDate, interestPreset, interestStart, interestEnd] = useWatch({
     control: c,
     name: ['periodYYMM', 'dueDate', 'interestEnabled', 'previousValueDate', 'balanceAsOfDate', 'interestPreset', 'interestStart', 'interestEnd'],
