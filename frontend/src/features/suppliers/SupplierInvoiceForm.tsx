@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
 import { getErrorMessage } from '../../api/problemDetails'
 import { ControlledTextField } from '../../shared/components/ControlledTextField'
+import { currentPeriodYYMM, MonthYearField } from '../../shared/components/MonthYearField'
 import { usePartnerAccounts } from '../master-data/useMasterData'
 import { useCreateSupplierInvoice } from './supplierApi'
 
@@ -34,7 +35,7 @@ export function SupplierInvoiceForm({ companyId, onSaved }: { companyId: number;
   // ponytail: calculationTypeId/documentTypeId stay raw numeric inputs — no lookup-list
   // endpoint is exposed for those yet. Wire up an Autocomplete once one exists.
   const partnerAccounts = usePartnerAccounts(companyId, { page: 1, pageSize: 200 })
-  const { control, handleSubmit } = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { invoiceNo: 1, codeName: '', caption: '', supplierPartnerAccountId: 0, calculationTypeId: 0, periodYYMM: 2601, amountRsd: 0, documentTypeId: 0, invoiceDate: '', transactionDate: '' } })
+  const { control, handleSubmit } = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { invoiceNo: 1, codeName: '', caption: '', supplierPartnerAccountId: 0, calculationTypeId: 0, periodYYMM: currentPeriodYYMM(), amountRsd: 0, documentTypeId: 0, invoiceDate: '', transactionDate: '' } })
   const submit = (value: Values) => create.mutate({
     ...value, invoiceTotalCalculationAmountEur: 0, invoiceTotalCalculationAmountRsd: value.amountRsd,
     calculationAmountByCoefficientEur: 0, calculationAmountByCoefficientRsd: value.amountRsd,
@@ -79,7 +80,7 @@ export function SupplierInvoiceForm({ companyId, onSaved }: { companyId: number;
 
         <SectionHeading>{t('suppliersUi.sectionAmounts')}</SectionHeading>
         <Grid size={{ xs: 12, sm: 3 }}>
-          <ControlledTextField control={control} name="periodYYMM" label={t('suppliers_.form.period')} type="number" required />
+          <MonthYearField control={control} name="periodYYMM" label={t('suppliers_.form.period')} required />
         </Grid>
         <Grid size={{ xs: 12, sm: 3 }}>
           <ControlledTextField control={control} name="amountRsd" label={t('suppliers_.form.amount')} type="number" required />

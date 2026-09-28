@@ -77,7 +77,7 @@ export const resources = {
         post: 'Knjiži',
         form: {
           notCreated: 'Serija nije kreirana.',
-          period: 'Period YYMM', caption: 'Naziv', place: 'Mesto',
+          period: 'Period', caption: 'Naziv', place: 'Mesto',
           issueDate: 'Datum izdavanja', serviceFrom: 'Usluga od', serviceTo: 'Usluga do',
           transactionDate: 'Datum prometa', dueDate: 'Rok plaćanja', exchangeRate: 'Kurs NBS',
           submit: 'Kreiraj seriju',
@@ -130,7 +130,7 @@ export const resources = {
         form: {
           notSaved: 'Dobavljački račun nije sačuvan.',
           invoiceNo: 'Redni broj', codeName: 'Šifra', caption: 'Naziv', partnerAccount: 'Konto dobavljača',
-          calculationType: 'Tip obračuna', period: 'Period YYMM', amount: 'Iznos RSD', documentType: 'Tip dokumenta',
+          calculationType: 'Tip obračuna', period: 'Period', amount: 'Iznos RSD', documentType: 'Tip dokumenta',
           invoiceDate: 'Datum računa', transactionDate: 'Datum prometa', submit: 'Sačuvaj dobavljački račun',
         },
       },
@@ -426,7 +426,7 @@ export const resources = {
         post: 'Књижи',
         form: {
           notCreated: 'Серија није креирана.',
-          period: 'Период ГГММ', caption: 'Назив', place: 'Место',
+          period: 'Период', caption: 'Назив', place: 'Место',
           issueDate: 'Датум издавања', serviceFrom: 'Услуга од', serviceTo: 'Услуга до',
           transactionDate: 'Датум промета', dueDate: 'Рок плаћања', exchangeRate: 'Курс НБС',
           submit: 'Креирај серију',
@@ -479,7 +479,7 @@ export const resources = {
         form: {
           notSaved: 'Добављачки рачун није сачуван.',
           invoiceNo: 'Редни број', codeName: 'Шифра', caption: 'Назив', partnerAccount: 'Конто добављача',
-          calculationType: 'Тип обрачуна', period: 'Период ГГММ', amount: 'Износ РСД', documentType: 'Тип документа',
+          calculationType: 'Тип обрачуна', period: 'Период', amount: 'Износ РСД', documentType: 'Тип документа',
           invoiceDate: 'Датум рачуна', transactionDate: 'Датум промета', submit: 'Сачувај добављачки рачун',
         },
       },
@@ -775,7 +775,7 @@ export const resources = {
         post: 'Post',
         form: {
           notCreated: 'Batch was not created.',
-          period: 'Period YYMM', caption: 'Name', place: 'Place',
+          period: 'Period', caption: 'Name', place: 'Place',
           issueDate: 'Issue date', serviceFrom: 'Service from', serviceTo: 'Service to',
           transactionDate: 'Transaction date', dueDate: 'Due date', exchangeRate: 'NBS exchange rate',
           submit: 'Create batch',
@@ -828,7 +828,7 @@ export const resources = {
         form: {
           notSaved: 'Supplier invoice was not saved.',
           invoiceNo: 'Sequence no.', codeName: 'Code', caption: 'Name', partnerAccount: 'Supplier account',
-          calculationType: 'Calculation type', period: 'Period YYMM', amount: 'Amount RSD', documentType: 'Document type',
+          calculationType: 'Calculation type', period: 'Period', amount: 'Amount RSD', documentType: 'Document type',
           invoiceDate: 'Invoice date', transactionDate: 'Transaction date', submit: 'Save supplier invoice',
         },
       },
