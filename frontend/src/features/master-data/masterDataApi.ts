@@ -4,6 +4,7 @@ import type {
   BankAccount,
   BuildingEntrance,
   CompanyDetail,
+  CreateCompany,
   Contract,
   LocationCategory,
   PageRequest,
@@ -15,6 +16,7 @@ import type {
   SaveBankAccount,
   SaveBuildingEntrance,
   SaveCompany,
+  SaveLocationCategory,
   SavePartner,
   SavePartnerAccount,
   SaveStaffAccess,
@@ -52,6 +54,16 @@ export const masterDataApi = {
       }),
     locationCategories: (companyId: number) =>
       apiRequest<LocationCategory[]>(`${companyBase(companyId)}/location-categories`),
+    create: (value: CreateCompany) =>
+      apiRequest<CompanyDetail>('/api/v1/master-data/companies', { method: 'POST', body: JSON.stringify(value) }),
+  },
+  locationCategories: {
+    create: (companyId: number, value: SaveLocationCategory) =>
+      apiRequest<LocationCategory>(`${companyBase(companyId)}/location-categories`, { method: 'POST', body: JSON.stringify(value) }),
+    update: (companyId: number, id: number, value: SaveLocationCategory) =>
+      apiRequest<LocationCategory>(`${companyBase(companyId)}/location-categories/${id}`, { method: 'PUT', body: JSON.stringify(value) }),
+    remove: (companyId: number, id: number) =>
+      apiRequest<void>(`${companyBase(companyId)}/location-categories/${id}`, { method: 'DELETE' }),
   },
   shortLists: {
     list: (companyId: number, tableName: string) =>
