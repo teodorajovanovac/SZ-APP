@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { masterDataApi } from './masterDataApi'
 import type {
   PageRequest,
@@ -51,6 +51,10 @@ export function useLocationCategories(companyId: number) {
     staleTime: 5 * 60_000,
   })
 }
+
+// Location categories are global; every company's cached copy is stale after a change.
+export const invalidateLocationCategories = (queryClient: QueryClient) =>
+  queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === 'master-data' && query.queryKey[2] === 'location-categories' })
 
 export function usePartners(companyId: number, page: PageRequest) {
   return useQuery({

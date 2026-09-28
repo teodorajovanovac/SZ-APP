@@ -32,6 +32,10 @@ export interface CompanyDetail {
 
 export type SaveCompany = Omit<CompanyDetail, 'id' | 'rowVersion'> & { rowVersion?: string }
 
+export type CreateCompany = Omit<SaveCompany, 'rowVersion'> & { id?: number | null }
+
+export type SaveLocationCategory = Omit<LocationCategory, 'id'>
+
 export interface LocationCategory {
   id: number
   name: string

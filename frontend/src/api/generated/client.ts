@@ -10,6 +10,7 @@ export interface CompanySummary {
   id: number
   name: string
   registrationNumber?: string | null
+  locationName?: string | null
 }
 
 export interface CompanyContext {

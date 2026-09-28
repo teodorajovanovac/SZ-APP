@@ -15,7 +15,7 @@ import { RoleGuard } from '../shared/routing/RoleGuard'
 import { AppShell } from './AppShell'
 import { theme } from './theme'
 import { useActiveCompany } from '../features/companies/useActiveCompany'
-import { AddressesPage, CompanyPage, PartnersPage, StaffPage, UnitsPage } from '../features/master-data/MasterDataPages'
+import { AddressesPage, BuildingEntrancesPage, CompanyPage, LocationCategoriesPage, PartnersPage, StaffPage, UnitsPage } from '../features/master-data/MasterDataPages'
 import { BuildingEntranceDetailPage } from '../features/master-data/pages/BuildingEntranceDetailPage'
 import { PartnerDetailPage } from '../features/master-data/pages/PartnerDetailPage'
 import { UnitDetailPage } from '../features/master-data/pages/UnitDetailPage'
@@ -54,6 +54,7 @@ function AuthenticatedRoutes() {
             <Route index element={<DashboardPage />} />
             <Route element={<RoleGuard allowedRoles={['Root', 'Upravnik']} />}>
               <Route path="companies" element={<CompanyPage />} />
+              <Route path="location-categories" element={<LocationCategoriesPage />} />
               <Route path="imports" element={<EtlRunsPage />} />
               <Route path="administration" element={<AdministrationRoute />} />
             </Route>
@@ -66,6 +67,7 @@ function AuthenticatedRoutes() {
             <Route path="contracts" element={<ContractsPage />} />
             <Route path="partners/:companyId/:partnerId" element={<PartnerDetailPage />} />
             <Route path="units/:companyId/:unitId" element={<UnitDetailPage />} />
+            <Route path="building-entrances" element={<BuildingEntrancesPage />} />
             <Route path="building-entrances/:companyId/:entranceId" element={<BuildingEntranceDetailPage />} />
             <Route path="billing" element={<BillingRoute />} />
             <Route path="suppliers" element={<SupplierRoute />} />

@@ -237,7 +237,7 @@ app.MapGet("/api/v1/companies", async (
     }
 
     var companies = await query.OrderBy(x => x.ShortName)
-        .Select(x => new CompanySummaryResponse(x.Id, x.ShortName, x.Partner.RegistrationNumber))
+        .Select(x => new CompanySummaryResponse(x.Id, x.ShortName, x.Partner.RegistrationNumber, x.LocationCategory != null ? x.LocationCategory.Name : null))
         .ToArrayAsync();
     return TypedResults.Ok(companies);
 }).WithTags("Companies").RequireAuthorization();
