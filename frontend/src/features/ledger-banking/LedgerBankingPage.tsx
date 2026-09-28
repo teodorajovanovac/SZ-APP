@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Alert, Box, Button, Chip, Stack, Tab, Tabs, Typography } from '@mui/material'
+import { Alert, Box, Button, Chip, Stack, Tab, Tabs, TextField, Typography } from '@mui/material'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ColumnDef, PaginationState, SortingState } from '@tanstack/react-table'
 import { useTranslation } from 'react-i18next'
@@ -11,7 +11,7 @@ import { ConfirmDialog } from '../../shared/components/ConfirmDialog'
 import { ServerDataTable } from '../../shared/components/ServerDataTable'
 import { ledgerBankingApi } from './ledgerBankingApi'
 import { canPostJournal, canPostStatement, formatMoney } from './ledgerBankingFormat'
-import type { BankStatementSummary, JournalEntrySummary } from './types'
+import type { BankStatementSummary, JournalEntrySummary, PostingPeriodLock } from './types'
 
 const statementStatusColor: Record<BankStatementSummary['status'], 'default' | 'warning' | 'info' | 'success'> = {
   Imported: 'default',
@@ -20,7 +20,7 @@ const statementStatusColor: Record<BankStatementSummary['status'], 'default' | '
   Posted: 'success',
 }
 
-export function LedgerBankingPage({ canPost }: { canPost: boolean }) {
+export function LedgerBankingPage({ canPost, canUnlock = false }: { canPost: boolean; canUnlock?: boolean }) {
   const { t } = useTranslation()
   const { pathname } = useLocation()
   // Both /ledger and /banking render this page (same element, so no remount on
@@ -40,15 +40,20 @@ export function LedgerBankingPage({ canPost }: { canPost: boolean }) {
         <Tabs value={tab} onChange={(_, value: number) => setTab(value)} aria-label={t('ledgerBanking.title')}>
           <Tab label={t('ledgerBanking.tabJournals')} id="ledger-tab-0" aria-controls="ledger-panel-0" />
           <Tab label={t('ledgerBanking.tabStatements')} id="ledger-tab-1" aria-controls="ledger-panel-1" />
+          <Tab label={t('posting_.tabPeriods')} id="ledger-tab-2" aria-controls="ledger-panel-2" />
         </Tabs>
       </Box>
       {tab === 0 ? (
         <Box role="tabpanel" id="ledger-panel-0" aria-labelledby="ledger-tab-0">
           <JournalPanel companyId={activeCompany.id} canPost={canPost} />
         </Box>
-      ) : (
+      ) : tab === 1 ? (
         <Box role="tabpanel" id="ledger-panel-1" aria-labelledby="ledger-tab-1">
           <StatementPanel companyId={activeCompany.id} canPost={canPost} />
+        </Box>
+      ) : (
+        <Box role="tabpanel" id="ledger-panel-2" aria-labelledby="ledger-tab-2">
+          <PostingPeriodPanel companyId={activeCompany.id} canLock={canPost} canUnlock={canUnlock} />
         </Box>
       )}
     </Stack>
@@ -273,6 +278,110 @@ function StatementPanel({ companyId, canPost }: { companyId: number; canPost: bo
         onConfirm={() => {
           if (pendingStatement) post.mutate(pendingStatement)
           setPendingStatement(null)
+        }}
+      />
+    </Stack>
+  )
+}
+
+function formatPeriod(periodYYMM: number) {
+  return `${String(periodYYMM % 100).padStart(2, '0')}/${2000 + Math.floor(periodYYMM / 100)}`
+}
+
+// P13: lock = posting right, unlock = Upravnik/Root (server enforces both; buttons just mirror it).
+function PostingPeriodPanel({ companyId, canLock, canUnlock }: { companyId: number; canLock: boolean; canUnlock: boolean }) {
+  const { t } = useTranslation()
+  const queryClient = useQueryClient()
+  const [month, setMonth] = useState('')
+  const [pending, setPending] = useState<{ periodYYMM: number; unlock: boolean } | null>(null)
+  const periods = useQuery({
+    queryKey: ['posting-periods', companyId],
+    queryFn: () => ledgerBankingApi.postingPeriods.list(companyId),
+  })
+  const mutation = useMutation({
+    mutationFn: ({ periodYYMM, unlock }: { periodYYMM: number; unlock: boolean }) =>
+      unlock
+        ? ledgerBankingApi.postingPeriods.unlock(companyId, periodYYMM)
+        : ledgerBankingApi.postingPeriods.lock(companyId, periodYYMM),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['posting-periods', companyId] }),
+  })
+  const [year, monthNumber] = month.split('-').map(Number)
+  const selectedPeriod = year && monthNumber ? (year % 100) * 100 + monthNumber : null
+  const rows: PostingPeriodLock[] = periods.data ?? []
+
+  return (
+    <Stack spacing={2}>
+      <Typography variant="body2" color="text.secondary">{t('posting_.periodsHint')}</Typography>
+      {periods.isError ? <Alert severity="error">{t('ledgerBanking.loadFailed')}</Alert> : null}
+      <MutationError error={mutation.error} />
+      {canLock ? (
+        <Stack direction="row" spacing={2} alignItems="center">
+          <TextField
+            size="small"
+            type="month"
+            label={t('posting_.periodLabel')}
+            value={month}
+            onChange={(event) => setMonth(event.target.value)}
+            slotProps={{ inputLabel: { shrink: true } }}
+          />
+          <Button
+            variant="contained"
+            disabled={selectedPeriod === null || mutation.isPending}
+            onClick={() => selectedPeriod && setPending({ periodYYMM: selectedPeriod, unlock: false })}
+          >
+            {t('posting_.lock')}
+          </Button>
+        </Stack>
+      ) : null}
+      {rows.length === 0 && !periods.isLoading ? <Typography color="text.secondary">{t('posting_.empty')}</Typography> : null}
+      <Box component="table" aria-label={t('posting_.tabPeriods')} sx={{ borderCollapse: 'collapse', '& td, & th': { p: 1, textAlign: 'left', borderBottom: 1, borderColor: 'divider' } }}>
+        <thead>
+          <tr>
+            <th>{t('posting_.colPeriod')}</th>
+            <th>{t('posting_.colLockedAt')}</th>
+            <th>{t('posting_.colUnlockedAt')}</th>
+            <th>{t('posting_.colStatus')}</th>
+            <th />
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.id}>
+              <td>{formatPeriod(row.periodYYMM)}</td>
+              <td>{formatDate(row.lockedAt)}</td>
+              <td>{row.unlockedAt ? formatDate(row.unlockedAt) : ''}</td>
+              <td>
+                <Chip
+                  size="small"
+                  color={row.unlockedAt ? 'default' : 'warning'}
+                  label={row.unlockedAt ? t('posting_.statusUnlocked') : t('posting_.statusLocked')}
+                />
+              </td>
+              <td>
+                {canUnlock && !row.unlockedAt ? (
+                  <Button size="small" variant="outlined" color="warning" disabled={mutation.isPending}
+                    onClick={() => setPending({ periodYYMM: row.periodYYMM, unlock: true })}>
+                    {t('posting_.unlock')}
+                  </Button>
+                ) : null}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </Box>
+      <ConfirmDialog
+        open={pending !== null}
+        title={pending?.unlock ? t('posting_.unlockConfirmTitle') : t('posting_.lockConfirmTitle')}
+        description={t(pending?.unlock ? 'posting_.unlockConfirmBody' : 'posting_.lockConfirmBody', {
+          period: pending ? formatPeriod(pending.periodYYMM) : '',
+        })}
+        confirmLabel={pending?.unlock ? t('posting_.unlock') : t('posting_.lock')}
+        destructive={pending?.unlock}
+        pending={mutation.isPending}
+        onClose={() => setPending(null)}
+        onConfirm={() => {
+          if (pending) mutation.mutate(pending)
+          setPending(null)
         }}
       />
     </Stack>
