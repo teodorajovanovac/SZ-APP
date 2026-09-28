@@ -102,7 +102,17 @@ public static class BillingModelBuilderExtensions
             entity.Property(x => x.Status).HasConversion<int>();
             entity.Property(x => x.GenerationFingerprint).HasMaxLength(64).IsUnicode(false);
             entity.Property(x => x.RowVersion).IsRowVersion();
-            entity.HasIndex(x => new { x.CompanyId, x.PeriodYYMM, x.ExtraordinaryInvoiceMarker }).IsUnique();
+            // FIN-09: ExtraordinaryInvoiceMarker is nullable, and EF Core's SqlServer provider
+            // auto-adds a "WHERE [col] IS NOT NULL" filter to a unique index on a nullable
+            // column unless told otherwise -- so simply not calling .HasFilter(...) does NOT
+            // produce an unfiltered index; it silently keeps that convention-generated filter,
+            // which lets duplicate *regular* batches (marker always NULL) through undetected.
+            // Passing an explicit null overrides the convention and forces a real unfiltered
+            // unique index (verified: regenerating the migration with this line removed
+            // entirely reproduces the exact same "IS NOT NULL" filter in the generated SQL).
+            entity.HasIndex(x => new { x.CompanyId, x.PeriodYYMM, x.ExtraordinaryInvoiceMarker })
+                .IsUnique()
+                .HasFilter(null);
             entity.HasIndex(x => new { x.CompanyId, x.Status });
             entity.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.NoAction);
             entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.StaffId).OnDelete(DeleteBehavior.NoAction);

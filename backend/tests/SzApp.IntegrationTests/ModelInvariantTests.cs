@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using SzApp.Data;
 using SzApp.Data.Entities;
+using SzApp.Data.Entities.Billing;
 
 namespace SzApp.IntegrationTests;
 
@@ -59,6 +60,23 @@ public sealed class ModelInvariantTests
         Assert.Equal(
             [nameof(LedgerEntry.JournalEntryId), nameof(LedgerEntry.CompanyId)],
             ledgerJournalFk.Properties.Select(x => x.Name));
+    }
+
+    // FIN-09: without an explicit .HasFilter(null), EF Core's SqlServer provider auto-adds a
+    // "WHERE [col] IS NOT NULL" filter to a unique index over a nullable column -- which let
+    // duplicate regular batches (marker always NULL) through. Asserting GetFilter() is null
+    // here catches a regression at the model level, without needing a live SQL Server.
+    [Fact]
+    public void InvoiceBatch_UniqueIndex_HasNoFilter()
+    {
+        using var context = CreateContext();
+
+        var index = context.Model.FindEntityType(typeof(InvoiceBatch))!.GetIndexes()
+            .Single(x => x.Properties.Select(p => p.Name)
+                .SequenceEqual([nameof(InvoiceBatch.CompanyId), nameof(InvoiceBatch.PeriodYYMM), nameof(InvoiceBatch.ExtraordinaryInvoiceMarker)]));
+
+        Assert.True(index.IsUnique);
+        Assert.Null(index.GetFilter());
     }
 
     private static void AssertUniqueIndex<TEntity>(SzAppDbContext context, params string[] propertyNames)
