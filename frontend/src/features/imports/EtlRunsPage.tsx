@@ -24,6 +24,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { apiRequest } from '../../api/generated/client'
 import { useActiveCompany } from '../companies/useActiveCompany'
+import { ConfirmDialog } from '../../shared/components/ConfirmDialog'
 
 interface EtlRun {
   id: string
@@ -74,6 +75,7 @@ export function EtlRunsPage() {
       apiRequest<EtlRun>(`/api/v1/companies/${activeCompany.id}/etl-runs/${id}/execute`, { method: 'POST' }),
     onSuccess: () => client.invalidateQueries({ queryKey: key }),
   })
+  const [pendingRun, setPendingRun] = useState<EtlRun | null>(null)
 
   const items = runs.data ?? []
 
@@ -165,7 +167,7 @@ export function EtlRunsPage() {
                           size="small"
                           variant="outlined"
                           disabled={execute.isPending}
-                          onClick={() => execute.mutate(run.id)}
+                          onClick={() => setPendingRun(run)}
                         >
                           {t('imports_.execute')}
                         </Button>
@@ -178,6 +180,22 @@ export function EtlRunsPage() {
           </TableContainer>
         )}
       </Paper>
+      <ConfirmDialog
+        open={pendingRun !== null}
+        title={t('imports_.executeConfirmTitle')}
+        description={t('imports_.executeConfirmBody', {
+          table: pendingRun?.sourceTable,
+          rows: pendingRun?.importedRows,
+          quarantined: pendingRun?.quarantinedRows,
+        })}
+        confirmLabel={t('imports_.execute')}
+        pending={execute.isPending}
+        onClose={() => setPendingRun(null)}
+        onConfirm={() => {
+          if (pendingRun) execute.mutate(pendingRun.id)
+          setPendingRun(null)
+        }}
+      />
     </Stack>
   )
 }

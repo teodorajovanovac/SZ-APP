@@ -15,8 +15,10 @@ import {
   Stack,
   Typography,
 } from '@mui/material'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { apiRequest } from '../../api/generated/client'
+import { ConfirmDialog } from '../../shared/components/ConfirmDialog'
 
 export interface SentEmailItem {
   id: number
@@ -52,6 +54,7 @@ export function EmailPage({ companyId }: { companyId: number }) {
     mutationFn: (id: number) => apiRequest(`/api/v1/companies/${companyId}/emails/${id}/send`, { method: 'POST' }),
     onSuccess: () => client.invalidateQueries({ queryKey: key(companyId) }),
   })
+  const [pendingEmail, setPendingEmail] = useState<SentEmailItem | null>(null)
 
   const items = emails.data ?? []
   const formatDate = (value: string) => new Date(value).toLocaleString(i18n.language)
@@ -116,7 +119,7 @@ export function EmailPage({ companyId }: { companyId: number }) {
                     size="small"
                     startIcon={<SendIcon />}
                     disabled={send.isPending}
-                    onClick={() => send.mutate(item.id)}
+                    onClick={() => setPendingEmail(item)}
                   >
                     {send.isPending ? t('email_.sending') : t('email_.send')}
                   </Button>
@@ -126,6 +129,18 @@ export function EmailPage({ companyId }: { companyId: number }) {
           ))}
         </Stack>
       )}
+      <ConfirmDialog
+        open={pendingEmail !== null}
+        title={t('email_.sendConfirmTitle')}
+        description={t('email_.sendConfirmBody', { recipient: pendingEmail?.toAddress, subject: pendingEmail?.subject })}
+        confirmLabel={t('email_.send')}
+        pending={send.isPending}
+        onClose={() => setPendingEmail(null)}
+        onConfirm={() => {
+          if (pendingEmail) send.mutate(pendingEmail.id)
+          setPendingEmail(null)
+        }}
+      />
     </Stack>
   )
 }
