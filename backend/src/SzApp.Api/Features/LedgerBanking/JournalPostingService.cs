@@ -32,6 +32,8 @@ public sealed class JournalPostingService(
         ValidateDraftRequest(request);
         await EnsurePostingAccountsAsync(request.Lines.Select(x => x.Account), cancellationToken);
         await shortLists.EnsureTypeAsync(request.JournalEntryTypeId, "LedgerLineType", cancellationToken);
+        await EnsurePartnerAccountsAsync(companyId, request.Lines.Select(x => x.PartnerAccountId), cancellationToken);
+        await EnsureSubAccountsAsync(request.Lines.Select(x => x.SubAccountId), cancellationToken);
 
         var journal = new JournalEntry
         {
@@ -176,11 +178,16 @@ public sealed class JournalPostingService(
                 throw new DomainRuleException("idempotency.key-reused", "Idempotency-Key je već iskorišćen za drugu komandu.");
             }
 
+            // FIN-08: a company-specific scheme AND a global fallback scheme for the same
+            // SourceType is a valid, expected configuration (company overrides global) -- it used
+            // to throw here because SingleOrDefaultAsync rejects more than one match regardless of
+            // the ordering. FirstOrDefault picks the company-specific one first thanks to the
+            // OrderByDescending below (true sorts after false).
             var scheme = await dbContext.Set<PostingScheme>().AsNoTracking()
                 .Where(x => x.IsActive && x.SourceType == request.SourceType &&
                             (x.CompanyId == request.CompanyId || x.CompanyId == null))
                 .OrderByDescending(x => x.CompanyId == request.CompanyId)
-                .SingleOrDefaultAsync(cancellationToken)
+                .FirstOrDefaultAsync(cancellationToken)
                 ?? throw new DomainRuleException("posting.scheme-missing", "Nije definisana šema knjiženja za izvor.");
 
             await EnsurePostingAccountsAsync([scheme.DebitAccount, scheme.CreditAccount], cancellationToken);
@@ -278,6 +285,36 @@ public sealed class JournalPostingService(
         if (validCount != codes.Length)
         {
             throw new DomainRuleException("journal.invalid-account", "Sve stavke moraju koristiti aktivna analitička konta.");
+        }
+    }
+
+    // SEC-06: PartnerAccountId comes from the client per line and was written straight into the
+    // shadow property with no ownership check -- a manual journal entry could reference another
+    // company's partner account. PartnerAccount.CompanyId can be null (shared partner accounts,
+    // same convention as Partner), so those remain allowed for any company.
+    private async Task EnsurePartnerAccountsAsync(int companyId, IEnumerable<int?> partnerAccountIds, CancellationToken cancellationToken)
+    {
+        var ids = partnerAccountIds.Where(x => x is not null).Select(x => x!.Value).Distinct().ToArray();
+        if (ids.Length == 0) return;
+        var validCount = await dbContext.Set<PartnerAccount>().AsNoTracking()
+            .CountAsync(x => ids.Contains(x.Id) && (x.CompanyId == companyId || x.CompanyId == null), cancellationToken);
+        if (validCount != ids.Length)
+        {
+            throw new DomainRuleException("journal.invalid-partner-account", "Konto partnera ne pripada aktivnoj kompaniji.");
+        }
+    }
+
+    // SubAccount is a global chart of sub-accounts (no CompanyId) -- not an IDOR risk, but it was
+    // never validated to even exist before being written onto the ledger line.
+    private async Task EnsureSubAccountsAsync(IEnumerable<string?> subAccountIds, CancellationToken cancellationToken)
+    {
+        var ids = subAccountIds.Where(x => x is not null).Select(x => x!).Distinct(StringComparer.Ordinal).ToArray();
+        if (ids.Length == 0) return;
+        var validCount = await dbContext.Set<SubAccount>().AsNoTracking()
+            .CountAsync(x => ids.Contains(x.Id), cancellationToken);
+        if (validCount != ids.Length)
+        {
+            throw new DomainRuleException("journal.invalid-sub-account", "Podkonto ne postoji.");
         }
     }
 
