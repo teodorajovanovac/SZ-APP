@@ -38,10 +38,6 @@ export function SettingsPage() {
     queryKey: ['settings', companyId],
     queryFn: () => apiRequest<Setting[]>(`/api/v1/companies/${companyId}/settings`),
   })
-  // Global rows and secrets: Root only. Company rows: Root or that company's Upravnik (server enforces).
-  const canEdit = (s: Pick<Setting, 'companyId' | 'key'>) =>
-    isRoot || (s.companyId !== null && !isSecretKey(s.key) && role === 'Upravnik')
-
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     const all = settings.data ?? []
@@ -49,8 +45,10 @@ export function SettingsPage() {
   }, [settings.data, search])
   const page = filtered.slice(pagination.pageIndex * pagination.pageSize, (pagination.pageIndex + 1) * pagination.pageSize)
 
-  const columns = useMemo<ColumnDef<Setting>[]>(
-    () => [
+  const columns = useMemo<ColumnDef<Setting>[]>(() => {
+    // Global rows and secrets: Root only. Company rows: Root or that company's Upravnik (server enforces).
+    const canEdit = (s: Setting) => role === 'Root' || (s.companyId !== null && !isSecretKey(s.key) && role === 'Upravnik')
+    return [
       { accessorKey: 'key', header: t('settings_.key'), enableSorting: false },
       { accessorKey: 'name', header: t('settings_.name'), enableSorting: false },
       {
@@ -79,11 +77,8 @@ export function SettingsPage() {
             </Tooltip>
           ) : null,
       },
-    ],
-    // canEdit depends only on role/isRoot
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [t, role],
-  )
+    ]
+  }, [t, role])
 
   return (
     <Stack spacing={2}>
