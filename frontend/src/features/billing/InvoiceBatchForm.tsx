@@ -8,9 +8,8 @@ import { ControlledTextField } from '../../shared/components/ControlledTextField
 import { MoneyField } from '../../shared/components/MoneyField'
 import { currentPeriodYYMM, MonthYearField } from '../../shared/components/MonthYearField'
 import { useQueryClient } from '@tanstack/react-query'
-import { apiRequest } from '../../api/generated/client'
 import { formatMoney } from '../../shared/format/money'
-import { useCreateInvoiceBatch, useRunInterest, type InterestPeriodPresets } from './billingApi'
+import { interestPresetsQuery, useCreateInvoiceBatch, useRunInterest } from './billingApi'
 import { InterestPeriodFields, resolveInterestPeriod } from './InterestPeriodFields'
 
 const schema = z.object({
@@ -73,14 +72,7 @@ export function InvoiceBatchForm({ companyId, onCreated }: { companyId: number; 
     let period = { start: '', end: '' }
     if (interestEnabled) {
       // Same inputs as the preset query the fields showed, so this is served from cache.
-      const params = new URLSearchParams({ periodYYMM: String(value.periodYYMM) })
-      if (previousValueDate) params.set('previousValueDate', previousValueDate)
-      if (balanceAsOfDate) params.set('balanceAsOfDate', balanceAsOfDate)
-      if (value.dueDate) params.set('dueDate', value.dueDate)
-      const presets = await queryClient.fetchQuery({
-        queryKey: ['companies', companyId, 'interest-presets', params.toString()],
-        queryFn: () => apiRequest<InterestPeriodPresets>(`/api/v1/companies/${companyId}/interest/period-presets?${params.toString()}`),
-      })
+      const presets = await queryClient.fetchQuery(interestPresetsQuery(companyId, { periodYYMM: value.periodYYMM, previousValueDate, balanceAsOfDate, dueDate: value.dueDate }))
       period = resolveInterestPeriod({ interestPreset, interestStart, interestEnd }, presets.presets, presets.defaultPreset)
     }
     const created = await create.mutateAsync({

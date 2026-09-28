@@ -81,21 +81,22 @@ export interface InterestRun {
   totals: { partnerAccountId: number; subAccountId: string; interest: number }[]
 }
 
+export interface InterestPresetParams { periodYYMM: number; previousValueDate?: string; balanceAsOfDate?: string; dueDate?: string }
+
 /** P10: suggested interest periods for a billing period; the run always takes explicit dates. */
-export function useInterestPeriodPresets(
-  companyId: number,
-  params: { periodYYMM: number; previousValueDate?: string; balanceAsOfDate?: string; dueDate?: string },
-  enabled: boolean,
-) {
+export function interestPresetsQuery(companyId: number, params: InterestPresetParams) {
   const search = new URLSearchParams({ periodYYMM: String(params.periodYYMM) })
   if (params.previousValueDate) search.set('previousValueDate', params.previousValueDate)
   if (params.balanceAsOfDate) search.set('balanceAsOfDate', params.balanceAsOfDate)
   if (params.dueDate) search.set('dueDate', params.dueDate)
-  return useQuery({
+  return {
     queryKey: ['companies', companyId, 'interest-presets', search.toString()],
     queryFn: () => apiRequest<InterestPeriodPresets>(`/api/v1/companies/${companyId}/interest/period-presets?${search.toString()}`),
-    enabled,
-  })
+  }
+}
+
+export function useInterestPeriodPresets(companyId: number, params: InterestPresetParams, enabled: boolean) {
+  return useQuery({ ...interestPresetsQuery(companyId, params), enabled })
 }
 
 /** Idempotent per batch: re-running replaces the batch's interest rows. */
