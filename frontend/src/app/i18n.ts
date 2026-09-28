@@ -272,6 +272,27 @@ export const resources = {
         new: 'Novi pristup', newTitle: 'Novi pristup zaposlenog', editTitle: 'Izmena pristupa',
         empty: 'Nijednom zaposlenom nije dodeljen pristup.',
       },
+      companiesAdmin_: {
+        title: 'Kompanije', new: 'Nova kompanija', editTitle: 'Izmena kompanije', search: 'Pretraga po nazivu, Id-u ili lokaciji',
+        id: 'Id', name: 'Naziv', printName: 'Naziv za štampu', location: 'Lokacija', registrationNumber: 'Matični broj',
+        idOptional: 'Id (opciono)', idHint: 'Prazno = sledeći slobodan (max+1).',
+        partnerId: 'Id partnera kompanije', partnerIdHint: 'Postojeći globalni partner.',
+        loadError: 'Kompanije nisu mogle da se učitaju.', saveError: 'Kompanija nije sačuvana.',
+      },
+      entrances_: {
+        title: 'SZ ulazi', new: 'Novi ulaz', editTitle: 'Izmena ulaza', search: 'Pretraga po zgradi, ulazu ili oznaci',
+        buildingName: 'Zgrada', entranceName: 'Ulaz', buildingLabel: 'Oznaka objekta (RGZ)', addressId: 'Id adrese',
+        sortIndex: 'Redosled', description: 'Opis', empty: 'Nema unetih ulaza.',
+        delete: 'Obriši', deleteTitle: 'Obrisati ulaz?', deleteBody: 'Ulaz „{{name}}“ biće trajno obrisan.',
+        deleteError: 'Ulaz nije obrisan (možda ga koriste posebni delovi).', saveError: 'Ulaz nije sačuvan.', loadError: 'Ulazi nisu mogli da se učitaju.',
+      },
+      locations_: {
+        title: 'Lokacije', new: 'Nova lokacija', editTitle: 'Izmena lokacije', search: 'Pretraga po nazivu',
+        name: 'Naziv', parent: 'Nadređena lokacija', sortIndex: 'Redosled',
+        delete: 'Obriši', deleteTitle: 'Obrisati lokaciju?', deleteBody: 'Lokacija „{{name}}“ biće trajno obrisana.',
+        deleteError: 'Lokacija nije obrisana.', saveError: 'Lokacija nije sačuvana.', loadError: 'Lokacije nisu mogle da se učitaju.',
+        rootOnly: 'Lokacije može da menja samo administrator (Root).',
+      },
       suppliersUi: {
         new: 'Novi dobavljački račun', newTitle: 'Novi dobavljački račun',
         empty: 'Nema unetih dobavljačkih računa.',
@@ -621,6 +642,27 @@ export const resources = {
         new: 'Нови приступ', newTitle: 'Нови приступ запосленог', editTitle: 'Измена приступа',
         empty: 'Ниједном запосленом није додељен приступ.',
       },
+      companiesAdmin_: {
+        title: 'Компаније', new: 'Нова компанија', editTitle: 'Измена компаније', search: 'Претрага по називу, Id-у или локацији',
+        id: 'Id', name: 'Назив', printName: 'Назив за штампу', location: 'Локација', registrationNumber: 'Матични број',
+        idOptional: 'Id (опционо)', idHint: 'Празно = следећи слободан (max+1).',
+        partnerId: 'Id партнера компаније', partnerIdHint: 'Постојећи глобални партнер.',
+        loadError: 'Компаније нису могле да се учитају.', saveError: 'Компанија није сачувана.',
+      },
+      entrances_: {
+        title: 'СЗ улази', new: 'Нови улаз', editTitle: 'Измена улаза', search: 'Претрага по згради, улазу или ознаци',
+        buildingName: 'Зграда', entranceName: 'Улаз', buildingLabel: 'Ознака објекта (РГЗ)', addressId: 'Id адресе',
+        sortIndex: 'Редослед', description: 'Опис', empty: 'Нема унетих улаза.',
+        delete: 'Обриши', deleteTitle: 'Обрисати улаз?', deleteBody: 'Улаз „{{name}}“ биће трајно обрисан.',
+        deleteError: 'Улаз није обрисан (можда га користе посебни делови).', saveError: 'Улаз није сачуван.', loadError: 'Улази нису могли да се учитају.',
+      },
+      locations_: {
+        title: 'Локације', new: 'Нова локација', editTitle: 'Измена локације', search: 'Претрага по називу',
+        name: 'Назив', parent: 'Надређена локација', sortIndex: 'Редослед',
+        delete: 'Обриши', deleteTitle: 'Обрисати локацију?', deleteBody: 'Локација „{{name}}“ биће трајно обрисана.',
+        deleteError: 'Локација није обрисана.', saveError: 'Локација није сачувана.', loadError: 'Локације нису могле да се учитају.',
+        rootOnly: 'Локације може да мења само администратор (Root).',
+      },
       suppliersUi: {
         new: 'Нови добављачки рачун', newTitle: 'Нови добављачки рачун',
         empty: 'Нема унетих добављачких рачуна.',
@@ -969,6 +1011,27 @@ export const resources = {
       staffAccess_: {
         new: 'New access', newTitle: 'New staff access', editTitle: 'Edit access',
         empty: 'No staff member has access yet.',
+      },
+      companiesAdmin_: {
+        title: 'Companies', new: 'New company', editTitle: 'Edit company', search: 'Search by name, Id or location',
+        id: 'Id', name: 'Name', printName: 'Print name', location: 'Location', registrationNumber: 'Registration number',
+        idOptional: 'Id (optional)', idHint: 'Empty = next free (max+1).',
+        partnerId: 'Company partner Id', partnerIdHint: 'An existing global partner.',
+        loadError: 'Companies could not be loaded.', saveError: 'Company was not saved.',
+      },
+      entrances_: {
+        title: 'Building entrances', new: 'New entrance', editTitle: 'Edit entrance', search: 'Search by building, entrance or label',
+        buildingName: 'Building', entranceName: 'Entrance', buildingLabel: 'Building label (cadastre)', addressId: 'Address Id',
+        sortIndex: 'Order', description: 'Description', empty: 'No entrances yet.',
+        delete: 'Delete', deleteTitle: 'Delete entrance?', deleteBody: 'Entrance "{{name}}" will be permanently deleted.',
+        deleteError: 'Entrance was not deleted (units may reference it).', saveError: 'Entrance was not saved.', loadError: 'Entrances could not be loaded.',
+      },
+      locations_: {
+        title: 'Locations', new: 'New location', editTitle: 'Edit location', search: 'Search by name',
+        name: 'Name', parent: 'Parent location', sortIndex: 'Order',
+        delete: 'Delete', deleteTitle: 'Delete location?', deleteBody: 'Location "{{name}}" will be permanently deleted.',
+        deleteError: 'Location was not deleted.', saveError: 'Location was not saved.', loadError: 'Locations could not be loaded.',
+        rootOnly: 'Only the administrator (Root) can change locations.',
       },
       suppliersUi: {
         new: 'New supplier invoice', newTitle: 'New supplier invoice',
