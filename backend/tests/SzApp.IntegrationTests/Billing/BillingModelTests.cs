@@ -27,6 +27,15 @@ public sealed class BillingModelTests
         var invoice = context.Model.FindEntityType(typeof(SzApp.Data.Entities.Invoice))!;
         Assert.NotNull(invoice.FindProperty("InvoiceBatchId"));
         Assert.NotNull(invoice.FindProperty("CancelReason"));
+
+        // P11 (boss's spelling) + P10: unrounded row interest, 4-dp stored coefficient.
+        var costs = context.Model.FindEntityType(typeof(NoticeAditionalCost))!;
+        Assert.Equal("NoticeAditionalCosts", costs.GetTableName());
+        Assert.Equal(2, costs.FindProperty(nameof(NoticeAditionalCost.AditionalCostsUpperAmount))!.GetScale());
+        Assert.True(context.Model.FindEntityType(typeof(NoticeBatch))!.FindProperty(nameof(NoticeBatch.AditionalCostsLowerLimit))!.IsNullable);
+        var statement = context.Model.FindEntityType(typeof(InterestStatement))!;
+        Assert.Equal(10, statement.FindProperty(nameof(InterestStatement.Interest))!.GetScale());
+        Assert.Equal(4, statement.FindProperty(nameof(InterestStatement.Coefficient))!.GetScale());
     }
 
     private sealed class BillingModelContext(DbContextOptions<BillingModelContext> options) : DbContext(options)

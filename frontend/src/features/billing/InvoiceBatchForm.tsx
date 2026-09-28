@@ -7,7 +7,10 @@ import { getErrorMessage } from '../../api/problemDetails'
 import { ControlledTextField } from '../../shared/components/ControlledTextField'
 import { MoneyField } from '../../shared/components/MoneyField'
 import { currentPeriodYYMM, MonthYearField } from '../../shared/components/MonthYearField'
-import { useCreateInvoiceBatch } from './billingApi'
+import { useQueryClient } from '@tanstack/react-query'
+import { formatMoney } from '../../shared/format/money'
+import { interestPresetsQuery, resolveInterestPeriod, useCreateInvoiceBatch, useRunInterest } from './billingApi'
+import { InterestPeriodFields } from './InterestPeriodFields'
 
 const schema = z.object({
   periodYYMM: z
@@ -26,9 +29,20 @@ const schema = z.object({
   transactionDate: z.string().min(1),
   dueDate: z.string().min(1),
   exchangeRateNbs: z.number({ error: 'Kurs mora biti broj.' }).positive('Kurs mora biti pozitivan broj.'),
+  // P10 / FIN-27: interest is on by default; the period is an explicit per-run parameter.
+  interestEnabled: z.boolean(),
+  previousValueDate: z.string(),
+  balanceAsOfDate: z.string(),
+  interestPreset: z.enum(['fromPreviousDueDate', 'wholeMonth', 'dueToDue', 'custom', '']),
+  interestStart: z.string(),
+  interestEnd: z.string(),
+}).refine((v) => v.interestPreset !== 'custom' || (v.interestStart !== '' && v.interestEnd !== '' && v.interestStart <= v.interestEnd), {
+  path: ['interestEnd'],
+  message: 'Početak perioda kamate mora biti pre kraja.',
 })
 
-type FormValues = z.infer<typeof schema>
+export type InvoiceBatchFormValues = z.infer<typeof schema>
+type FormValues = InvoiceBatchFormValues
 
 function SectionHeading({ children }: { children: string }) {
   return (
@@ -42,14 +56,33 @@ function SectionHeading({ children }: { children: string }) {
 export function InvoiceBatchForm({ companyId, onCreated }: { companyId: number; onCreated?: () => void }) {
   const { t } = useTranslation()
   const create = useCreateInvoiceBatch(companyId)
-  const { control, handleSubmit, reset, formState } = useForm<FormValues>({
+  const runInterest = useRunInterest(companyId)
+  const queryClient = useQueryClient()
+  const { control, handleSubmit, reset, formState, setValue } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { periodYYMM: currentPeriodYYMM(), caption: '', place: '', issueDate: '', serviceDateFrom: '', serviceDateTo: '', transactionDate: '', dueDate: '', exchangeRateNbs: 1 },
+    defaultValues: {
+      periodYYMM: currentPeriodYYMM(), caption: '', place: '', issueDate: '', serviceDateFrom: '', serviceDateTo: '', transactionDate: '', dueDate: '', exchangeRateNbs: 1,
+      interestEnabled: true, previousValueDate: '', balanceAsOfDate: '', interestPreset: '', interestStart: '', interestEnd: '',
+    },
   })
   const submit = async (value: FormValues) => {
     const month = value.periodYYMM % 100
     const year = 2000 + Math.floor(value.periodYYMM / 100)
-    await create.mutateAsync({ ...value, month, year, extraordinaryInvoiceMarker: null, balanceAsOfDate: null, previousValueDate: null, isInterestCalculated: false, paymentPurpose: null })
+    const { interestEnabled, previousValueDate, balanceAsOfDate, interestPreset, interestStart, interestEnd, ...batch } = value
+    let period = { start: '', end: '' }
+    if (interestEnabled) {
+      // Same inputs as the preset query the fields showed, so this is served from cache.
+      const presets = await queryClient.fetchQuery(interestPresetsQuery(companyId, { periodYYMM: value.periodYYMM, previousValueDate, balanceAsOfDate, dueDate: value.dueDate }))
+      period = resolveInterestPeriod({ interestPreset, interestStart, interestEnd }, presets.presets, presets.defaultPreset)
+    }
+    const created = await create.mutateAsync({
+      ...batch, month, year, extraordinaryInvoiceMarker: null,
+      balanceAsOfDate: balanceAsOfDate || null, previousValueDate: previousValueDate || null,
+      isInterestCalculated: interestEnabled, paymentPurpose: null,
+    })
+    if (interestEnabled) {
+      await runInterest.mutateAsync({ invoiceBatchId: created.id, periodStart: period.start, periodEnd: period.end })
+    }
     reset()
     onCreated?.()
   }
@@ -58,6 +91,10 @@ export function InvoiceBatchForm({ companyId, onCreated }: { companyId: number; 
     <Stack component="form" onSubmit={handleSubmit(submit)} spacing={2} noValidate>
       <Typography variant="h6" component="h2">{t('billingUi.formTitle')}</Typography>
       {create.error ? <Alert severity="error">{getErrorMessage(create.error, t('billing_.form.notCreated'))}</Alert> : null}
+      {runInterest.error ? <Alert severity="error">{getErrorMessage(runInterest.error, t('interest_.runFailed'))}</Alert> : null}
+      {runInterest.data && formState.isSubmitSuccessful ? (
+        <Alert severity="info">{t('interest_.runDone', { total: formatMoney(runInterest.data.totalInterest), count: runInterest.data.totals.length })}</Alert>
+      ) : null}
       {create.isSuccess && formState.isSubmitSuccessful ? <Alert severity="success">{t('billingUi.created')}</Alert> : null}
       <Grid container spacing={2} columnSpacing={3}>
         <SectionHeading>{t('billingUi.sectionIdentification')}</SectionHeading>
@@ -92,6 +129,9 @@ export function InvoiceBatchForm({ companyId, onCreated }: { companyId: number; 
         <Grid size={{ xs: 12, sm: 6 }}>
           <MoneyField control={control} name="exchangeRateNbs" label={t('billing_.form.exchangeRate')} required />
         </Grid>
+
+        <SectionHeading>{t('interest_.section')}</SectionHeading>
+        <InterestPeriodFields companyId={companyId} control={control} setValue={setValue} />
       </Grid>
       <Stack direction="row" justifyContent="flex-end">
         <Button type="submit" variant="contained" disabled={create.isPending}>{t('billing_.form.submit')}</Button>

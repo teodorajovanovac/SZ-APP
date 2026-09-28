@@ -205,15 +205,21 @@ public sealed record CreateInterestRateRequest(DateOnly Date, decimal Rate, stri
 public sealed record CalculateInterestRequest(decimal Principal, DateOnly From, DateOnly To);
 public sealed record InterestCalculationLineResponse(DateOnly From, DateOnly To, int Days, decimal Rate, decimal Coefficient, decimal Interest);
 public sealed record InterestCalculationResponse(decimal Principal, decimal TotalInterest, IReadOnlyList<InterestCalculationLineResponse> Lines);
-public sealed record CreateInterestStatementRequest(
-    string Account,
-    decimal Principal,
-    decimal Balance,
-    int PartnerAccountId,
-    string? SubAccountId,
+/// <summary>P10: one interest run per invoice batch over an explicit, inclusive period. Re-running replaces the batch's rows.</summary>
+public sealed record RunInterestRequest(int InvoiceBatchId, DateOnly PeriodStart, DateOnly PeriodEnd);
+public sealed record InterestTotalResponse(int PartnerAccountId, string SubAccountId, decimal Interest);
+public sealed record InterestRunResponse(
     int InvoiceBatchId,
-    DateOnly From,
-    DateOnly To);
+    DateOnly PeriodStart,
+    DateOnly PeriodEnd,
+    int RowCount,
+    decimal TotalInterest,
+    IReadOnlyList<InterestTotalResponse> Totals);
+public sealed record InterestPeriodPresetResponse(string Key, DateOnly Start, DateOnly End);
+public sealed record InterestPeriodPresetsResponse(
+    string DefaultPreset,
+    DateOnly? LastRunEnd,
+    IReadOnlyList<InterestPeriodPresetResponse> Presets);
 public sealed record InterestStatementResponse(
     int Id,
     string Account,
@@ -225,11 +231,21 @@ public sealed record InterestStatementResponse(
     decimal Coefficient,
     decimal Interest,
     int PartnerAccountId,
+    string? SubAccountId,
     int InvoiceBatchId);
 
 public sealed record NoticeTemplateResponse(int Id, string Name, string Body, bool IsActive, string RowVersion);
 public sealed record CreateNoticeTemplateRequest(string Name, string Body);
-public sealed record NoticeBatchResponse(int Id, string Title, DateOnly Date, int NoticeTemplateId, int NoticeTypeId, string RowVersion);
+public sealed record NoticeBatchResponse(
+    int Id,
+    string Title,
+    DateOnly Date,
+    int NoticeTemplateId,
+    int NoticeTypeId,
+    decimal? AditionalCostsLowerAmount,
+    decimal? AditionalCostsLowerLimit,
+    decimal? AditionalCostsUpperAmount,
+    string RowVersion);
 public sealed record CreateNoticeBatchRequest(
     string Title,
     DateOnly Date,
@@ -259,8 +275,26 @@ public sealed record NoticeSeedRequest(
     decimal Debt,
     string? InvoiceText,
     string PaymentReference,
-    decimal AdditionalCosts,
     IReadOnlyList<NoticeLineSeedRequest> Lines);
+
+/// <summary>P11 NoticeAditionalCosts row. CompanyId null = global (Root only).</summary>
+public sealed record NoticeAditionalCostResponse(
+    int Id,
+    DateOnly DateStart,
+    DateOnly? DateEnd,
+    int? CompanyId,
+    decimal AditionalCostsLowerAmount,
+    decimal AditionalCostsLowerLimit,
+    decimal AditionalCostsUpperAmount,
+    string RowVersion);
+public sealed record SaveNoticeAditionalCostRequest(
+    DateOnly DateStart,
+    DateOnly? DateEnd,
+    bool IsGlobal,
+    decimal AditionalCostsLowerAmount,
+    decimal AditionalCostsLowerLimit,
+    decimal AditionalCostsUpperAmount,
+    string? RowVersion);
 
 public sealed record GenerateNoticesRequest(IReadOnlyList<NoticeSeedRequest> Notices);
 public sealed record NoticeGenerationResponse(int BatchId, bool AlreadyGenerated, IReadOnlyList<int> NoticeIds);

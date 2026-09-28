@@ -91,6 +91,8 @@ public static class BillingModelBuilderExtensions
             {
                 table.HasCheckConstraint("CK_InvoiceBatch_Period", "[Month] BETWEEN 1 AND 12 AND [PeriodYYMM] = ([Year] % 100) * 100 + [Month]");
                 table.HasCheckConstraint("CK_InvoiceBatch_Dates", "[ServiceDateFrom] <= [ServiceDateTo] AND [IssueDate] <= [DueDate]");
+                table.HasCheckConstraint("CK_InvoiceBatch_InterestPeriod",
+                    "([InterestPeriodStart] IS NULL AND [InterestPeriodEnd] IS NULL) OR [InterestPeriodStart] <= [InterestPeriodEnd]");
             });
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Id).UseIdentityColumn();
@@ -208,8 +210,8 @@ public static class BillingModelBuilderExtensions
             entity.Property(x => x.Amount).HasPrecision(18, 2);
             entity.Property(x => x.Balance).HasPrecision(18, 2);
             entity.Property(x => x.Rate).HasPrecision(18, 4);
-            entity.Property(x => x.Coefficient).HasPrecision(18, 4);
-            entity.Property(x => x.Interest).HasPrecision(18, 2);
+            entity.Property(x => x.Coefficient).HasPrecision(18, 4); // owner decision: stored 4 dp, calculated with 8
+            entity.Property(x => x.Interest).HasPrecision(28, 10); // unrounded Koef(8) x Saldo(2); only the per-partner sum is rounded
             entity.Property(x => x.SubAccountId).HasMaxLength(10).IsUnicode(false);
             entity.HasIndex(x => new { x.CompanyId, x.InvoiceBatchId, x.PartnerAccountId });
             entity.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.NoAction);
@@ -240,6 +242,9 @@ public static class BillingModelBuilderExtensions
             entity.Property(x => x.DebtTolerance).HasPrecision(18, 2);
             entity.Property(x => x.DebtToleranceByMonth).HasPrecision(18, 2);
             entity.Property(x => x.CustomCaptionOnSlip).HasMaxLength(255);
+            entity.Property(x => x.AditionalCostsLowerAmount).HasPrecision(18, 2);
+            entity.Property(x => x.AditionalCostsLowerLimit).HasPrecision(18, 2);
+            entity.Property(x => x.AditionalCostsUpperAmount).HasPrecision(18, 2);
             entity.Property(x => x.GenerationFingerprint).HasMaxLength(64).IsUnicode(false);
             entity.Property(x => x.RowVersion).IsRowVersion();
             entity.HasIndex(x => new { x.CompanyId, x.Date, x.Title });
@@ -247,6 +252,24 @@ public static class BillingModelBuilderExtensions
             entity.HasOne<NoticeTemplate>().WithMany().HasForeignKey(x => x.NoticeTemplateId).OnDelete(DeleteBehavior.NoAction);
             entity.HasOne<ShortList>().WithMany().HasForeignKey(x => x.NoticeTypeId).OnDelete(DeleteBehavior.NoAction);
             entity.HasOne<InvoiceBatch>().WithMany().HasForeignKey(x => x.InvoiceBatchId).OnDelete(DeleteBehavior.NoAction);
+        });
+
+        builder.Entity<NoticeAditionalCost>(entity =>
+        {
+            entity.ToTable("NoticeAditionalCosts", "billing", table =>
+            {
+                table.HasCheckConstraint("CK_NoticeAditionalCosts_Amounts",
+                    "[AditionalCostsLowerAmount] >= 0 AND [AditionalCostsLowerLimit] >= 0 AND [AditionalCostsUpperAmount] >= 0");
+                table.HasCheckConstraint("CK_NoticeAditionalCosts_Period", "[DateEnd] IS NULL OR [DateEnd] >= [DateStart]");
+            });
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).UseIdentityColumn();
+            entity.Property(x => x.AditionalCostsLowerAmount).HasPrecision(18, 2);
+            entity.Property(x => x.AditionalCostsLowerLimit).HasPrecision(18, 2);
+            entity.Property(x => x.AditionalCostsUpperAmount).HasPrecision(18, 2);
+            entity.Property(x => x.RowVersion).IsRowVersion();
+            entity.HasIndex(x => new { x.CompanyId, x.DateStart });
+            entity.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.NoAction);
         });
 
         builder.Entity<Notice>(entity =>

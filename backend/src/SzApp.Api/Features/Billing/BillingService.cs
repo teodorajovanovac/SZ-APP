@@ -648,61 +648,180 @@ public sealed class BillingService(
 
     public async Task<InterestCalculationResponse> CalculateInterestAsync(CalculateInterestRequest request, CancellationToken ct)
     {
-        if (request.To < request.From) throw new DomainRuleException("interest.invalid-period", "Period kamate nije ispravan.");
-        var rates = await db.Set<InterestRate>().AsNoTracking().Where(x => x.TimeCode == "G" && x.Date <= request.To).OrderBy(x => x.Date).ToArrayAsync(ct);
-        var effective = rates.LastOrDefault(x => x.Date <= request.From)
-            ?? throw new DomainRuleException("interest.rate-not-found", "Nema stope kamate za početak perioda.");
-        var changes = rates.Where(x => x.Date > request.From).ToArray();
-        var periods = new List<InterestPeriod>();
-        var from = request.From;
-        var rate = effective.Rate;
-        foreach (var change in changes)
-        {
-            periods.Add(new(from, change.Date.AddDays(-1), rate));
-            from = change.Date;
-            rate = change.Rate;
-        }
-        periods.Add(new(from, request.To, rate));
-        var calculated = InterestCalculator.Calculate(request.Principal, periods);
+        var rates = await LoadInterestRatesAsync(request.To, ct);
+        var calculated = InterestCalculator.Calculate(request.Principal, request.From, request.To, rates);
         var lines = calculated.Select(x => new InterestCalculationLineResponse(x.From, x.To, x.Days, x.AnnualRate, x.Coefficient, x.Interest)).ToArray();
-        return new(FinanceRounding.Money(request.Principal), FinanceRounding.Money(lines.Sum(x => x.Interest)), lines);
+        return new(FinanceRounding.Money(request.Principal), FinanceRounding.Money(calculated.Sum(x => x.Interest)), lines);
     }
 
     public async Task<IReadOnlyList<InterestStatementResponse>> ListInterestStatementsAsync(int companyId, int invoiceBatchId, CancellationToken ct) =>
         await db.Set<InterestStatement>().AsNoTracking()
             .Where(x => x.CompanyId == companyId && x.InvoiceBatchId == invoiceBatchId)
-            .OrderBy(x => x.PartnerAccountId).ThenBy(x => x.Date)
+            .OrderBy(x => x.PartnerAccountId).ThenBy(x => x.SubAccountId).ThenBy(x => x.Date)
             .Select(x => new InterestStatementResponse(x.Id, x.Account, x.Date, x.Amount, x.Balance, x.Days,
-                x.Rate, x.Coefficient, x.Interest, x.PartnerAccountId, x.InvoiceBatchId))
+                x.Rate, x.Coefficient, x.Interest, x.PartnerAccountId, x.SubAccountId, x.InvoiceBatchId))
             .ToArrayAsync(ct);
 
-    public async Task<IReadOnlyList<InterestStatementResponse>> CreateInterestStatementsAsync(int companyId, CreateInterestStatementRequest request, CancellationToken ct)
+    /// <summary>P10 suggestions for the run period; the run itself always takes explicit dates.</summary>
+    public async Task<InterestPeriodPresetsResponse> GetInterestPeriodPresetsAsync(
+        int companyId, int periodYYMM, DateOnly? previousValueDate, DateOnly? balanceAsOfDate, DateOnly? dueDate, CancellationToken ct)
     {
-        if (!await db.Set<InvoiceBatch>().AnyAsync(x => x.Id == request.InvoiceBatchId && x.CompanyId == companyId, ct))
-            throw new DomainRuleException("billing.batch-not-found", "Serija računa ne postoji.");
-        if (!await db.Set<PartnerAccount>().AnyAsync(x => x.Id == request.PartnerAccountId && x.CompanyId == companyId, ct))
-            throw new DomainRuleException("billing.partner-account-not-found", "Konto partnera ne pripada aktivnoj kompaniji.");
-        var calculation = await CalculateInterestAsync(new CalculateInterestRequest(request.Principal, request.From, request.To), ct);
-        var entities = calculation.Lines.Select(line => new InterestStatement
-        {
-            CompanyId = companyId,
-            Account = Required(request.Account, 50, "Konto"),
-            Date = line.From,
-            Amount = FinanceRounding.Money(request.Principal),
-            Balance = FinanceRounding.Money(request.Balance),
-            Days = line.Days,
-            Rate = line.Rate,
-            Coefficient = line.Coefficient,
-            Interest = line.Interest,
-            PartnerAccountId = request.PartnerAccountId,
-            SubAccountId = Trim(request.SubAccountId, 10),
-            InvoiceBatchId = request.InvoiceBatchId
-        }).ToArray();
-        db.AddRange(entities);
-        await db.SaveChangesAsync(ct);
-        return entities.Select(x => new InterestStatementResponse(x.Id, x.Account, x.Date, x.Amount, x.Balance,
-            x.Days, x.Rate, x.Coefficient, x.Interest, x.PartnerAccountId, x.InvoiceBatchId)).ToArray();
+        var previousBatchDue = await db.Set<InvoiceBatch>().AsNoTracking()
+            .Where(x => x.CompanyId == companyId && x.PeriodYYMM < periodYYMM && x.ExtraordinaryInvoiceMarker == null)
+            .OrderByDescending(x => x.PeriodYYMM).Select(x => (DateOnly?)x.DueDate).FirstOrDefaultAsync(ct);
+        var lastRunEnd = await db.Set<InvoiceBatch>().AsNoTracking()
+            .Where(x => x.CompanyId == companyId && x.InterestPeriodEnd != null)
+            .MaxAsync(x => x.InterestPeriodEnd, ct);
+        var setting = await db.Set<Setting>().AsNoTracking()
+            .Where(x => (x.CompanyId == companyId || x.CompanyId == null) && x.Key == InterestPeriodPresets.DefaultPresetSettingKey)
+            .OrderByDescending(x => x.CompanyId).Select(x => x.Value).FirstOrDefaultAsync(ct);
+        var presets = InterestPeriodPresets.Suggest(periodYYMM, previousValueDate, balanceAsOfDate, dueDate, previousBatchDue);
+        return new(InterestPeriodPresets.NormalizeKey(setting), lastRunEnd,
+            presets.Select(x => new InterestPeriodPresetResponse(x.Key, x.Start, x.End)).ToArray());
     }
+
+    /// <summary>
+    /// Legacy ObracunajKamatu: ClearKamatniList (delete the batch's rows) + recreate from the 2040 ledger.
+    /// Idempotent per batch; periods of different batches of one company may not overlap (runs cover every partner).
+    /// </summary>
+    public Task<InterestRunResponse> RunInterestAsync(int companyId, RunInterestRequest request, CancellationToken ct) =>
+        ExecuteSerializableAsync(async () =>
+        {
+            if (request.PeriodEnd < request.PeriodStart)
+                throw new DomainRuleException("interest.invalid-period", "Početak perioda kamate mora biti pre kraja.");
+            await LockInvoiceBatchAsync(request.InvoiceBatchId, ct);
+            var batch = await db.Set<InvoiceBatch>().SingleOrDefaultAsync(x => x.Id == request.InvoiceBatchId && x.CompanyId == companyId, ct)
+                ?? throw new DomainRuleException("billing.batch-not-found", "Serija računa ne postoji.");
+            if (batch.Status == BillingBatchStatus.Posted)
+                throw new DomainRuleException("interest.batch-posted", "Serija je proknjižena; kamata se ne može ponovo obračunati.");
+            var overlapping = await db.Set<InvoiceBatch>().AsNoTracking()
+                .Where(x => x.CompanyId == companyId && x.Id != batch.Id && x.InterestPeriodStart != null
+                    && x.InterestPeriodStart <= request.PeriodEnd && request.PeriodStart <= x.InterestPeriodEnd)
+                .Select(x => new { x.Caption, x.InterestPeriodStart, x.InterestPeriodEnd })
+                .FirstOrDefaultAsync(ct);
+            if (overlapping is not null)
+                throw new DomainRuleException("interest.period-overlap",
+                    $"Period se preklapa sa obračunom kamate serije '{overlapping.Caption}' ({overlapping.InterestPeriodStart:dd.MM.yyyy}–{overlapping.InterestPeriodEnd:dd.MM.yyyy}).");
+
+            var rates = await LoadInterestRatesAsync(request.PeriodEnd, ct);
+            var movements = await LoadInterestBaseAsync(companyId, request.PeriodEnd, ct);
+            var rows = InterestCalculator.CalculateRows(request.PeriodStart, request.PeriodEnd, rates, movements);
+
+            await db.Set<InterestStatement>().Where(x => x.CompanyId == companyId && x.InvoiceBatchId == batch.Id).ExecuteDeleteAsync(ct);
+            db.AddRange(rows.Select(x => new InterestStatement
+            {
+                CompanyId = companyId,
+                Account = LedgerAccounts.Customers,
+                Date = x.From,
+                Amount = x.Movement,
+                Balance = x.Balance,
+                Days = x.Days,
+                Rate = x.Rate,
+                Coefficient = FinanceRounding.Calculation(x.Coefficient),
+                Interest = x.Interest,
+                PartnerAccountId = x.PartnerAccountId,
+                SubAccountId = x.SubAccountId,
+                InvoiceBatchId = batch.Id
+            }));
+            batch.IsInterestCalculated = true;
+            batch.InterestPeriodStart = request.PeriodStart;
+            batch.InterestPeriodEnd = request.PeriodEnd;
+            await db.SaveChangesAsync(ct);
+
+            var totals = InterestCalculator.Totals(rows);
+            return new InterestRunResponse(batch.Id, request.PeriodStart, request.PeriodEnd, rows.Count,
+                FinanceRounding.Money(totals.Sum(x => x.Interest)),
+                totals.Select(x => new InterestTotalResponse(x.PartnerAccountId, x.SubAccountId, x.Interest)).ToArray());
+        }, ct);
+
+    private async Task<InterestRatePoint[]> LoadInterestRatesAsync(DateOnly to, CancellationToken ct) =>
+        await db.Set<InterestRate>().AsNoTracking().Where(x => x.TimeCode == "G" && x.Date <= to)
+            .OrderBy(x => x.Date).Select(x => new InterestRatePoint(x.Date, x.Rate)).ToArrayAsync(ct);
+
+    /// <summary>
+    /// The single query behind the interest base (audit 9.4): posted 2040 lines with a partner account and a
+    /// sub-account whose SubAccount.InterestSubAccountId is set (legacy Troskovi_PodKonta.Kamata not -1, so interest
+    /// itself, booked on the mapped sub-account, never earns interest). Date = legacy DPO (due date, else posting date).
+    /// Sub-accounts 9xxxx are merged into 3xxxx like legacy.
+    /// </summary>
+    private async Task<IReadOnlyList<InterestMovement>> LoadInterestBaseAsync(int companyId, DateOnly to, CancellationToken ct)
+    {
+        var rows = await (
+                from e in db.LedgerEntries.AsNoTracking()
+                join s in db.Set<SubAccount>().AsNoTracking() on EF.Property<string?>(e, "SubAccountId") equals s.Id
+                where e.CompanyId == companyId && e.Account == LedgerAccounts.Customers
+                    && EF.Property<int?>(e, "PartnerAccountId") != null
+                    && s.InterestSubAccountId != null && s.InterestSubAccountId != "-1"
+                    && (e.DueDate ?? e.PostingDate) <= to
+                select new
+                {
+                    PartnerAccountId = EF.Property<int?>(e, "PartnerAccountId")!.Value,
+                    SubAccountId = s.Id,
+                    Date = e.DueDate ?? e.PostingDate,
+                    Amount = e.DebitAmount - e.CreditAmount
+                })
+            .ToArrayAsync(ct);
+        return rows.Select(x => new InterestMovement(x.PartnerAccountId,
+                x.SubAccountId.StartsWith('9') ? "3" + x.SubAccountId[1..] : x.SubAccountId,
+                x.Date, x.Amount))
+            .ToArray();
+    }
+
+    public async Task<IReadOnlyList<NoticeAditionalCostResponse>> ListNoticeCostsAsync(int companyId, CancellationToken ct) =>
+        await db.Set<NoticeAditionalCost>().AsNoTracking()
+            .Where(x => x.CompanyId == null || x.CompanyId == companyId)
+            .OrderBy(x => x.CompanyId == null).ThenByDescending(x => x.DateStart)
+            .Select(x => ToNoticeCostResponse(x))
+            .ToArrayAsync(ct);
+
+    /// <summary>P11 rule create (id null) / edit. Global rows are Root-only; the scope of an existing row never changes.</summary>
+    public Task<NoticeAditionalCostResponse> SaveNoticeCostAsync(int companyId, int? id, SaveNoticeAditionalCostRequest request, bool isRoot, CancellationToken ct) =>
+        ExecuteSerializableAsync(async () =>
+        {
+            NoticeAditionalCost entity;
+            if (id is null)
+            {
+                entity = new NoticeAditionalCost { CompanyId = request.IsGlobal ? null : companyId };
+                db.Add(entity);
+            }
+            else
+            {
+                entity = await FindNoticeCostAsync(companyId, id.Value, ct);
+                db.Entry(entity).Property(x => x.RowVersion).OriginalValue =
+                    DecodeRowVersion(request.RowVersion ?? throw new DomainRuleException("concurrency.row-version-required", "RowVersion je obavezan za izmenu."));
+            }
+            if (entity.CompanyId is null && !isRoot)
+                throw new UnauthorizedAccessException("Globalne troškove opomena menja samo Root.");
+
+            var rule = new NoticeCostRule(entity.Id, request.DateStart, request.DateEnd, entity.CompanyId,
+                FinanceRounding.Money(request.AditionalCostsLowerAmount), FinanceRounding.Money(request.AditionalCostsLowerLimit),
+                FinanceRounding.Money(request.AditionalCostsUpperAmount));
+            NoticeCostCalculator.EnsureValid(rule, await LoadNoticeCostRulesAsync(entity.CompanyId, ct));
+            entity.DateStart = rule.DateStart;
+            entity.DateEnd = rule.DateEnd;
+            entity.AditionalCostsLowerAmount = rule.LowerAmount;
+            entity.AditionalCostsLowerLimit = rule.LowerLimit;
+            entity.AditionalCostsUpperAmount = rule.UpperAmount;
+            await db.SaveChangesAsync(ct);
+            return ToNoticeCostResponse(entity);
+        }, ct);
+
+    public async Task DeleteNoticeCostAsync(int companyId, int id, bool isRoot, CancellationToken ct)
+    {
+        var entity = await FindNoticeCostAsync(companyId, id, ct);
+        if (entity.CompanyId is null && !isRoot)
+            throw new UnauthorizedAccessException("Globalne troškove opomena briše samo Root.");
+        db.Remove(entity);
+        await db.SaveChangesAsync(ct);
+    }
+
+    private async Task<NoticeAditionalCost> FindNoticeCostAsync(int companyId, int id, CancellationToken ct) =>
+        await db.Set<NoticeAditionalCost>().SingleOrDefaultAsync(x => x.Id == id && (x.CompanyId == null || x.CompanyId == companyId), ct)
+            ?? throw new DomainRuleException("notice-costs.not-found", "Red troškova opomena ne postoji.");
+
+    private static NoticeAditionalCostResponse ToNoticeCostResponse(NoticeAditionalCost x) =>
+        new(x.Id, x.DateStart, x.DateEnd, x.CompanyId, x.AditionalCostsLowerAmount, x.AditionalCostsLowerLimit,
+            x.AditionalCostsUpperAmount, Convert.ToBase64String(x.RowVersion));
 
     public async Task<IReadOnlyList<NoticeTemplateResponse>> ListNoticeTemplatesAsync(int companyId, CancellationToken ct) =>
         await db.Set<NoticeTemplate>().AsNoTracking().Where(x => x.CompanyId == companyId)
@@ -719,7 +838,7 @@ public sealed class BillingService(
 
     public async Task<NoticeBatchResponse> CreateNoticeBatchAsync(int companyId, CreateNoticeBatchRequest request, CancellationToken ct)
     {
-        await shortLists.EnsureTypeAsync(request.NoticeTypeId, "NoticeType", ct);
+        await shortLists.EnsureTypeAsync(request.NoticeTypeId, NoticeTypes.ShortListTable, ct);
         if (!await db.Set<NoticeTemplate>().AnyAsync(x => x.Id == request.NoticeTemplateId && x.CompanyId == companyId && x.IsActive, ct))
             throw new DomainRuleException("notice.template-not-found", "Aktivan šablon opomene ne postoji.");
         if (request.InvoiceBatchId is not null &&
@@ -740,10 +859,23 @@ public sealed class BillingService(
             InvoiceBatchId = request.InvoiceBatchId,
             CustomCaptionOnSlip = Trim(request.CustomCaptionOnSlip, 255)
         };
+        // P11: snapshot the cost thresholds in force on the batch date (company row beats global).
+        var thresholds = NoticeCostCalculator.Snapshot(NoticeCostCalculator.Applicable(await LoadNoticeCostRulesAsync(companyId, ct), companyId, request.Date));
+        entity.AditionalCostsLowerAmount = thresholds?.LowerAmount;
+        entity.AditionalCostsLowerLimit = thresholds?.LowerLimit;
+        entity.AditionalCostsUpperAmount = thresholds?.UpperAmount;
         db.Add(entity);
         await db.SaveChangesAsync(ct);
-        return new(entity.Id, entity.Title, entity.Date, entity.NoticeTemplateId, entity.NoticeTypeId, Convert.ToBase64String(entity.RowVersion));
+        return new(entity.Id, entity.Title, entity.Date, entity.NoticeTemplateId, entity.NoticeTypeId,
+            entity.AditionalCostsLowerAmount, entity.AditionalCostsLowerLimit, entity.AditionalCostsUpperAmount, Convert.ToBase64String(entity.RowVersion));
     }
+
+    private async Task<NoticeCostRule[]> LoadNoticeCostRulesAsync(int? companyId, CancellationToken ct) =>
+        await db.Set<NoticeAditionalCost>().AsNoTracking()
+            .Where(x => x.CompanyId == null || x.CompanyId == companyId)
+            .Select(x => new NoticeCostRule(x.Id, x.DateStart, x.DateEnd, x.CompanyId,
+                x.AditionalCostsLowerAmount, x.AditionalCostsLowerLimit, x.AditionalCostsUpperAmount))
+            .ToArrayAsync(ct);
 
     public Task<NoticeGenerationResponse> GenerateNoticesAsync(int companyId, int batchId, GenerateNoticesRequest request, CancellationToken ct) =>
         ExecuteSerializableAsync(() => GenerateNoticesCoreAsync(companyId, batchId, request, ct), ct);
@@ -773,8 +905,16 @@ public sealed class BillingService(
                 throw new DomainRuleException("notice.invoice-not-found", "Račun u stavci opomene ne pripada aktivnoj kompaniji.");
         }
 
+        var noticeTypeCode = await db.ShortLists.AsNoTracking().Where(x => x.Id == batch.NoticeTypeId).Select(x => x.IndexValue).SingleAsync(ct);
+        var carriesCost = NoticeTypes.CarriesCost(noticeTypeCode);
+        NoticeCostThresholds? thresholds = batch.AditionalCostsLowerAmount is { } lowerAmount
+            && batch.AditionalCostsLowerLimit is { } lowerLimit && batch.AditionalCostsUpperAmount is { } upperAmount
+            ? new(lowerAmount, lowerLimit, upperAmount)
+            : null;
         foreach (var seed in normalized.Where(x => x.UnpaidInvoiceCount >= batch.MinUnpaidInvoiceCount && x.Debt > batch.DebtTolerance))
         {
+            // P11: the cost is computed here from the batch snapshot, never taken from the client.
+            var cost = NoticeCostCalculator.Cost(FinanceRounding.Money(seed.Debt), thresholds, carriesCost);
             if (!await db.Set<PartnerAccount>().AnyAsync(x => x.Id == seed.PartnerAccountId && x.CompanyId == companyId, ct))
                 throw new DomainRuleException("notice.partner-account-not-found", "Konto partnera ne pripada aktivnoj kompaniji.");
             var notice = new Notice
@@ -785,8 +925,8 @@ public sealed class BillingService(
                 Debt = FinanceRounding.Money(seed.Debt),
                 InvoiceText = Trim(seed.InvoiceText, 255),
                 PaymentReference = Required(seed.PaymentReference, 50, "Poziv na broj"),
-                AdditionalCosts = FinanceRounding.Money(seed.AdditionalCosts),
-                Total = BillingCalculator.CalculateNoticeTotal(seed.Debt, seed.AdditionalCosts)
+                AdditionalCosts = cost,
+                Total = BillingCalculator.CalculateNoticeTotal(FinanceRounding.Money(seed.Debt), cost)
             };
             foreach (var line in seed.Lines)
             {

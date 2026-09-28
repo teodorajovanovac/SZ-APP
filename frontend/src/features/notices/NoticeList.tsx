@@ -6,6 +6,7 @@ import { getErrorMessage } from '../../api/problemDetails'
 import { formatMoney } from '../../shared/format/money'
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog'
 import { ServerDataTable } from '../../shared/components/ServerDataTable'
+import { NoticeCostsPanel } from './NoticeCostsPanel'
 import { useNoticeCommand, useNotices } from './noticeApi'
 import type { Notice } from './noticeApi'
 
@@ -25,12 +26,15 @@ export function NoticeList({ companyId, canWrite }: { companyId: number; canWrit
   const command = useNoticeCommand(companyId)
   const error = query.error ?? command.error
   const [pendingSend, setPendingSend] = useState<Notice | null>(null)
+  const [showCosts, setShowCosts] = useState(false)
 
   const columns = useMemo<ColumnDef<Notice>[]>(
     () => [
       { accessorKey: 'partnerAccountId', header: t('notices_.columns.partnerAccount') },
       { accessorKey: 'unpaidInvoiceCount', header: t('notices_.columns.invoiceCount') },
-      { accessorKey: 'total', header: t('notices_.columns.debt'), cell: ({ getValue }) => formatMoney(getValue<number>()) },
+      { accessorKey: 'debt', header: t('notices_.columns.debt'), cell: ({ getValue }) => formatMoney(getValue<number>()) },
+      { accessorKey: 'additionalCosts', header: t('noticeCosts_.column'), cell: ({ getValue }) => formatMoney(getValue<number>()) },
+      { accessorKey: 'total', header: t('noticeCosts_.total'), cell: ({ getValue }) => formatMoney(getValue<number>()) },
       {
         accessorKey: 'deliveryStatus',
         header: t('notices_.columns.status'),
@@ -79,7 +83,11 @@ export function NoticeList({ companyId, canWrite }: { companyId: number; canWrit
       <Box component="header">
         <Typography component="h1" variant="h1">{t('notices_.title')}</Typography>
         <Typography color="text.secondary" sx={{ mt: 1, maxWidth: 720 }}>{t('notices_.subtitle')}</Typography>
+        <Button sx={{ mt: 1 }} variant="outlined" aria-expanded={showCosts} onClick={() => setShowCosts((v) => !v)}>
+          {t('noticeCosts_.title')}
+        </Button>
       </Box>
+      {showCosts ? <NoticeCostsPanel companyId={companyId} /> : null}
       {error ? <Alert severity="error">{getErrorMessage(error, t('notices_.processingFailed'))}</Alert> : null}
       <ServerDataTable
         ariaLabel={t('notices_.title')}
