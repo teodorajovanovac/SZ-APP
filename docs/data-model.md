@@ -232,6 +232,7 @@ CREATE TABLE [FiscalYear]
 
 -- OPOMENE
 -- NoticeTypeId - Samostalna opomene, Notifikacija na računu
+-- 2026-09-27 Korigivana tabela
 CREATE TABLE [NoticeBatch]
  (
 	[Id]			Long Integer, 
@@ -247,8 +248,24 @@ CREATE TABLE [NoticeBatch]
 	[UpToPaymentDate]			DateTime, 
 	[InvoiceBatchId]			Long Integer, 
 	[CustomCaptionOnOnSlip]			Text (255), 
-	
+	-- 2026-09-27 korekcija, kopirano iz tabele NoticeAditionalCosts
+	[AditionalCostsLowerAmount]	Decimal(18,2), 
+	[AditionalCostsLowerLimit]	Decimal(18,2), 
+	[AditionalCostsUpperAmount]	Decimal(18,2), 
 );
+
+-- 2026-09-27 Nova tabela
+CREATE TABLE [NoticeAditionalCosts]
+ (
+	[Id]			Long Integer, 
+	[DateStart]		DateTime, 
+	[DateEnd]		DateTime,  -- if null its active period
+	[CompanyId]		Long Integer,  -- if null its for all companies
+	[AditionalCostsLowerAmount]	Decimal(18,2), 
+	[AditionalCostsLowerLimit]	Decimal(18,2), 
+	[AditionalCostsUpperAmount]	Decimal(18,2), 
+ );
+
 
 CREATE TABLE [InvoiceBatch]
  (
