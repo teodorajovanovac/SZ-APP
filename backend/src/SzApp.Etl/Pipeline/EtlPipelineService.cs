@@ -42,6 +42,11 @@ public sealed class EtlPipelineService(
             await using var file = File.OpenRead(absoluteFilePath);
             var document = await csvParser.ParseAsync(file, encodingName, delimiter, cancellationToken);
             var now = timeProvider.GetUtcNow();
+            // SEC-04: legacy Staff.Password is plaintext (CLAUDE.md / data-model.md) and must
+            // never land in etl.RawStagingRow or etl.QuarantineRecord, not even for debugging.
+            // Checked once per file off the header row so a malformed (StructuralError) row —
+            // whose Values dict is empty — still gets its RawText redacted below.
+            var hasSensitiveColumns = SensitiveColumnFilter.AnySensitive(document.Headers);
 
             foreach (var row in document.Rows)
             {
@@ -55,7 +60,9 @@ public sealed class EtlPipelineService(
                         EtlRunId = runId,
                         SourceTable = context.SourceTable,
                         SourceKey = null,
-                        RawJson = row.RawText,
+                        RawJson = hasSensitiveColumns
+                            ? $"[SEC-04: red {row.RowNumber} redigovan — tabela ima kolonu lozinke]"
+                            : row.RawText,
                         ErrorCode = "etl.malformed-row",
                         ErrorMessage = row.StructuralError,
                         CreatedAt = now
@@ -63,6 +70,8 @@ public sealed class EtlPipelineService(
                     continue;
                 }
 
+                var safeValues = SensitiveColumnFilter.Strip(row.Values);
+                var safeValuesJson = JsonSerializer.Serialize(safeValues);
                 var raw = new RawStagingRow
                 {
                     EtlRunId = runId,
@@ -71,13 +80,16 @@ public sealed class EtlPipelineService(
                     SourceRowNumber = row.RowNumber,
                     SourceKey = row.Values.GetValueOrDefault("Id"),
                     RowHash = row.RowHash,
-                    RawText = row.RawText,
-                    ValuesJson = JsonSerializer.Serialize(row.Values),
+                    // RawText normally keeps the original CSV line for debugging; once the table has
+                    // a password column, the original line is exactly what we're forbidden to keep,
+                    // so fall back to the already-stripped values instead.
+                    RawText = hasSensitiveColumns ? safeValuesJson : row.RawText,
+                    ValuesJson = safeValuesJson,
                     StagedAt = now
                 };
                 dbContext.Set<RawStagingRow>().Add(raw);
 
-                foreach (var error in GenericRowValidator.Validate(row.Values))
+                foreach (var error in GenericRowValidator.Validate(safeValues))
                 {
                     dbContext.QuarantineRecords.Add(new QuarantineRecord
                     {
@@ -413,6 +425,26 @@ public sealed class EtlPipelineService(
         var context = await dbContext.Set<EtlRunContext>().SingleAsync(x => x.EtlRunId == runId, cancellationToken);
         return (run, context);
     }
+}
+
+// SEC-04: single choke point for keeping secrets out of staging/quarantine. Legacy Staff export
+// column is literally named "Password" (docs/data-model.md's CREATE TABLE [Staff]); "StaffLogin"
+// and "Lozinka" are covered defensively since docs/audit-detaljni.md 9.6 uses that name for the
+// same field in the login form. Matches on any column name (not just Staff's) — a secret column
+// has no legitimate reason to be staged regardless of which source table it turns up on.
+public static class SensitiveColumnFilter
+{
+    private static bool IsSensitive(string header) =>
+        header.Contains("password", StringComparison.OrdinalIgnoreCase) ||
+        header.Contains("lozinka", StringComparison.OrdinalIgnoreCase) ||
+        header.Equals("StaffLogin", StringComparison.OrdinalIgnoreCase);
+
+    public static bool AnySensitive(IEnumerable<string> headers) => headers.Any(IsSensitive);
+
+    public static IReadOnlyDictionary<string, string> Strip(IReadOnlyDictionary<string, string> values) =>
+        values.Any(x => IsSensitive(x.Key))
+            ? values.Where(x => !IsSensitive(x.Key)).ToDictionary(x => x.Key, x => x.Value, StringComparer.OrdinalIgnoreCase)
+            : values;
 }
 
 public sealed record RowValidationError(string Code, string Message);

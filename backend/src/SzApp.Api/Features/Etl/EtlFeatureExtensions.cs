@@ -51,12 +51,19 @@ public static class EtlFeatureExtensions
 
         group.MapGet("/", ListAsync);
         group.MapGet("/{runId:guid}", GetAsync);
+        // SEC-03: Root-only. MasterDataMaterializer trusts CompanyId straight off the CSV row
+        // (Partner/BuildingEntrance/Unit resolve it via LegacyKeyMap, not the route's companyId)
+        // and Company.csv can materialize brand-new companies with no tie to the route at all —
+        // so any importer who isn't Root could plant/move records outside the company they were
+        // authorized for. Locking the whole feature to Root (rather than re-deriving CompanyId
+        // from the route for every materialized entity/FK) is the smaller diff and matches how
+        // ETL is actually used today (Root runs the imports; see docs/audit-detaljni.md SEC-03).
         group.MapPost("/import", ImportAsync)
             .DisableAntiforgery()
-            .RequireAuthorization(policy => policy.RequireRole(SecurityConstants.RootRole, SecurityConstants.UpravnikRole));
+            .RequireAuthorization(policy => policy.RequireRole(SecurityConstants.RootRole));
         group.MapPost("/{runId:guid}/execute", ExecuteAsync)
             .AddEndpointFilter<AntiforgeryEndpointFilter>()
-            .RequireAuthorization(policy => policy.RequireRole(SecurityConstants.RootRole, SecurityConstants.UpravnikRole));
+            .RequireAuthorization(policy => policy.RequireRole(SecurityConstants.RootRole));
         return endpoints;
     }
 

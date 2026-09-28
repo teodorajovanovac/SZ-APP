@@ -35,6 +35,19 @@ public sealed class MasterDataValidationTests
         Assert.Empty(errors);
     }
 
+    // SEC-05(d): Enum.TryParse alone accepts any integer string ("99") as a defined-looking
+    // enum value -- must be rejected via Enum.IsDefined, not silently stored.
+    [Theory]
+    [InlineData("99")]
+    [InlineData("-1")]
+    [InlineData("garbage")]
+    public void StaffAccessValidation_RejectsUndefinedRole(string role)
+    {
+        var errors = MasterDataValidation.Validate(new SaveStaffAccessRequest(42, role));
+
+        Assert.Contains(nameof(SaveStaffAccessRequest.StaffRole), errors.Keys);
+    }
+
     [Fact]
     public void ContractPeriodValidation_RejectsOverlapWithinSinglePeriod()
     {

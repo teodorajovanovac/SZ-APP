@@ -116,17 +116,26 @@ public static class MasterDataFeatureExtensions
         Apply(company, request);
         dbContext.Companies.Add(company);
 
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
-        await dbContext.Database.ExecuteSqlRawAsync("SET IDENTITY_INSERT core.Company ON", cancellationToken);
-        try
+        // FIN-10: the DbContext is registered with EnableRetryOnFailure (Program.cs), so a
+        // manually-scoped BeginTransactionAsync here throws InvalidOperationException the moment
+        // SaveChangesAsync runs inside it -- EF's retrying execution strategy refuses to wrap a
+        // user-owned transaction it doesn't control. Must go through CreateExecutionStrategy the
+        // same way BillingService.ExecuteSerializableAsync does (BillingService.cs:661-671).
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
         {
-            await dbContext.SaveChangesAsync(cancellationToken);
-        }
-        finally
-        {
-            await dbContext.Database.ExecuteSqlRawAsync("SET IDENTITY_INSERT core.Company OFF", cancellationToken);
-        }
-        await transaction.CommitAsync(cancellationToken);
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+            await dbContext.Database.ExecuteSqlRawAsync("SET IDENTITY_INSERT core.Company ON", cancellationToken);
+            try
+            {
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
+            finally
+            {
+                await dbContext.Database.ExecuteSqlRawAsync("SET IDENTITY_INSERT core.Company OFF", cancellationToken);
+            }
+            await transaction.CommitAsync(cancellationToken);
+        });
 
         SetETag(httpContext, company.RowVersion);
         return Results.Created($"/api/v1/companies/{company.Id}", ToResponse(company));
@@ -588,7 +597,13 @@ public static class MasterDataFeatureExtensions
         SzAppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        if (!await permission.CanWriteAsync(principal, companyId, cancellationToken))
+        // SEC-05(a): managing grants is Upravnik/Root only, not ordinary "write" access.
+        if (!await permission.CanManageStaffAccessAsync(principal, companyId, cancellationToken))
+        {
+            return Results.Forbid();
+        }
+        // SEC-05(c): nobody edits their own access row (self-service privilege change).
+        if (permission.GetStaffId(principal) == request.StaffId)
         {
             return Results.Forbid();
         }
@@ -608,7 +623,19 @@ public static class MasterDataFeatureExtensions
             return Results.Conflict(new { message = "Korisnik već ima pristup ovoj kompaniji." });
         }
 
+        // Validated above, so this always succeeds with a defined StaffRole.
         Enum.TryParse<StaffRole>(request.StaffRole, true, out var role);
+        // SEC-05(b): nobody grants a role more privileged than their own (Root bypasses -- it
+        // isn't a grantable StaffRole at all). Upravnik==1 is already the ceiling of this enum,
+        // so this only guards against a future StaffRole being added above it.
+        if (!permission.IsRoot(principal))
+        {
+            var ownRole = await permission.GetOwnRoleAsync(principal, companyId, cancellationToken);
+            if (ownRole is null || (int)role < (int)ownRole.Value)
+            {
+                return Results.Forbid();
+            }
+        }
         var access = new StaffAccess
         {
             CompanyId = companyId,
@@ -634,7 +661,7 @@ public static class MasterDataFeatureExtensions
         SzAppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        if (!await permission.CanWriteAsync(principal, companyId, cancellationToken))
+        if (!await permission.CanManageStaffAccessAsync(principal, companyId, cancellationToken))
         {
             return Results.Forbid();
         }
@@ -654,7 +681,22 @@ public static class MasterDataFeatureExtensions
         {
             return Unprocessable("StaffId postojećeg pristupa se ne može promeniti; obrišite ga i kreirajte novi.");
         }
+        // SEC-05(c): nobody edits their own access row.
+        if (permission.GetStaffId(principal) == access.StaffId)
+        {
+            return Results.Forbid();
+        }
+        // Validated above, so this always succeeds with a defined StaffRole.
         Enum.TryParse<StaffRole>(request.StaffRole, true, out var role);
+        // SEC-05(b): nobody grants a role more privileged than their own.
+        if (!permission.IsRoot(principal))
+        {
+            var ownRole = await permission.GetOwnRoleAsync(principal, companyId, cancellationToken);
+            if (ownRole is null || (int)role < (int)ownRole.Value)
+            {
+                return Results.Forbid();
+            }
+        }
         access.StaffRole = role;
         await dbContext.SaveChangesAsync(cancellationToken);
         return Results.Ok(new StaffAccessResponse(
@@ -673,7 +715,7 @@ public static class MasterDataFeatureExtensions
         SzAppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        if (!await permission.CanWriteAsync(principal, companyId, cancellationToken))
+        if (!await permission.CanManageStaffAccessAsync(principal, companyId, cancellationToken))
         {
             return Results.Forbid();
         }
@@ -683,6 +725,11 @@ public static class MasterDataFeatureExtensions
         if (access is null)
         {
             return Results.NotFound();
+        }
+        // SEC-05(c): nobody deletes their own access row.
+        if (permission.GetStaffId(principal) == access.StaffId)
+        {
+            return Results.Forbid();
         }
         dbContext.StaffAccess.Remove(access);
         await dbContext.SaveChangesAsync(cancellationToken);
