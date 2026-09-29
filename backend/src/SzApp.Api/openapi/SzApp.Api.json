@@ -2391,6 +2391,88 @@
         }
       }
     },
+    "/api/v1/companies/{companyId}/invoice-batches/preview": {
+      "post": {
+        "tags": [
+          "Billing - Invoice batches"
+        ],
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateInvoicesV2Request"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceBatchPreviewV2Response"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/companies/{companyId}/invoice-batches/generate": {
+      "post": {
+        "tags": [
+          "Billing - Invoice batches"
+        ],
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateInvoicesV2Request"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerateInvoicesV2Response"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/companies/{companyId}/invoice-batches/{batchId}/preview": {
       "post": {
         "tags": [
@@ -8962,6 +9044,62 @@
           }
         }
       },
+      "CustomerInvoicePreviewV2": {
+        "required": [
+          "customerId",
+          "customerName",
+          "net",
+          "vat",
+          "interest",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "net": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "vat": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "interest": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "total": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
       "DecidePlatformEventRequest": {
         "required": [
           "reason",
@@ -9134,6 +9272,99 @@
           },
           "isCurrent": {
             "type": "boolean"
+          }
+        }
+      },
+      "GenerateInvoicesV2Request": {
+        "required": [
+          "periodYYMM",
+          "extraordinaryMarker",
+          "place",
+          "issueDate",
+          "dueDate",
+          "serviceDateFrom",
+          "serviceDateTo",
+          "transactionDate",
+          "exchangeRateNbs"
+        ],
+        "type": "object",
+        "properties": {
+          "periodYYMM": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "extraordinaryMarker": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "place": {
+            "type": "string"
+          },
+          "issueDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "dueDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "serviceDateFrom": {
+            "type": "string",
+            "format": "date"
+          },
+          "serviceDateTo": {
+            "type": "string",
+            "format": "date"
+          },
+          "transactionDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "exchangeRateNbs": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "GenerateInvoicesV2Response": {
+        "required": [
+          "invoiceBatchId",
+          "alreadyGenerated",
+          "invoiceIds"
+        ],
+        "type": "object",
+        "properties": {
+          "invoiceBatchId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "alreadyGenerated": {
+            "type": "boolean"
+          },
+          "invoiceIds": {
+            "type": "array",
+            "items": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
           }
         }
       },
@@ -9600,6 +9831,83 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/InvoicePreviewResponse"
+            }
+          }
+        }
+      },
+      "InvoiceBatchPreviewV2Response": {
+        "required": [
+          "companyId",
+          "periodYYMM",
+          "customerCount",
+          "netTotal",
+          "vatTotal",
+          "interestTotal",
+          "total",
+          "customers"
+        ],
+        "type": "object",
+        "properties": {
+          "companyId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "periodYYMM": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "customerCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "netTotal": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "vatTotal": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "interestTotal": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "total": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "customers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CustomerInvoicePreviewV2"
             }
           }
         }

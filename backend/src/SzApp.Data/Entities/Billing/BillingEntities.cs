@@ -123,6 +123,24 @@ public sealed class Benefit : ICompanyOwned
     public byte[] RowVersion { get; set; } = [];
 }
 
+/// <summary>
+/// Item 5 (FIN-18, corrected): legacy UpdateBenefit does NOT reduce lines proportionally.
+/// After generation it zeroes the customer's supplier-9001 ("upravnik") lines for that period
+/// and archives the original amount here with a bilingual note ("Benefit FM n/m – YYMM").
+/// </summary>
+public sealed class BenefitArchive : ICompanyOwned
+{
+    public int Id { get; set; }
+    public int CompanyId { get; set; }
+    public int CustomerId { get; set; }
+    public int PeriodYYMM { get; set; }
+    public int InvoiceId { get; set; }
+    public int InvoiceLineId { get; set; }
+    public decimal OriginalAmount { get; set; }
+    public string Note { get; set; } = string.Empty;
+    public DateTimeOffset EntryDate { get; set; }
+}
+
 public sealed class InterestRate
 {
     public int Id { get; set; }

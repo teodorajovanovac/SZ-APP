@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SzApp.Data;
 
@@ -11,9 +12,11 @@ using SzApp.Data;
 namespace SzApp.Data.Migrations
 {
     [DbContext(typeof(SzAppDbContext))]
-    partial class SzAppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260929165540_AddBenefitArchive")]
+    partial class AddBenefitArchive
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -2835,10 +2838,6 @@ namespace SzApp.Data.Migrations
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("rowversion");
 
-                    b.Property<string>("SourceFileName")
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
-
                     b.Property<int>("StatementNumber")
                         .HasColumnType("int");
 
@@ -2913,20 +2912,8 @@ namespace SzApp.Data.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
 
-                    b.Property<bool>("IsConfidentMatch")
-                        .HasColumnType("bit");
-
                     b.Property<int>("LineNumber")
                         .HasColumnType("int");
-
-                    b.Property<string>("MatchNote")
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
-
-                    b.Property<string>("MatchSource")
-                        .HasMaxLength(20)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(20)");
 
                     b.Property<int?>("PartnerAccountId")
                         .HasColumnType("int");
@@ -2981,87 +2968,6 @@ namespace SzApp.Data.Migrations
                         });
                 });
 
-            modelBuilder.Entity("SzApp.Data.Entities.LedgerBanking.BankStatementLineAllocation", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Account")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(10)");
-
-                    b.Property<decimal>("Amount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<int>("BankStatementLineId")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("ClosesDocumentType")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("CollectionPriority")
-                        .HasColumnType("int");
-
-                    b.Property<int>("CompanyId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("DocumentRef")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<int?>("InvoiceId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Kind")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(20)");
-
-                    b.Property<string>("Parameters")
-                        .HasMaxLength(25)
-                        .HasColumnType("nvarchar(25)");
-
-                    b.Property<int?>("PartnerAccountId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("SortIndex")
-                        .HasColumnType("int");
-
-                    b.Property<string>("SubAccountId")
-                        .HasMaxLength(10)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(10)");
-
-                    b.Property<int?>("SupplierInvoiceId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Account");
-
-                    b.HasIndex("CompanyId");
-
-                    b.HasIndex("PartnerAccountId");
-
-                    b.HasIndex("SubAccountId");
-
-                    b.HasIndex("BankStatementLineId", "CompanyId");
-
-                    b.HasIndex("BankStatementLineId", "SortIndex");
-
-                    b.ToTable("BankStatementLineAllocation", "finance", t =>
-                        {
-                            t.HasCheckConstraint("CK_BankStatementLineAllocation_Amount", "[Amount] <> 0");
-                        });
-                });
-
             modelBuilder.Entity("SzApp.Data.Entities.LedgerBanking.BankStatementPostingTemplate", b =>
                 {
                     b.Property<int>("Id")
@@ -3094,6 +3000,7 @@ namespace SzApp.Data.Migrations
                         .HasColumnType("int");
 
                     b.Property<string>("SetAccountCode")
+                        .IsRequired()
                         .HasMaxLength(10)
                         .IsUnicode(false)
                         .HasColumnType("varchar(10)");
@@ -5445,40 +5352,6 @@ namespace SzApp.Data.Migrations
                     b.Navigation("SubAccount");
                 });
 
-            modelBuilder.Entity("SzApp.Data.Entities.LedgerBanking.BankStatementLineAllocation", b =>
-                {
-                    b.HasOne("SzApp.Data.Entities.LedgerBanking.ChartAccount", null)
-                        .WithMany()
-                        .HasForeignKey("Account")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
-
-                    b.HasOne("SzApp.Data.Entities.Company", null)
-                        .WithMany()
-                        .HasForeignKey("CompanyId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
-
-                    b.HasOne("SzApp.Data.Entities.PartnerAccount", null)
-                        .WithMany()
-                        .HasForeignKey("PartnerAccountId")
-                        .OnDelete(DeleteBehavior.NoAction);
-
-                    b.HasOne("SzApp.Data.Entities.LedgerBanking.SubAccount", null)
-                        .WithMany()
-                        .HasForeignKey("SubAccountId")
-                        .OnDelete(DeleteBehavior.NoAction);
-
-                    b.HasOne("SzApp.Data.Entities.LedgerBanking.BankStatementLine", "BankStatementLine")
-                        .WithMany("Allocations")
-                        .HasForeignKey("BankStatementLineId", "CompanyId")
-                        .HasPrincipalKey("Id", "CompanyId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
-
-                    b.Navigation("BankStatementLine");
-                });
-
             modelBuilder.Entity("SzApp.Data.Entities.LedgerBanking.BankStatementPostingTemplate", b =>
                 {
                     b.HasOne("SzApp.Data.Entities.Company", "Company")
@@ -5494,7 +5367,8 @@ namespace SzApp.Data.Migrations
                     b.HasOne("SzApp.Data.Entities.LedgerBanking.ChartAccount", null)
                         .WithMany()
                         .HasForeignKey("SetAccountCode")
-                        .OnDelete(DeleteBehavior.NoAction);
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
 
                     b.HasOne("SzApp.Data.Entities.PartnerAccount", null)
                         .WithMany()
@@ -6047,11 +5921,6 @@ namespace SzApp.Data.Migrations
             modelBuilder.Entity("SzApp.Data.Entities.LedgerBanking.BankStatement", b =>
                 {
                     b.Navigation("Lines");
-                });
-
-            modelBuilder.Entity("SzApp.Data.Entities.LedgerBanking.BankStatementLine", b =>
-                {
-                    b.Navigation("Allocations");
                 });
 
             modelBuilder.Entity("SzApp.Data.Entities.Reports.ReportDefinition", b =>

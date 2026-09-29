@@ -17,7 +17,7 @@ public sealed class BillingCalculatorGoldenTests
     }
 
     [Fact]
-    public void CalculateInvoice_GoldenMixedVatBenefitAndInterest()
+    public void CalculateInvoice_GoldenMixedVatAndInterest_NoProportionalBenefit()
     {
         BillingLineInput[] lines =
         [
@@ -25,14 +25,13 @@ public sealed class BillingCalculatorGoldenTests
             new("Usluga", 2m, 10m, 10m, K1: 0.5m)
         ];
 
-        var result = BillingCalculator.CalculateInvoice(lines, benefitAmount: 1.01m, interestAmount: 0.005m);
+        var result = BillingCalculator.CalculateInvoice(lines, interestAmount: 0.005m);
 
         Assert.Equal(11.01m, result.NetAmount);
-        Assert.Equal(1.01m, result.BenefitAmount);
-        Assert.Equal(10.00m, result.TaxableAmount);
-        Assert.Equal(1.09m, result.VatAmount);
+        Assert.Equal(11.01m, result.TaxableAmount);
+        Assert.Equal(1.20m, result.VatAmount);
         Assert.Equal(0.01m, result.InterestAmount);
-        Assert.Equal(11.10m, result.TotalAmount);
+        Assert.Equal(12.22m, result.TotalAmount);
     }
 
     [Theory]
@@ -56,14 +55,5 @@ public sealed class BillingCalculatorGoldenTests
         Assert.Equal(64, first.Length);
         Assert.Equal(first, same);
         Assert.NotEqual(first, changed);
-    }
-
-    [Fact]
-    public void InvalidBenefit_IsRejected()
-    {
-        var error = Assert.Throws<DomainRuleException>(() =>
-            BillingCalculator.CalculateInvoice([new("Stavka", 1m, 100m, 20m)], benefitAmount: 100.01m));
-
-        Assert.Equal("billing.invalid-benefit", error.Code);
     }
 }

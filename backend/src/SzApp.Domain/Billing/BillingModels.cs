@@ -20,7 +20,6 @@ public sealed record BillingLineAmounts(
 
 public sealed record BillingInvoiceAmounts(
     decimal NetAmount,
-    decimal BenefitAmount,
     decimal TaxableAmount,
     decimal VatAmount,
     decimal InterestAmount,

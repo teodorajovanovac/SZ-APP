@@ -36,7 +36,6 @@ public static class BillingCalculator
 
     public static BillingInvoiceAmounts CalculateInvoice(
         IEnumerable<BillingLineInput> lines,
-        decimal benefitAmount = 0m,
         decimal interestAmount = 0m)
     {
         var calculated = lines.Select(CalculateLine).ToArray();
@@ -46,16 +45,10 @@ public static class BillingCalculator
         }
 
         var net = FinanceRounding.Money(calculated.Sum(x => x.NetAmount));
-        var benefit = FinanceRounding.Money(benefitAmount);
-        if (benefit is < 0m || benefit > net)
-        {
-            throw new DomainRuleException("billing.invalid-benefit", "Benefit mora biti između nule i neto iznosa.");
-        }
-
-        // Benefit is applied proportionally to the tax base. This preserves mixed-rate VAT.
-        var ratio = net == 0m ? 0m : FinanceRounding.Calculation((net - benefit) / net);
-        var vat = FinanceRounding.Money(calculated.Sum(x => x.VatAmount * ratio));
-        var taxable = FinanceRounding.Money(net - benefit);
+        // FIN-18: no proportional benefit reduction here -- the invoice engine zeroes the
+        // manager's lines and archives them (InvoiceGenerationService, BenefitArchive).
+        var vat = FinanceRounding.Money(calculated.Sum(x => x.VatAmount));
+        var taxable = net;
         var interest = FinanceRounding.Money(interestAmount);
         if (interest < 0m)
         {
@@ -64,7 +57,6 @@ public static class BillingCalculator
 
         return new BillingInvoiceAmounts(
             net,
-            benefit,
             taxable,
             vat,
             interest,
