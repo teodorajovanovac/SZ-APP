@@ -57,7 +57,9 @@ export function ContractsPage() {
           <ClickableCell
             onClick={() =>
               navigate(
-                `/kartice?companyId=${row.original.companyId}&accountNumber=${row.original.partnerAccountNumber ?? ''}`,
+                row.original.partnerAccountId != null
+                  ? `/kartice?companyId=${row.original.companyId}&account=2040&partnerAccountId=${row.original.partnerAccountId}`
+                  : `/kartice?companyId=${row.original.companyId}`,
               )
             }
           >
@@ -71,7 +73,7 @@ export function ContractsPage() {
         accessorKey: 'partnerAccountNumber',
         cell: ({ row }) =>
           row.original.partnerAccountId != null ? (
-            <ClickableCell onClick={() => navigate(`/kartice?partnerAccountId=${row.original.partnerAccountId}`)}>
+            <ClickableCell onClick={() => navigate(`/kartice?companyId=${row.original.companyId}&account=2040&partnerAccountId=${row.original.partnerAccountId}`)}>
               {row.original.partnerAccountNumber}
             </ClickableCell>
           ) : (
