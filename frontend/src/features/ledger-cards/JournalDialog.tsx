@@ -2,7 +2,7 @@ import { Alert, Dialog, DialogContent, DialogTitle, Skeleton, Table, TableBody, 
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { formatDate } from '../../shared/format/date'
-import { formatNumber } from '../../shared/format/money'
+import { formatAmount } from '../../shared/format/money'
 import { ledgerCardsApi } from './ledgerCardsApi'
 
 const num = { fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' } as const
@@ -45,8 +45,8 @@ export function JournalDialog({ companyId, journalId, onClose }: { companyId: nu
                   <TableCell>{formatDate(line.postingDate)}</TableCell>
                   <TableCell>{line.documentRef}</TableCell>
                   <TableCell>{line.partnerAccountId ?? ''}</TableCell>
-                  <TableCell align="right" sx={num}>{formatNumber(line.debitAmount)}</TableCell>
-                  <TableCell align="right" sx={num}>{formatNumber(line.creditAmount)}</TableCell>
+                  <TableCell align="right" sx={num}>{formatAmount(line.debitAmount)}</TableCell>
+                  <TableCell align="right" sx={num}>{formatAmount(line.creditAmount)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

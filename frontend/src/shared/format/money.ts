@@ -12,3 +12,8 @@ export function formatMoney(value: number, currency = 'RSD') {
 export function formatNumber(value: number) {
   return new Intl.NumberFormat('sr-Latn-RS', { maximumFractionDigits: 2 }).format(value)
 }
+
+/** Ledger amount without currency symbol, always 2 decimals (card / balance columns). */
+export function formatAmount(value: number) {
+  return new Intl.NumberFormat('sr-Latn-RS', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
+}
