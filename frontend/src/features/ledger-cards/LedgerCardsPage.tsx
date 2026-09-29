@@ -83,7 +83,8 @@ function CardPanel() {
   const grouped = groupBy === 'paymentReference' || groupBy === 'document'
   const rows = card.data?.items ?? []
   // Carry-over into this page: the first row's running balance minus its own movement.
-  const carry = rows.length > 0 ? rows[0].balance - rows[0].debit + rows[0].credit : card.data?.openingBalance ?? 0
+  const first = rows[0]
+  const carry = first ? first.balance - first.debit + first.credit : card.data?.openingBalance ?? 0
 
   const openRow = (row: LedgerCardRow) => {
     if (row.journalEntryId != null) setJournalId(row.journalEntryId)
