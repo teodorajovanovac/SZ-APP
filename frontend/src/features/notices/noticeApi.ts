@@ -38,6 +38,67 @@ export function useNoticeCommand(companyId: number) {
   })
 }
 
+export interface NoticeTemplate {
+  id: number
+  name: string
+  body: string
+  isActive: boolean
+  rowVersion: string
+}
+
+export function useNoticeTemplates(companyId: number) {
+  return useQuery({
+    queryKey: ['companies', companyId, 'notice-templates'],
+    queryFn: () => apiRequest<NoticeTemplate[]>(`/api/v1/companies/${companyId}/notice-templates`),
+  })
+}
+
+export interface NoticeBatch {
+  id: number
+  title: string
+  date: string
+  noticeTemplateId: number
+  noticeTypeId: number
+  aditionalCostsLowerAmount: number | null
+  aditionalCostsLowerLimit: number | null
+  aditionalCostsUpperAmount: number | null
+  rowVersion: string
+}
+
+/** FIN-12: only the cutoffs and thresholds go to the server -- debt/lines are computed from the GL. */
+export interface CreateNoticeBatch {
+  title: string
+  date: string
+  minUnpaidInvoiceCount: number
+  debtTolerance: number
+  debtToleranceByMonth: number
+  noticeTemplateId: number
+  noticeTypeId: number
+  upToClaimDate: string
+  upToPaymentDate: string
+  invoiceBatchId: number | null
+  customCaptionOnSlip: string | null
+}
+
+export function useCreateNoticeBatch(companyId: number) {
+  return useMutation({
+    mutationFn: (request: CreateNoticeBatch) =>
+      apiRequest<NoticeBatch>(`/api/v1/companies/${companyId}/notice-batches`, { method: 'POST', body: JSON.stringify(request) }),
+  })
+}
+
+export function useGenerateNotices(companyId: number) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ batchId, confirm }: { batchId: number; confirm: boolean }) =>
+      apiRequest<{ batchId: number; alreadyGenerated: boolean; noticeIds: number[] }>(
+        `/api/v1/companies/${companyId}/notice-batches/${batchId}/generate`,
+        { method: 'POST', body: JSON.stringify({ confirm }), headers: { 'Idempotency-Key': crypto.randomUUID() } },
+      ),
+    onSuccess: () => client.invalidateQueries({ queryKey: ['companies', companyId, 'notices'] }),
+  })
+}
+
 /** P11 NoticeAditionalCosts row (boss's spelling). companyId null = global (Root only). */
 export interface NoticeCost {
   id: number

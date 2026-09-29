@@ -181,7 +181,17 @@ export const resources = {
         status: {
           Draft: 'Nacrt', Rendered: 'Renderovana', Queued: 'U redu za slanje', Sent: 'Poslata', Failed: 'Neuspela',
         },
+        newBatch: 'Nova serija opomena', createAndGenerate: 'Napravi i generiši',
+        createFailed: 'Serija opomena nije napravljena.', generateFailed: 'Generisanje opomena nije uspelo.',
+        regenerateConfirmTitle: 'Ponovno generisanje',
+        regenerateConfirmBody: 'Opomene za ovu seriju već postoje. Postojeće opomene će biti obrisane i generisane ponovo iz glavne knjige. Nastavite?',
+        form: {
+          title: 'Naziv serije', date: 'Datum', template: 'Šablon opomene', type: 'Vrsta opomene',
+          minBnr: 'Min. broj stavki (MinBNR)', debtTolerance: 'Tolerancija duga', debtToleranceByMonth: 'Tolerancija duga po dokumentu',
+          claimDate: 'Presek zaduženja (do)', paymentDate: 'Presek uplata (do)',
+        },
       },
+      consistency_: { title: 'Kontrole konzistentnosti', subtitle: 'Legacy ERROR_* provere, samo čitanje. Ispravke se rade ručno, uz potvrdu.', run: 'Pokreni sada', allCompanies: 'Sve kompanije', failed: 'Provere nisu izvršene.', company: 'Kompanija', key: 'Ključ', info: 'Opis', amount: 'Iznos', truncated: 'Prikazano {{shown}} od {{total}}.', notTranslated: 'Provere koje nisu prenete' },
       documents_: {
         title: 'Dokumenti',
         subtitle: 'Arhiva dokumenata aktivne stambene zajednice — ugovori, računi i prilozi.',
@@ -636,7 +646,17 @@ export const resources = {
         status: {
           Draft: 'Нацрт', Rendered: 'Рендерована', Queued: 'У реду за слање', Sent: 'Послата', Failed: 'Неуспела',
         },
+        newBatch: 'Нова серија опомена', createAndGenerate: 'Направи и генериши',
+        createFailed: 'Серија опомена није направљена.', generateFailed: 'Генерисање опомена није успело.',
+        regenerateConfirmTitle: 'Поновно генерисање',
+        regenerateConfirmBody: 'Опомене за ову серију већ постоје. Постојеће опомене ће бити обрисане и генерисане поново из главне књиге. Наставите?',
+        form: {
+          title: 'Назив серије', date: 'Датум', template: 'Шаблон опомене', type: 'Врста опомене',
+          minBnr: 'Мин. број ставки (MinBNR)', debtTolerance: 'Толеранција дуга', debtToleranceByMonth: 'Толеранција дуга по документу',
+          claimDate: 'Пресек задужења (до)', paymentDate: 'Пресек уплата (до)',
+        },
       },
+      consistency_: { title: 'Контроле конзистентности', subtitle: 'Legacy ERROR_* провере, само читање. Исправке се раде ручно, уз потврду.', run: 'Покрени сада', allCompanies: 'Све компаније', failed: 'Провере нису извршене.', company: 'Компанија', key: 'Кључ', info: 'Опис', amount: 'Износ', truncated: 'Приказано {{shown}} од {{total}}.', notTranslated: 'Провере које нису пренете' },
       documents_: {
         title: 'Документи',
         subtitle: 'Архива докумената активне стамбене заједнице — уговори, рачуни и прилози.',
@@ -1091,7 +1111,17 @@ export const resources = {
         status: {
           Draft: 'Draft', Rendered: 'Rendered', Queued: 'Queued', Sent: 'Sent', Failed: 'Failed',
         },
+        newBatch: 'New notice batch', createAndGenerate: 'Create and generate',
+        createFailed: 'Notice batch was not created.', generateFailed: 'Notice generation failed.',
+        regenerateConfirmTitle: 'Regenerate notices',
+        regenerateConfirmBody: 'Notices for this batch already exist. The existing notices will be deleted and regenerated from the ledger. Continue?',
+        form: {
+          title: 'Batch title', date: 'Date', template: 'Notice template', type: 'Notice type',
+          minBnr: 'Min. line count (MinBNR)', debtTolerance: 'Debt tolerance', debtToleranceByMonth: 'Per-document debt tolerance',
+          claimDate: 'Debt cutoff (through)', paymentDate: 'Payment cutoff (through)',
+        },
       },
+      consistency_: { title: 'Consistency checks', subtitle: 'Legacy ERROR_* checks, read-only. Fixes are manual and confirmed.', run: 'Run now', allCompanies: 'All companies', failed: 'Checks failed to run.', company: 'Company', key: 'Key', info: 'Info', amount: 'Amount', truncated: 'Showing {{shown}} of {{total}}.', notTranslated: 'Checks not ported' },
       documents_: {
         title: 'Documents',
         subtitle: 'Document archive for the active housing community — contracts, invoices and attachments.',
