@@ -6119,7 +6119,8 @@ export interface components {
             isCurrent: boolean;
         };
         GenerateNoticesRequest: {
-            notices: components["schemas"]["NoticeSeedRequest"][];
+            /** @default false */
+            confirm: boolean;
         };
         InterestCalculationLineResponse: {
             /** Format: date */
@@ -6477,21 +6478,6 @@ export interface components {
             alreadyGenerated: boolean;
             noticeIds: (number | string)[];
         };
-        NoticeLineSeedRequest: {
-            documentRef: string;
-            /** Format: double */
-            debit: number | string;
-            /** Format: double */
-            credit: number | string;
-            text: string;
-            /** Format: date */
-            dueDate: string;
-            /** Format: int32 */
-            invoiceId: null | number | string;
-            /** Format: date */
-            invoiceDate: null | string;
-            unitAddress: null | string;
-        };
         NoticeResponse: {
             /** Format: int32 */
             id: number | string;
@@ -6511,17 +6497,6 @@ export interface components {
             deliveryStatus: string;
             renderedDocumentPath: null | string;
             rowVersion: string;
-        };
-        NoticeSeedRequest: {
-            /** Format: int32 */
-            partnerAccountId: number | string;
-            /** Format: int32 */
-            unpaidInvoiceCount: number | string;
-            /** Format: double */
-            debt: number | string;
-            invoiceText: null | string;
-            paymentReference: string;
-            lines: components["schemas"]["NoticeLineSeedRequest"][];
         };
         NoticeTemplateResponse: {
             /** Format: int32 */
