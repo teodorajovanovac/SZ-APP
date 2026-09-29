@@ -9,7 +9,8 @@ export function AccountSelect({ companyId, value, onChange }: { companyId: numbe
   const { t } = useTranslation()
   const chart = useQuery({ queryKey: ['chart-of-accounts', companyId], queryFn: () => ledgerCardsApi.chartOfAccounts(companyId), staleTime: 5 * 60_000 })
   const names = new Map((chart.data ?? []).filter((x) => x.isActive).map((x) => [x.account, x.name]))
-  const accounts = [...new Set([...CORE_ACCOUNTS, ...names.keys(), ...(value ? [value] : [])])].sort()
+  // Chart of accounts only supplies names: the full chart is long and 9.2 uses just these five.
+  const accounts = [...new Set([...CORE_ACCOUNTS, ...(value ? [value] : [])])].sort()
   return (
     <TextField select size="small" label={t('cards_.account')} value={value} onChange={(e) => onChange(e.target.value)} sx={{ minWidth: 200 }}>
       <MenuItem value="">{t('cards_.allAccounts')}</MenuItem>
