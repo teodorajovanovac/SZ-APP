@@ -30,8 +30,7 @@ public interface IBankStatementService
 public sealed partial class BankStatementService(
     SzAppDbContext dbContext,
     BankStatementMatchingService matching,
-    IJournalPostingService journals,
-    TimeProvider timeProvider) : IBankStatementService
+    IJournalPostingService journals) : IBankStatementService
 {
     /// <summary>Manual/JSON import (no file). Same checks as the file import, then auto-matching.</summary>
     public async Task<BankStatementResponse> ImportAsync(
