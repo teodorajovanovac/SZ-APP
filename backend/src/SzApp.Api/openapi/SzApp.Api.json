@@ -3925,6 +3925,18 @@
         }
       }
     },
+    "/api/v1/companies/{companyId}/bank-statements/formats": {
+      "get": {
+        "tags": [
+          "Ledger & Banking"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/v1/companies/{companyId}/bank-statements/{id}": {
       "get": {
         "tags": [
@@ -3976,6 +3988,30 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/v1/companies/{companyId}/bank-statements/import-json": {
+      "post": {
+        "tags": [
+          "Ledger & Banking"
+        ],
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -3993,7 +4029,75 @@
         }
       }
     },
-    "/api/v1/companies/{companyId}/bank-statement-lines/{id}/match": {
+    "/api/v1/companies/{companyId}/bank-statements/{id}/rematch": {
+      "post": {
+        "tags": [
+          "Ledger & Banking"
+        ],
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/v1/companies/{companyId}/bank-statements/{id}/accept-confident": {
+      "post": {
+        "tags": [
+          "Ledger & Banking"
+        ],
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/v1/companies/{companyId}/bank-statement-lines/{id}/accept": {
       "post": {
         "tags": [
           "Ledger & Banking"
@@ -4024,7 +4128,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/MatchBankStatementLineRequest"
+                "$ref": "#/components/schemas/AcceptBankStatementLineRequest"
               }
             }
           },
@@ -4037,7 +4141,7 @@
         }
       }
     },
-    "/api/v1/companies/{companyId}/bank-statement-lines/{id}/ignore": {
+    "/api/v1/companies/{companyId}/bank-statement-lines/{id}/reopen": {
       "post": {
         "tags": [
           "Ledger & Banking"
@@ -4081,7 +4185,238 @@
         }
       }
     },
+    "/api/v1/companies/{companyId}/bank-statement-lines/{id}/assign-partner": {
+      "post": {
+        "tags": [
+          "Ledger & Banking"
+        ],
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignPartnerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/v1/companies/{companyId}/bank-statement-lines/{id}/save-payer-account": {
+      "post": {
+        "tags": [
+          "Ledger & Banking"
+        ],
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavePayerAccountRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/v1/companies/{companyId}/bank-statement-lines/{id}/create-template": {
+      "post": {
+        "tags": [
+          "Ledger & Banking"
+        ],
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTemplateFromLineRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/v1/companies/{companyId}/bank-statement-partners": {
+      "get": {
+        "tags": [
+          "Ledger & Banking"
+        ],
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/v1/companies/{companyId}/bank-statement-templates": {
+      "get": {
+        "tags": [
+          "Ledger & Banking"
+        ],
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/v1/companies/{companyId}/bank-statements/{id}/post": {
+      "post": {
+        "tags": [
+          "Ledger & Banking"
+        ],
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConcurrencyCommandRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/v1/companies/{companyId}/bank-statements/{id}/unpost": {
       "post": {
         "tags": [
           "Ledger & Banking"
@@ -6480,6 +6815,27 @@
   },
   "components": {
     "schemas": {
+      "AcceptBankStatementLineRequest": {
+        "required": [
+          "allocations",
+          "rowVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "allocations": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/BankStatementAllocationRequest"
+            }
+          },
+          "rowVersion": {
+            "type": "string"
+          }
+        }
+      },
       "AddSelectionBasketRequest": {
         "required": [
           "targetType",
@@ -6641,6 +6997,117 @@
           },
           "headerName": {
             "type": "string"
+          }
+        }
+      },
+      "AssignPartnerRequest": {
+        "required": [
+          "partnerAccountId",
+          "rowVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "partnerAccountId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "rowVersion": {
+            "type": "string"
+          }
+        }
+      },
+      "BankStatementAllocationRequest": {
+        "required": [
+          "account",
+          "partnerAccountId",
+          "amount",
+          "subAccountId",
+          "parameters",
+          "documentRef",
+          "invoiceId",
+          "supplierInvoiceId",
+          "collectionPriority",
+          "closesDocumentType"
+        ],
+        "type": "object",
+        "properties": {
+          "account": {
+            "type": "string"
+          },
+          "partnerAccountId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "amount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "subAccountId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "parameters": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "documentRef": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "invoiceId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "supplierInvoiceId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "collectionPriority": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "closesDocumentType": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
         }
       },
@@ -8151,6 +8618,36 @@
           }
         }
       },
+      "CreateTemplateFromLineRequest": {
+        "required": [
+          "partnerAccountId",
+          "name",
+          "subAccountId"
+        ],
+        "type": "object",
+        "properties": {
+          "partnerAccountId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "subAccountId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "DecidePlatformEventRequest": {
         "required": [
           "reason",
@@ -9534,38 +10031,6 @@
           "rememberMe": {
             "type": "boolean",
             "default": false
-          }
-        }
-      },
-      "MatchBankStatementLineRequest": {
-        "required": [
-          "partnerAccountId",
-          "subAccountId",
-          "counterAccount",
-          "rowVersion"
-        ],
-        "type": "object",
-        "properties": {
-          "partnerAccountId": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "null",
-              "integer",
-              "string"
-            ],
-            "format": "int32"
-          },
-          "subAccountId": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "counterAccount": {
-            "type": "string"
-          },
-          "rowVersion": {
-            "type": "string"
           }
         }
       },
@@ -11168,6 +11633,22 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "SavePayerAccountRequest": {
+        "required": [
+          "partnerAccountId"
+        ],
+        "type": "object",
+        "properties": {
+          "partnerAccountId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
         }
       },

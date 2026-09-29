@@ -49,6 +49,7 @@ public static class LedgerBankingFeature
         services.AddScoped<PostingPeriodGuard>();
         services.AddScoped<LedgerMutationGuardInterceptor>();
         services.AddScoped<IJournalPostingService, JournalPostingService>();
+        services.AddScoped<BankStatementMatchingService>();
         services.AddScoped<IBankStatementService, BankStatementService>();
         services.AddScoped<ILedgerPostingGateway, LedgerPostingGateway>();
         services.AddDbContext<SzAppDbContext>((serviceProvider, options) =>
@@ -202,18 +203,50 @@ public static class LedgerBankingFeature
             return Results.Ok(new PageResponse<BankStatementSummaryResponse>(items, safePage, safePageSize, total));
         });
 
+        group.MapGet("/bank-statements/formats", (IBankStatementService _) =>
+            Results.Ok(SzApp.Domain.LedgerBanking.StatementParsing.BankStatementParsers.All
+                .Select(x => new BankStatementFormatResponse(x.BankCode, x.Name, x.IsSupported)).ToArray()));
+
         group.MapGet("/bank-statements/{id:int}", async (
             int companyId,
             int id,
-            SzAppDbContext db,
+            IBankStatementService service,
             CancellationToken cancellationToken) =>
         {
-            var statement = await db.Set<BankStatement>().AsNoTracking().Include(x => x.Lines)
-                .SingleOrDefaultAsync(x => x.Id == id && x.CompanyId == companyId, cancellationToken);
-            return statement is null ? Results.NotFound() : Results.Ok(BankStatementService.MapStatement(statement));
+            var statement = await service.GetAsync(companyId, id, cancellationToken);
+            return statement is null ? Results.NotFound() : Results.Ok(statement);
         });
 
+        // GAP-04: multipart file upload, bank format auto-detected from the file name or chosen.
         group.MapPost("/bank-statements/import", async (
+            int companyId,
+            HttpRequest request,
+            IBankStatementService service,
+            CancellationToken cancellationToken) =>
+        {
+            if (!request.HasFormContentType)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["file"] = ["Fajl izvoda je obavezan."] });
+            }
+
+            var form = await request.ReadFormAsync(cancellationToken);
+            var file = form.Files.GetFile("file");
+            if (file is null or { Length: 0 })
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["file"] = ["Fajl izvoda je obavezan."] });
+            }
+
+            int? bankCode = int.TryParse(form["bankCode"], out var code) ? code : null;
+            int? bankAccountId = int.TryParse(form["bankAccountId"], out var accountId) ? accountId : null;
+            using var stream = new MemoryStream();
+            await file.CopyToAsync(stream, cancellationToken);
+            var result = await service.ImportFileAsync(companyId, file.FileName, stream.ToArray(), bankCode, bankAccountId, cancellationToken);
+            return Results.Ok(result);
+        })
+            .DisableAntiforgery()
+            .RequireAuthorization(SecurityConstants.CompanyWritePolicy);
+
+        group.MapPost("/bank-statements/import-json", async (
             int companyId,
             BankStatementImportRequest request,
             IBankStatementService service,
@@ -223,25 +256,111 @@ public static class LedgerBankingFeature
             .AddEndpointFilter<AntiforgeryEndpointFilter>()
             .RequireAuthorization(SecurityConstants.CompanyWritePolicy);
 
-        group.MapPost("/bank-statement-lines/{id:int}/match", async (
+        group.MapPost("/bank-statements/{id:int}/rematch", async (
             int companyId,
             int id,
-            MatchBankStatementLineRequest request,
             IBankStatementService service,
             CancellationToken cancellationToken) =>
-            Results.Ok(await service.MatchAsync(companyId, id, request, cancellationToken)))
+            Results.Ok(await service.RematchAsync(companyId, id, cancellationToken)))
             .AddEndpointFilter<AntiforgeryEndpointFilter>()
             .RequireAuthorization(SecurityConstants.CompanyWritePolicy);
 
-        group.MapPost("/bank-statement-lines/{id:int}/ignore", async (
+        group.MapPost("/bank-statements/{id:int}/accept-confident", async (
+            int companyId,
+            int id,
+            IBankStatementService service,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await service.AcceptConfidentAsync(companyId, id, cancellationToken)))
+            .AddEndpointFilter<AntiforgeryEndpointFilter>()
+            .RequireAuthorization(SecurityConstants.CompanyWritePolicy);
+
+        group.MapPost("/bank-statement-lines/{id:int}/accept", async (
+            int companyId,
+            int id,
+            AcceptBankStatementLineRequest request,
+            IBankStatementService service,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await service.AcceptLineAsync(companyId, id, request, cancellationToken)))
+            .AddEndpointFilter<AntiforgeryEndpointFilter>()
+            .RequireAuthorization(SecurityConstants.CompanyWritePolicy);
+
+        group.MapPost("/bank-statement-lines/{id:int}/reopen", async (
             int companyId,
             int id,
             ConcurrencyCommandRequest request,
             IBankStatementService service,
             CancellationToken cancellationToken) =>
-            Results.Ok(await service.IgnoreAsync(companyId, id, DecodeVersion(request.RowVersion), cancellationToken)))
+            Results.Ok(await service.ReopenLineAsync(companyId, id, DecodeVersion(request.RowVersion), cancellationToken)))
             .AddEndpointFilter<AntiforgeryEndpointFilter>()
             .RequireAuthorization(SecurityConstants.CompanyWritePolicy);
+
+        group.MapPost("/bank-statement-lines/{id:int}/assign-partner", async (
+            int companyId,
+            int id,
+            AssignPartnerRequest request,
+            IBankStatementService service,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await service.AssignPartnerAsync(companyId, id, request, cancellationToken)))
+            .AddEndpointFilter<AntiforgeryEndpointFilter>()
+            .RequireAuthorization(SecurityConstants.CompanyWritePolicy);
+
+        group.MapPost("/bank-statement-lines/{id:int}/save-payer-account", async (
+            int companyId,
+            int id,
+            SavePayerAccountRequest request,
+            IBankStatementService service,
+            CancellationToken cancellationToken) =>
+        {
+            await service.SavePayerAccountAsync(companyId, id, request.PartnerAccountId, cancellationToken);
+            return Results.NoContent();
+        })
+            .AddEndpointFilter<AntiforgeryEndpointFilter>()
+            .RequireAuthorization(SecurityConstants.CompanyWritePolicy);
+
+        group.MapPost("/bank-statement-lines/{id:int}/create-template", async (
+            int companyId,
+            int id,
+            CreateTemplateFromLineRequest request,
+            IBankStatementService service,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await service.CreateTemplateFromLineAsync(companyId, id, request, cancellationToken)))
+            .AddEndpointFilter<AntiforgeryEndpointFilter>()
+            .RequireAuthorization(SecurityConstants.CompanyWritePolicy);
+
+        // "/" partner search while matching a line: partner's own accounts first (2040/4350), by name or account number.
+        group.MapGet("/bank-statement-partners", async (
+            int companyId,
+            string? search,
+            SzAppDbContext db,
+            CancellationToken cancellationToken) =>
+        {
+            var term = (search ?? string.Empty).Trim();
+            var query = db.Set<PartnerAccount>().AsNoTracking().Where(x => x.CompanyId == companyId || x.CompanyId == null);
+            if (term.Length > 0)
+            {
+                query = query.Where(x => x.Partner.Name.Contains(term) || x.AccountNumber.ToString().Contains(term));
+            }
+
+            var items = await query.OrderBy(x => x.Partner.Name).Take(20)
+                .Select(x => new MatchPartnerOptionResponse(x.Id, x.Account, x.AccountNumber, x.Partner.Name))
+                .ToArrayAsync(cancellationToken);
+            return Results.Ok(items);
+        });
+
+        group.MapGet("/bank-statement-templates", async (
+            int companyId,
+            SzAppDbContext db,
+            CancellationToken cancellationToken) =>
+        {
+            var rows = await db.Set<BankStatementPostingTemplate>().AsNoTracking()
+                .Where(x => x.CompanyId == companyId || x.CompanyId == null)
+                .OrderBy(x => x.SortIndex).ThenBy(x => x.Id)
+                .ToArrayAsync(cancellationToken);
+            var items = rows.Where(x => x.ParentId == null)
+                .Select(root => BankStatementService.MapTemplate(root, rows.Where(x => x.Id == root.Id || x.ParentId == root.Id)))
+                .ToArray();
+            return Results.Ok(items);
+        });
 
         group.MapPost("/bank-statements/{id:int}/post", async (
             int companyId,
@@ -251,6 +370,19 @@ public static class LedgerBankingFeature
             IBankStatementService service,
             CancellationToken cancellationToken) =>
             Results.Ok(await service.PostAsync(
+                companyId, id, GetStaffId(principal), DecodeVersion(request.RowVersion), cancellationToken)))
+            .AddEndpointFilter<IdempotencyKeyEndpointFilter>()
+            .AddEndpointFilter<AntiforgeryEndpointFilter>()
+            .RequireAuthorization(SecurityConstants.CompanyPostPolicy);
+
+        group.MapPost("/bank-statements/{id:int}/unpost", async (
+            int companyId,
+            int id,
+            ConcurrencyCommandRequest request,
+            ClaimsPrincipal principal,
+            IBankStatementService service,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await service.UnpostAsync(
                 companyId, id, GetStaffId(principal), DecodeVersion(request.RowVersion), cancellationToken)))
             .AddEndpointFilter<IdempotencyKeyEndpointFilter>()
             .AddEndpointFilter<AntiforgeryEndpointFilter>()
