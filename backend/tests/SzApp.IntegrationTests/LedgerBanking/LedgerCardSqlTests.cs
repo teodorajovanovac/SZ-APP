@@ -92,6 +92,9 @@ public sealed class LedgerCardSqlTests
         Assert.Equal([500m, 450m], page2.Items.Select(x => x.Balance)); // running continues across pages
         Assert.Equal(LedgerLineTypes.BankStatement, page1.Items.Last().LineType);
 
+        var byPartner = await LedgerCardQueries.GetCardAsync(db, company.Id, new LedgerCardFilter(PartnerId: petar.Id), 1, 50, CancellationToken.None);
+        Assert.Equal((5, 450m), (byPartner.TotalCount, byPartner.ClosingBalance));
+
         var open = await LedgerCardQueries.GetCardAsync(db, company.Id, filter with { GroupBy = LedgerCardGrouping.OpenItems }, 1, 50, CancellationToken.None);
         Assert.Equal(0m, open.OpeningBalance); // July reference is closed
         Assert.All(open.Items, x => Assert.Equal("9717072608", x.PaymentReference));

@@ -17,7 +17,8 @@ public sealed record LedgerCardFilter(
     DateOnly? To = null,
     string? PaymentReference = null,
     string? Document = null,
-    LedgerCardGrouping GroupBy = LedgerCardGrouping.None);
+    LedgerCardGrouping GroupBy = LedgerCardGrouping.None,
+    int? PartnerId = null);
 
 /// <summary>Read side of the general ledger: Kartica (GAP-07), partner balances (GAP-08), Ctrl+K search (DES-08).</summary>
 public static class LedgerCardQueries
@@ -26,7 +27,7 @@ public static class LedgerCardQueries
     public static void MapLedgerCardEndpoints(RouteGroupBuilder group)
     {
         group.MapGet("/ledger-cards", async Task<IResult> (
-            int companyId, string? account, int? partnerAccountId, string? subAccountId, DateOnly? from, DateOnly? to,
+            int companyId, string? account, int? partnerAccountId, int? partnerId, string? subAccountId, DateOnly? from, DateOnly? to,
             string? paymentReference, string? document, string? groupBy, int? page, int? pageSize,
             SzAppDbContext db, CancellationToken ct) =>
         {
@@ -39,7 +40,7 @@ public static class LedgerCardQueries
             }
 
             return Results.Ok(await GetCardAsync(db, companyId,
-                new LedgerCardFilter(account, partnerAccountId, subAccountId, from, to, paymentReference, document, grouping),
+                new LedgerCardFilter(account, partnerAccountId, subAccountId, from, to, paymentReference, document, grouping, partnerId),
                 Math.Max(page ?? 1, 1), Math.Clamp(pageSize ?? 100, 1, 500), ct));
         });
 
@@ -66,6 +67,10 @@ public static class LedgerCardQueries
         var q = Posted(db, companyId);
         if (!string.IsNullOrWhiteSpace(f.Account)) q = q.Where(x => x.Account == f.Account);
         if (f.PartnerAccountId is { } partnerAccountId) q = q.Where(x => EF.Property<int?>(x, "PartnerAccountId") == partnerAccountId);
+        if (f.PartnerId is { } partnerId)
+        {
+            q = q.Where(x => db.Set<PartnerAccount>().Any(pa => pa.PartnerId == partnerId && (int?)pa.Id == EF.Property<int?>(x, "PartnerAccountId")));
+        }
         if (!string.IsNullOrWhiteSpace(f.SubAccountId)) q = q.Where(x => EF.Property<string?>(x, "SubAccountId") == f.SubAccountId);
         if (f.To is { } to) q = q.Where(x => x.PostingDate <= to);
         if (!string.IsNullOrWhiteSpace(f.PaymentReference))
