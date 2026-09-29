@@ -27,6 +27,8 @@ import {
 import { useTranslation } from 'react-i18next'
 import { getErrorMessage } from '../../api/problemDetails'
 import { useActiveCompany } from '../companies/useActiveCompany'
+import { useCompanyRole } from '../companies/useCompanyRole'
+import { ConsistencyChecksPanel } from './ConsistencyChecksPanel'
 import { formatDate } from '../../shared/format/date'
 import { formatNumber } from '../../shared/format/money'
 import {
@@ -51,6 +53,7 @@ import type { ReportParameters, ReportTable } from './types'
 export function ReportsPage() {
   const { t } = useTranslation()
   const { activeCompany } = useActiveCompany()
+  const { role, canAdmin } = useCompanyRole()
   const [rawParameters, setRawParameters] = useState('')
   const [table, setTable] = useState<ReportTable>()
   const analyses = useAnalysisDefinitions(activeCompany.id)
@@ -77,6 +80,7 @@ export function ReportsPage() {
     <Stack spacing={3}>
       <Typography component="h1" variant="h1">Analize i izveštaji</Typography>
       <Typography color="text.secondary">{t('reports_.intro')}</Typography>
+      {canAdmin ? <ConsistencyChecksPanel companyId={activeCompany.id} isRoot={role === 'Root'} /> : null}
 
       {definitionsError ? <Alert severity="error">Definicije izveštaja nisu dostupne.</Alert> : null}
       {runError ? <Alert severity="error">{getErrorMessage(runError, 'Izveštaj nije mogao da se pokrene.')}</Alert> : null}

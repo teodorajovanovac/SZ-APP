@@ -190,6 +190,7 @@ export const resources = {
           claimDate: 'Presek zaduženja (do)', paymentDate: 'Presek uplata (do)',
         },
       },
+      consistency_: { title: 'Kontrole konzistentnosti', subtitle: 'Legacy ERROR_* provere, samo čitanje. Ispravke se rade ručno, uz potvrdu.', run: 'Pokreni sada', allCompanies: 'Sve kompanije', failed: 'Provere nisu izvršene.', company: 'Kompanija', key: 'Ključ', info: 'Opis', amount: 'Iznos', truncated: 'Prikazano {{shown}} od {{total}}.', notTranslated: 'Provere koje nisu prenete' },
       documents_: {
         title: 'Dokumenti',
         subtitle: 'Arhiva dokumenata aktivne stambene zajednice — ugovori, računi i prilozi.',
@@ -654,6 +655,7 @@ export const resources = {
           claimDate: 'Пресек задужења (до)', paymentDate: 'Пресек уплата (до)',
         },
       },
+      consistency_: { title: 'Контроле конзистентности', subtitle: 'Legacy ERROR_* провере, само читање. Исправке се раде ручно, уз потврду.', run: 'Покрени сада', allCompanies: 'Све компаније', failed: 'Провере нису извршене.', company: 'Компанија', key: 'Кључ', info: 'Опис', amount: 'Износ', truncated: 'Приказано {{shown}} од {{total}}.', notTranslated: 'Провере које нису пренете' },
       documents_: {
         title: 'Документи',
         subtitle: 'Архива докумената активне стамбене заједнице — уговори, рачуни и прилози.',
@@ -1118,6 +1120,7 @@ export const resources = {
           claimDate: 'Debt cutoff (through)', paymentDate: 'Payment cutoff (through)',
         },
       },
+      consistency_: { title: 'Consistency checks', subtitle: 'Legacy ERROR_* checks, read-only. Fixes are manual and confirmed.', run: 'Run now', allCompanies: 'All companies', failed: 'Checks failed to run.', company: 'Company', key: 'Key', info: 'Info', amount: 'Amount', truncated: 'Showing {{shown}} of {{total}}.', notTranslated: 'Checks not ported' },
       documents_: {
         title: 'Documents',
         subtitle: 'Document archive for the active housing community — contracts, invoices and attachments.',
