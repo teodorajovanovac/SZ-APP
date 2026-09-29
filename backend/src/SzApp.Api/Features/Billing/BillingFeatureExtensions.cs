@@ -93,8 +93,11 @@ public static class BillingFeatureExtensions
             .RequireAuthorization(SecurityConstants.CompanyWritePolicy).AddEndpointFilter<AntiforgeryEndpointFilter>();
         interest.MapGet("/statements", (int companyId, int invoiceBatchId, BillingService service, CancellationToken ct) =>
             service.ListInterestStatementsAsync(companyId, invoiceBatchId, ct));
-        interest.MapPost("/statements", (int companyId, CreateInterestStatementRequest request, BillingService service, CancellationToken ct) =>
-                service.CreateInterestStatementsAsync(companyId, request, ct))
+        interest.MapGet("/period-presets", (int companyId, int periodYYMM, DateOnly? previousValueDate, DateOnly? balanceAsOfDate, DateOnly? dueDate,
+                BillingService service, CancellationToken ct) =>
+            service.GetInterestPeriodPresetsAsync(companyId, periodYYMM, previousValueDate, balanceAsOfDate, dueDate, ct));
+        interest.MapPost("/runs", (int companyId, RunInterestRequest request, BillingService service, CancellationToken ct) =>
+                service.RunInterestAsync(companyId, request, ct))
             .RequireAuthorization(SecurityConstants.CompanyWritePolicy).AddEndpointFilter<AntiforgeryEndpointFilter>();
 
         var notices = root.MapGroup("/notices").WithTags("Billing - Notices");
@@ -114,6 +117,22 @@ public static class BillingFeatureExtensions
                 service.CreateNoticeTemplateAsync(companyId, request, ct))
             .RequireAuthorization(SecurityConstants.CompanyAdminPolicy)
             .AddEndpointFilter<AntiforgeryEndpointFilter>();
+
+        // P11: company rows need CompanyAdmin; global rows (isGlobal / CompanyId null) additionally Root (checked in the service).
+        var noticeCosts = root.MapGroup("/notice-additional-costs").WithTags("Billing - Notice additional costs");
+        noticeCosts.MapGet("/", (int companyId, BillingService service, CancellationToken ct) => service.ListNoticeCostsAsync(companyId, ct));
+        noticeCosts.MapPost("/", (int companyId, SaveNoticeAditionalCostRequest request, ClaimsPrincipal principal, BillingService service, CancellationToken ct) =>
+                service.SaveNoticeCostAsync(companyId, null, request, principal.IsInRole(SecurityConstants.RootRole), ct))
+            .RequireAuthorization(SecurityConstants.CompanyAdminPolicy).AddEndpointFilter<AntiforgeryEndpointFilter>();
+        noticeCosts.MapPut("/{id:int}", (int companyId, int id, SaveNoticeAditionalCostRequest request, ClaimsPrincipal principal, BillingService service, CancellationToken ct) =>
+                service.SaveNoticeCostAsync(companyId, id, request, principal.IsInRole(SecurityConstants.RootRole), ct))
+            .RequireAuthorization(SecurityConstants.CompanyAdminPolicy).AddEndpointFilter<AntiforgeryEndpointFilter>();
+        noticeCosts.MapDelete("/{id:int}", async (int companyId, int id, ClaimsPrincipal principal, BillingService service, CancellationToken ct) =>
+            {
+                await service.DeleteNoticeCostAsync(companyId, id, principal.IsInRole(SecurityConstants.RootRole), ct);
+                return Results.NoContent();
+            })
+            .RequireAuthorization(SecurityConstants.CompanyAdminPolicy).AddEndpointFilter<AntiforgeryEndpointFilter>();
 
         var noticeBatches = root.MapGroup("/notice-batches").WithTags("Billing - Notice batches");
         noticeBatches.MapPost("/", (int companyId, CreateNoticeBatchRequest request, BillingService service, CancellationToken ct) =>

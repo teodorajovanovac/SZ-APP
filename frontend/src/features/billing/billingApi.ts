@@ -66,6 +66,59 @@ export function usePostInvoiceBatch(companyId: number) {
   })
 }
 
+export type InterestPresetKey = 'fromPreviousDueDate' | 'wholeMonth' | 'dueToDue' | 'custom'
+export interface InterestPeriodPresets {
+  defaultPreset: InterestPresetKey
+  lastRunEnd: string | null
+  presets: { key: InterestPresetKey; start: string; end: string }[]
+}
+export interface InterestRun {
+  invoiceBatchId: number
+  periodStart: string
+  periodEnd: string
+  rowCount: number
+  totalInterest: number
+  totals: { partnerAccountId: number; subAccountId: string; interest: number }[]
+}
+
+export interface InterestPresetParams { periodYYMM: number; previousValueDate?: string; balanceAsOfDate?: string; dueDate?: string }
+
+/** P10: suggested interest periods for a billing period; the run always takes explicit dates. */
+export function interestPresetsQuery(companyId: number, params: InterestPresetParams) {
+  const search = new URLSearchParams({ periodYYMM: String(params.periodYYMM) })
+  if (params.previousValueDate) search.set('previousValueDate', params.previousValueDate)
+  if (params.balanceAsOfDate) search.set('balanceAsOfDate', params.balanceAsOfDate)
+  if (params.dueDate) search.set('dueDate', params.dueDate)
+  return {
+    queryKey: ['companies', companyId, 'interest-presets', search.toString()],
+    queryFn: () => apiRequest<InterestPeriodPresets>(`/api/v1/companies/${companyId}/interest/period-presets?${search.toString()}`),
+  }
+}
+
+export function useInterestPeriodPresets(companyId: number, params: InterestPresetParams, enabled: boolean) {
+  return useQuery({ ...interestPresetsQuery(companyId, params), enabled })
+}
+
+/** Resolves the period the run will use: a preset's dates, or the edited custom dates. */
+export function resolveInterestPeriod(
+  values: { interestPreset: InterestPresetKey | ''; interestStart: string; interestEnd: string },
+  presets: { key: InterestPresetKey; start: string; end: string }[] | undefined,
+  defaultPreset: InterestPresetKey | undefined,
+) {
+  const key = values.interestPreset || defaultPreset || 'fromPreviousDueDate'
+  if (key === 'custom') return { key, start: values.interestStart, end: values.interestEnd }
+  const preset = presets?.find((p) => p.key === key)
+  return { key, start: preset?.start ?? '', end: preset?.end ?? '' }
+}
+
+/** Idempotent per batch: re-running replaces the batch's interest rows. */
+export function useRunInterest(companyId: number) {
+  return useMutation({
+    mutationFn: (request: { invoiceBatchId: number; periodStart: string; periodEnd: string }) =>
+      mutate<InterestRun>(`/api/v1/companies/${companyId}/interest/runs`, request),
+  })
+}
+
 /** FIN-02: per-invoice red storno (negative amounts, same side, type 7). */
 export function useCancelInvoice(companyId: number, invoiceId: number) {
   const queryClient = useQueryClient()

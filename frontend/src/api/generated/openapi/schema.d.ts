@@ -83,6 +83,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    companyIds?: string;
+                    tables?: string;
+                    encoding?: string;
+                    includePersonalData?: boolean;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies": {
         parameters: {
             query?: never;
@@ -1350,6 +1388,163 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/staff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    Page?: number | string;
+                    PageSize?: number | string;
+                    Search?: string;
+                    SortBy?: string;
+                    Descending?: boolean;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CreateStaffRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/staff/{staffId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    staffId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    staffId: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["UpdateStaffRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/staff/{staffId}/reset-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    staffId: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ResetStaffPasswordRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/calculation-types": {
         parameters: {
             query?: never;
@@ -1459,6 +1654,82 @@ export interface paths {
                     "application/json": components["schemas"]["CreateSupplierInvoiceRequest"];
                 };
             };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SupplierInvoiceResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/supplier-invoices/{supplierInvoiceId}/post": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    companyId: number;
+                    supplierInvoiceId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SupplierInvoiceResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/supplier-invoices/{supplierInvoiceId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    companyId: number;
+                    supplierInvoiceId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
             responses: {
                 /** @description OK */
                 200: {
@@ -1975,6 +2246,64 @@ export interface paths {
             };
         };
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/interest/period-presets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query: {
+                    periodYYMM: number | string;
+                    previousValueDate?: string;
+                    balanceAsOfDate?: string;
+                    dueDate?: string;
+                };
+                header?: never;
+                path: {
+                    companyId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["InterestPeriodPresetsResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/interest/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
         post: {
             parameters: {
                 query?: never;
@@ -1986,7 +2315,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": components["schemas"]["CreateInterestStatementRequest"];
+                    "application/json": components["schemas"]["RunInterestRequest"];
                 };
             };
             responses: {
@@ -1996,7 +2325,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["InterestStatementResponse"][];
+                        "application/json": components["schemas"]["InterestRunResponse"];
                     };
                 };
             };
@@ -2180,6 +2509,130 @@ export interface paths {
             };
         };
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/notice-additional-costs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    companyId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["NoticeAditionalCostResponse"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    companyId: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SaveNoticeAditionalCostRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["NoticeAditionalCostResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/notice-additional-costs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    companyId: number;
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SaveNoticeAditionalCostRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["NoticeAditionalCostResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    companyId: number;
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
         options?: never;
         head?: never;
         patch?: never;
@@ -2502,6 +2955,119 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/posting-periods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    companyId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PostingPeriodLockResponse"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/posting-periods/{periodYYMM}/lock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    companyId: number;
+                    periodYYMM: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PostingPeriodLockResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/posting-periods/{periodYYMM}/unlock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    companyId: number;
+                    periodYYMM: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PostingPeriodLockResponse"];
+                    };
                 };
             };
         };
@@ -3445,7 +4011,9 @@ export interface paths {
         get?: never;
         put: {
             parameters: {
-                query?: never;
+                query?: {
+                    global?: boolean;
+                };
                 header?: never;
                 path: {
                     companyId: number;
@@ -3849,7 +4417,26 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    companyId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
         put?: never;
         post: {
             parameters: {
@@ -3876,6 +4463,66 @@ export interface paths {
             };
         };
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/short-lists/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    companyId: number;
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SaveShortListRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    companyId: number;
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
         options?: never;
         head?: never;
         patch?: never;
@@ -3961,8 +4608,89 @@ export interface paths {
             };
         };
         put?: never;
-        post?: never;
+        post: {
+            parameters: {
+                query?: {
+                    id?: number | string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["LocationCategoryRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/location-categories/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["LocationCategoryRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
         options?: never;
         head?: never;
         patch?: never;
@@ -4601,6 +5329,80 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/export/tables": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    companyId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    tables?: string;
+                    encoding?: string;
+                    includePersonalData?: boolean;
+                };
+                header?: never;
+                path: {
+                    companyId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/antiforgery": {
         parameters: {
             query?: never;
@@ -4655,6 +5457,43 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": components["schemas"]["LoginRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/change-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ChangePasswordRequest"];
                 };
             };
             responses: {
@@ -4900,11 +5739,16 @@ export interface components {
             reason: string;
             rowVersion: string;
         };
+        ChangePasswordRequest: {
+            currentPassword: string;
+            newPassword: string;
+        };
         CompanySummaryResponse: {
             /** Format: int32 */
             id: number | string;
             name: string;
             registrationNumber: null | string;
+            locationName?: null | string;
         };
         ConcurrencyCommandRequest: {
             rowVersion: string;
@@ -4955,22 +5799,6 @@ export interface components {
             /** Format: double */
             rate: number | string;
             timeCode: string;
-        };
-        CreateInterestStatementRequest: {
-            account: string;
-            /** Format: double */
-            principal: number | string;
-            /** Format: double */
-            balance: number | string;
-            /** Format: int32 */
-            partnerAccountId: number | string;
-            subAccountId: null | string;
-            /** Format: int32 */
-            invoiceBatchId: number | string;
-            /** Format: date */
-            from: string;
-            /** Format: date */
-            to: string;
         };
         CreateInvoiceBatchRequest: {
             /** Format: int32 */
@@ -5090,6 +5918,15 @@ export interface components {
             bodyHtml: string;
             documentIds: null | (number | string)[];
         };
+        CreateStaffRequest: {
+            email: string;
+            temporaryPassword: string;
+            preferredLanguage: string;
+            isRoot: boolean;
+            /** Format: int32 */
+            companyId: null | number | string;
+            staffRole: null | string;
+        };
         CreateSupplierInvoiceRequest: {
             /** Format: int32 */
             invoiceNo: number | string;
@@ -5177,6 +6014,19 @@ export interface components {
             totalInterest: number | string;
             lines: components["schemas"]["InterestCalculationLineResponse"][];
         };
+        InterestPeriodPresetResponse: {
+            key: string;
+            /** Format: date */
+            start: string;
+            /** Format: date */
+            end: string;
+        };
+        InterestPeriodPresetsResponse: {
+            defaultPreset: string;
+            /** Format: date */
+            lastRunEnd: null | string;
+            presets: components["schemas"]["InterestPeriodPresetResponse"][];
+        };
         InterestRateResponse: {
             /** Format: int32 */
             id: number | string;
@@ -5185,6 +6035,19 @@ export interface components {
             /** Format: double */
             rate: number | string;
             timeCode: string;
+        };
+        InterestRunResponse: {
+            /** Format: int32 */
+            invoiceBatchId: number | string;
+            /** Format: date */
+            periodStart: string;
+            /** Format: date */
+            periodEnd: string;
+            /** Format: int32 */
+            rowCount: number | string;
+            /** Format: double */
+            totalInterest: number | string;
+            totals: components["schemas"]["InterestTotalResponse"][];
         };
         InterestStatementResponse: {
             /** Format: int32 */
@@ -5206,8 +6069,16 @@ export interface components {
             interest: number | string;
             /** Format: int32 */
             partnerAccountId: number | string;
+            subAccountId: null | string;
             /** Format: int32 */
             invoiceBatchId: number | string;
+        };
+        InterestTotalResponse: {
+            /** Format: int32 */
+            partnerAccountId: number | string;
+            subAccountId: string;
+            /** Format: double */
+            interest: number | string;
         };
         InvoiceBatchGenerationResponse: {
             /** Format: int32 */
@@ -5417,6 +6288,13 @@ export interface components {
             partnerAccountId: null | number | string;
             note: null | string;
         };
+        LocationCategoryRequest: {
+            name: string;
+            /** Format: int32 */
+            parentId: null | number | string;
+            /** Format: int32 */
+            sortIndex: number | string;
+        };
         LoginRequest: {
             email: string;
             password: string;
@@ -5430,6 +6308,23 @@ export interface components {
             counterAccount: string;
             rowVersion: string;
         };
+        NoticeAditionalCostResponse: {
+            /** Format: int32 */
+            id: number | string;
+            /** Format: date */
+            dateStart: string;
+            /** Format: date */
+            dateEnd: null | string;
+            /** Format: int32 */
+            companyId: null | number | string;
+            /** Format: double */
+            aditionalCostsLowerAmount: number | string;
+            /** Format: double */
+            aditionalCostsLowerLimit: number | string;
+            /** Format: double */
+            aditionalCostsUpperAmount: number | string;
+            rowVersion: string;
+        };
         NoticeBatchResponse: {
             /** Format: int32 */
             id: number | string;
@@ -5440,6 +6335,12 @@ export interface components {
             noticeTemplateId: number | string;
             /** Format: int32 */
             noticeTypeId: number | string;
+            /** Format: double */
+            aditionalCostsLowerAmount: null | number | string;
+            /** Format: double */
+            aditionalCostsLowerLimit: null | number | string;
+            /** Format: double */
+            aditionalCostsUpperAmount: null | number | string;
             rowVersion: string;
         };
         NoticeGenerationResponse: {
@@ -5492,8 +6393,6 @@ export interface components {
             debt: number | string;
             invoiceText: null | string;
             paymentReference: string;
-            /** Format: double */
-            additionalCosts: number | string;
             lines: components["schemas"]["NoticeLineSeedRequest"][];
         };
         NoticeTemplateResponse: {
@@ -5544,6 +6443,20 @@ export interface components {
             isFavorite: boolean;
             isArchived: boolean;
             rowVersion: string;
+        };
+        PostingPeriodLockResponse: {
+            /** Format: int32 */
+            id: number | string;
+            /** Format: int32 */
+            periodYYMM: number | string;
+            /** Format: date-time */
+            lockedAt: string;
+            /** Format: int32 */
+            lockedByStaffId: number | string;
+            /** Format: date-time */
+            unlockedAt: null | string;
+            /** Format: int32 */
+            unlockedByStaffId: null | number | string;
         };
         ReplaceContractRequest: {
             /** Format: int32 */
@@ -5616,6 +6529,17 @@ export interface components {
             /** Format: int32 */
             rowCount: number | string;
             isTruncated: boolean;
+        };
+        ResetStaffPasswordRequest: {
+            temporaryPassword: string;
+        };
+        RunInterestRequest: {
+            /** Format: int32 */
+            invoiceBatchId: number | string;
+            /** Format: date */
+            periodStart: string;
+            /** Format: date */
+            periodEnd: string;
         };
         RunReportRequest: {
             parameters: null | Record<string, never>;
@@ -5702,6 +6626,20 @@ export interface components {
             isDefault: boolean;
             /** Format: int32 */
             sortIndex: null | number | string;
+        };
+        SaveNoticeAditionalCostRequest: {
+            /** Format: date */
+            dateStart: string;
+            /** Format: date */
+            dateEnd: null | string;
+            isGlobal: boolean;
+            /** Format: double */
+            aditionalCostsLowerAmount: number | string;
+            /** Format: double */
+            aditionalCostsLowerLimit: number | string;
+            /** Format: double */
+            aditionalCostsUpperAmount: number | string;
+            rowVersion: null | string;
         };
         SavePartnerAccountRequest: {
             account: string;
@@ -5814,6 +6752,10 @@ export interface components {
             extraordinaryInvoiceMarker: null | string;
             unitTypeIds: (number | string)[];
             rowVersion: string;
+            /** Format: int32 */
+            journalEntryId?: null | number | string;
+            /** @default false */
+            isPostingCancelled: boolean;
         };
         UpdateCompanyRequest: {
             /** Format: int32 */
@@ -5836,6 +6778,13 @@ export interface components {
             sortIndex: null | number | string;
             externalAccount: null | string;
             rowVersion: string;
+        };
+        UpdateStaffRequest: {
+            email: string;
+            phoneNumber: null | string;
+            preferredLanguage: string;
+            isActive: boolean;
+            isRoot: boolean;
         };
     };
     responses: never;

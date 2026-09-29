@@ -92,6 +92,9 @@ public sealed class InvoiceBatch : ICompanyOwned
     public DateOnly? BalanceAsOfDate { get; set; }
     public DateOnly? PreviousValueDate { get; set; }
     public bool IsInterestCalculated { get; set; }
+    // P10: the last interest run's explicit period (null = never run). Runs of one company must not overlap.
+    public DateOnly? InterestPeriodStart { get; set; }
+    public DateOnly? InterestPeriodEnd { get; set; }
     public string? PaymentPurpose { get; set; }
     public BillingBatchStatus Status { get; set; }
     public string? GenerationFingerprint { get; set; }
@@ -170,9 +173,29 @@ public sealed class NoticeBatch : ICompanyOwned
     public DateOnly UpToPaymentDate { get; set; }
     public int? InvoiceBatchId { get; set; }
     public string? CustomCaptionOnSlip { get; set; }
+    // P11 snapshot of the NoticeAditionalCosts row in force at batch creation (null = no rule applied).
+    public decimal? AditionalCostsLowerAmount { get; set; }
+    public decimal? AditionalCostsLowerLimit { get; set; }
+    public decimal? AditionalCostsUpperAmount { get; set; }
     public string? GenerationFingerprint { get; set; }
     public byte[] RowVersion { get; set; } = [];
     public ICollection<Notice> Notices { get; } = new List<Notice>();
+}
+
+/// <summary>
+/// P11 (data-model NoticeAditionalCosts, boss's spelling): notice cost thresholds over time.
+/// DateEnd null = still active; CompanyId null = all companies (a company row beats a global one).
+/// </summary>
+public sealed class NoticeAditionalCost
+{
+    public int Id { get; set; }
+    public DateOnly DateStart { get; set; }
+    public DateOnly? DateEnd { get; set; }
+    public int? CompanyId { get; set; }
+    public decimal AditionalCostsLowerAmount { get; set; }
+    public decimal AditionalCostsLowerLimit { get; set; }
+    public decimal AditionalCostsUpperAmount { get; set; }
+    public byte[] RowVersion { get; set; } = [];
 }
 
 public sealed class Notice : ICompanyOwned
