@@ -1,14 +1,20 @@
 import { useMemo, useState } from 'react'
-import { Alert, Box, Button, Chip, Stack, Typography } from '@mui/material'
+import { Alert, Box, Button, Chip, MenuItem, Select, Stack, Typography } from '@mui/material'
+import type { SelectChangeEvent } from '@mui/material'
 import type { ColumnDef, PaginationState, SortingState } from '@tanstack/react-table'
+import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { getErrorMessage } from '../../api/problemDetails'
 import { formatMoney } from '../../shared/format/money'
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog'
+import { ControlledTextField } from '../../shared/components/ControlledTextField'
+import { FormDialog } from '../../shared/components/FormDialog'
+import { MoneyField } from '../../shared/components/MoneyField'
 import { ServerDataTable } from '../../shared/components/ServerDataTable'
+import { useShortList } from '../master-data/useShortList'
 import { NoticeCostsPanel } from './NoticeCostsPanel'
-import { useNoticeCommand, useNotices } from './noticeApi'
-import type { Notice } from './noticeApi'
+import { useCreateNoticeBatch, useGenerateNotices, useNoticeCommand, useNoticeTemplates, useNotices } from './noticeApi'
+import type { CreateNoticeBatch, Notice } from './noticeApi'
 
 const statusColor: Record<Notice['deliveryStatus'], 'default' | 'info' | 'success' | 'error'> = {
   Draft: 'default',
@@ -27,6 +33,7 @@ export function NoticeList({ companyId, canWrite }: { companyId: number; canWrit
   const error = query.error ?? command.error
   const [pendingSend, setPendingSend] = useState<Notice | null>(null)
   const [showCosts, setShowCosts] = useState(false)
+  const [showNewBatch, setShowNewBatch] = useState(false)
 
   const columns = useMemo<ColumnDef<Notice>[]>(
     () => [
@@ -83,11 +90,21 @@ export function NoticeList({ companyId, canWrite }: { companyId: number; canWrit
       <Box component="header">
         <Typography component="h1" variant="h1">{t('notices_.title')}</Typography>
         <Typography color="text.secondary" sx={{ mt: 1, maxWidth: 720 }}>{t('notices_.subtitle')}</Typography>
-        <Button sx={{ mt: 1 }} variant="outlined" aria-expanded={showCosts} onClick={() => setShowCosts((v) => !v)}>
-          {t('noticeCosts_.title')}
-        </Button>
+        <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+          <Button variant="outlined" aria-expanded={showCosts} onClick={() => setShowCosts((v) => !v)}>
+            {t('noticeCosts_.title')}
+          </Button>
+          {canWrite ? (
+            <Button variant="contained" onClick={() => setShowNewBatch(true)}>
+              {t('notices_.newBatch')}
+            </Button>
+          ) : null}
+        </Stack>
       </Box>
       {showCosts ? <NoticeCostsPanel companyId={companyId} /> : null}
+      <FormDialog open={showNewBatch} title={t('notices_.newBatch')} onClose={() => setShowNewBatch(false)}>
+        {showNewBatch ? <NewNoticeBatchForm companyId={companyId} onDone={() => setShowNewBatch(false)} /> : null}
+      </FormDialog>
       {error ? <Alert severity="error">{getErrorMessage(error, t('notices_.processingFailed'))}</Alert> : null}
       <ServerDataTable
         ariaLabel={t('notices_.title')}
@@ -117,6 +134,80 @@ export function NoticeList({ companyId, canWrite }: { companyId: number; canWrit
           setPendingSend(null)
         }}
       />
+    </Stack>
+  )
+}
+
+const today = () => new Date().toISOString().slice(0, 10)
+
+/** FIN-12: only cutoffs + thresholds go to the server; debt/lines are computed from the ledger. */
+function NewNoticeBatchForm({ companyId, onDone }: { companyId: number; onDone: () => void }) {
+  const { t } = useTranslation()
+  const templates = useNoticeTemplates(companyId)
+  const noticeTypes = useShortList(companyId, 'NoticeType')
+  const createBatch = useCreateNoticeBatch(companyId)
+  const generate = useGenerateNotices(companyId)
+  const { control, handleSubmit, watch, setValue } = useForm<CreateNoticeBatch>({
+    defaultValues: {
+      title: '', date: today(),
+      minUnpaidInvoiceCount: 3, debtTolerance: 1, debtToleranceByMonth: 1,
+      noticeTemplateId: 0, noticeTypeId: 0,
+      upToClaimDate: today(), upToPaymentDate: today(),
+      invoiceBatchId: null, customCaptionOnSlip: null,
+    },
+  })
+  const noticeTemplateId = watch('noticeTemplateId')
+  const noticeTypeId = watch('noticeTypeId')
+  const pending = createBatch.isPending || generate.isPending
+  const error = createBatch.error ?? generate.error
+
+  const submit = async (value: CreateNoticeBatch) => {
+    const batch = await createBatch.mutateAsync(value)
+    await generate.mutateAsync({ batchId: batch.id, confirm: false })
+    onDone()
+  }
+
+  return (
+    <Stack component="form" spacing={2} noValidate onSubmit={handleSubmit(submit)}>
+      {error ? (
+        <Alert severity="error">
+          {getErrorMessage(error, t('notices_.createFailed'))}
+        </Alert>
+      ) : null}
+      <ControlledTextField control={control} name="title" label={t('notices_.form.title')} required />
+      <ControlledTextField control={control} name="date" label={t('notices_.form.date')} type="date" required />
+      <Select
+        displayEmpty
+        size="small"
+        value={noticeTemplateId ? String(noticeTemplateId) : ''}
+        onChange={(event: SelectChangeEvent) => setValue('noticeTemplateId', Number(event.target.value))}
+      >
+        <MenuItem value="" disabled>{t('notices_.form.template')}</MenuItem>
+        {(templates.data ?? []).filter((x) => x.isActive).map((x) => (
+          <MenuItem key={x.id} value={String(x.id)}>{x.name}</MenuItem>
+        ))}
+      </Select>
+      <Select
+        displayEmpty
+        size="small"
+        value={noticeTypeId ? String(noticeTypeId) : ''}
+        onChange={(event: SelectChangeEvent) => setValue('noticeTypeId', Number(event.target.value))}
+      >
+        <MenuItem value="" disabled>{t('notices_.form.type')}</MenuItem>
+        {(noticeTypes.data ?? []).map((x) => (
+          <MenuItem key={x.id} value={String(x.id)}>{x.caption}</MenuItem>
+        ))}
+      </Select>
+      <ControlledTextField control={control} name="upToClaimDate" label={t('notices_.form.claimDate')} type="date" required />
+      <ControlledTextField control={control} name="upToPaymentDate" label={t('notices_.form.paymentDate')} type="date" required />
+      <ControlledTextField control={control} name="minUnpaidInvoiceCount" label={t('notices_.form.minBnr')} type="number" required />
+      <MoneyField control={control} name="debtTolerance" label={t('notices_.form.debtTolerance')} required />
+      <MoneyField control={control} name="debtToleranceByMonth" label={t('notices_.form.debtToleranceByMonth')} required />
+      <Stack direction="row" justifyContent="flex-end">
+        <Button type="submit" variant="contained" disabled={pending || !noticeTemplateId || !noticeTypeId}>
+          {t('notices_.createAndGenerate')}
+        </Button>
+      </Stack>
     </Stack>
   )
 }

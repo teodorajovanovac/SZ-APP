@@ -180,6 +180,15 @@ export const resources = {
         status: {
           Draft: 'Nacrt', Rendered: 'Renderovana', Queued: 'U redu za slanje', Sent: 'Poslata', Failed: 'Neuspela',
         },
+        newBatch: 'Nova serija opomena', createAndGenerate: 'Napravi i generiši',
+        createFailed: 'Serija opomena nije napravljena.', generateFailed: 'Generisanje opomena nije uspelo.',
+        regenerateConfirmTitle: 'Ponovno generisanje',
+        regenerateConfirmBody: 'Opomene za ovu seriju već postoje. Postojeće opomene će biti obrisane i generisane ponovo iz glavne knjige. Nastavite?',
+        form: {
+          title: 'Naziv serije', date: 'Datum', template: 'Šablon opomene', type: 'Vrsta opomene',
+          minBnr: 'Min. broj stavki (MinBNR)', debtTolerance: 'Tolerancija duga', debtToleranceByMonth: 'Tolerancija duga po dokumentu',
+          claimDate: 'Presek zaduženja (do)', paymentDate: 'Presek uplata (do)',
+        },
       },
       documents_: {
         title: 'Dokumenti',
@@ -635,6 +644,15 @@ export const resources = {
         status: {
           Draft: 'Нацрт', Rendered: 'Рендерована', Queued: 'У реду за слање', Sent: 'Послата', Failed: 'Неуспела',
         },
+        newBatch: 'Нова серија опомена', createAndGenerate: 'Направи и генериши',
+        createFailed: 'Серија опомена није направљена.', generateFailed: 'Генерисање опомена није успело.',
+        regenerateConfirmTitle: 'Поновно генерисање',
+        regenerateConfirmBody: 'Опомене за ову серију већ постоје. Постојеће опомене ће бити обрисане и генерисане поново из главне књиге. Наставите?',
+        form: {
+          title: 'Назив серије', date: 'Датум', template: 'Шаблон опомене', type: 'Врста опомене',
+          minBnr: 'Мин. број ставки (MinBNR)', debtTolerance: 'Толеранција дуга', debtToleranceByMonth: 'Толеранција дуга по документу',
+          claimDate: 'Пресек задужења (до)', paymentDate: 'Пресек уплата (до)',
+        },
       },
       documents_: {
         title: 'Документи',
@@ -1089,6 +1107,15 @@ export const resources = {
         emptyBody: 'Reminders are generated from unpaid invoices once their due date has passed.',
         status: {
           Draft: 'Draft', Rendered: 'Rendered', Queued: 'Queued', Sent: 'Sent', Failed: 'Failed',
+        },
+        newBatch: 'New notice batch', createAndGenerate: 'Create and generate',
+        createFailed: 'Notice batch was not created.', generateFailed: 'Notice generation failed.',
+        regenerateConfirmTitle: 'Regenerate notices',
+        regenerateConfirmBody: 'Notices for this batch already exist. The existing notices will be deleted and regenerated from the ledger. Continue?',
+        form: {
+          title: 'Batch title', date: 'Date', template: 'Notice template', type: 'Notice type',
+          minBnr: 'Min. line count (MinBNR)', debtTolerance: 'Debt tolerance', debtToleranceByMonth: 'Per-document debt tolerance',
+          claimDate: 'Debt cutoff (through)', paymentDate: 'Payment cutoff (through)',
         },
       },
       documents_: {
