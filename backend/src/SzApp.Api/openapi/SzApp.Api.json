@@ -6207,6 +6207,51 @@
         }
       }
     },
+    "/api/v1/companies/{companyId}/consistency-checks": {
+      "get": {
+        "tags": [
+          "Consistency checks"
+        ],
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "allCompanies",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "checkId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsistencyReport"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/companies/{companyId}/etl-runs": {
       "get": {
         "tags": [
@@ -7218,6 +7263,125 @@
         "properties": {
           "rowVersion": {
             "type": "string"
+          }
+        }
+      },
+      "ConsistencyCheckResult": {
+        "required": [
+          "id",
+          "legacy",
+          "name",
+          "critical",
+          "count",
+          "rows"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "legacy": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "critical": {
+            "type": "boolean"
+          },
+          "count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConsistencyRow"
+            }
+          }
+        }
+      },
+      "ConsistencyNotTranslated": {
+        "required": [
+          "id",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "ConsistencyReport": {
+        "required": [
+          "companyId",
+          "checks",
+          "notTranslated"
+        ],
+        "type": "object",
+        "properties": {
+          "companyId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConsistencyCheckResult"
+            }
+          },
+          "notTranslated": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConsistencyNotTranslated"
+            }
+          }
+        }
+      },
+      "ConsistencyRow": {
+        "required": [
+          "companyId",
+          "key",
+          "info",
+          "amount"
+        ],
+        "type": "object",
+        "properties": {
+          "companyId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "key": {
+            "type": "string"
+          },
+          "info": {
+            "type": "string"
+          },
+          "amount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
           }
         }
       },
@@ -11688,6 +11852,9 @@
     },
     {
       "name": "Reports"
+    },
+    {
+      "name": "Consistency checks"
     },
     {
       "name": "ETL"

@@ -9,6 +9,9 @@ namespace SzApp.Api.Features.Reports;
 
 /// <summary>One violating row: company, a drill-down key (journal/partner account/document) and a short info text.</summary>
 public sealed record ConsistencyRow(int CompanyId, string Key, string Info, decimal? Amount);
+public sealed record ConsistencyCheckResult(string Id, string Legacy, string Name, bool Critical, int Count, IReadOnlyList<ConsistencyRow> Rows);
+public sealed record ConsistencyNotTranslated(string Id, string Reason);
+public sealed record ConsistencyReport(int? CompanyId, IReadOnlyList<ConsistencyCheckResult> Checks, IReadOnlyList<ConsistencyNotTranslated> NotTranslated);
 
 /// <summary>
 /// ERR-01/03: a legacy ERROR_* consistency check, translated to a read-only query on the new schema.
@@ -102,21 +105,51 @@ public static class ConsistencyChecks
                 .Where(x => (c == null || x.CompanyId == c) && x.SentAt == null && x.Status != EmailSendStatus.Failed && x.Status != EmailSendStatus.Draft && !x.IsArchived)
                 .Select(x => new ConsistencyRow(x.CompanyId, "Mejl " + x.Id, x.ToAddress + " / " + x.Subject, null))),
 
-        new("GK-BAL", "(novo) bruto bilans po nalogu",
-            "Proknjižen nalog nije u ravnoteži (Σ D ≠ Σ P)", true,
-            (db, c) => Ledger(db, c).Where(x => x.JournalEntry.IsPosted)
+        new("GK-103", "ERROR_103_2040_IZVOD_NEMASTAVKUIZVODA",
+            "2040: stavka tipa izvod bez veze na stavku izvoda", true,
+            (db, c) => Ledger(db, c).Where(x => x.Account == LedgerAccounts.Customers && x.LineType != null
+                    && x.LineType.IndexValue == LedgerLineTypes.BankStatement && EF.Property<int?>(x, "BankStatementLineId") == null)
+                .Select(x => new ConsistencyRow(x.CompanyId, "Nalog " + x.JournalEntryId, "PA " + EF.Property<int?>(x, "PartnerAccountId"), x.DebitAmount - x.CreditAmount))),
+
+        new("GK-901", "ERROR_901_A_NALOG_VISE_IZVODA",
+            "Jedan nalog je vezan za više izvoda", false,
+            (db, c) => db.Set<BankStatement>().AsNoTracking()
+                .Where(x => x.JournalEntryId != null && (c == null || x.CompanyId == c))
+                .GroupBy(x => new { x.CompanyId, x.JournalEntryId })
+                .Where(g => g.Count() > 1)
+                .Select(g => new ConsistencyRow(g.Key.CompanyId, "Nalog " + g.Key.JournalEntryId, "izvoda: " + g.Count(), null))),
+
+        new("GK-104", "ERROR_104_NALOG_RAVNOTEZA",
+            "Nalog nije u ravnoteži (Σ D ≠ Σ P)", true,
+            (db, c) => Ledger(db, c)
                 .GroupBy(x => new { x.CompanyId, x.JournalEntryId })
                 .Where(g => g.Sum(x => x.DebitAmount - x.CreditAmount) >= 0.005m || g.Sum(x => x.DebitAmount - x.CreditAmount) <= -0.005m)
                 .Select(g => new ConsistencyRow(g.Key.CompanyId, "Nalog " + g.Key.JournalEntryId, "neravnoteža", g.Sum(x => x.DebitAmount - x.CreditAmount)))),
     ];
+
+    public const int MaxRows = 200;
+
+    /// <summary>Runs every check (read-only); rows are capped at <see cref="MaxRows"/>, Count is the full total.</summary>
+    public static async Task<ConsistencyReport> RunAsync(SzAppDbContext db, int? companyId, string? checkId, CancellationToken ct)
+    {
+        var results = new List<ConsistencyCheckResult>();
+        foreach (var check in All.Where(x => checkId is null || x.Id == checkId))
+        {
+            var query = check.Query(db, companyId);
+            var count = await query.CountAsync(ct);
+            var rows = count == 0 ? [] : await query.Take(MaxRows).ToArrayAsync(ct);
+            results.Add(new(check.Id, check.Legacy, check.Name, check.Critical, count, rows));
+        }
+        return new(companyId, results, NotTranslated.Select(x => new ConsistencyNotTranslated(x.Key, x.Value)).ToArray());
+    }
 
     /// <summary>
     /// Critical legacy checks not translated, with the reason (reported by the endpoint, not faked).
     /// </summary>
     public static readonly IReadOnlyDictionary<string, string> NotTranslated = new Dictionary<string, string>
     {
-        ["GK-902"] = "Upit ERROR_902 ne postoji u izvozu upita (queries-sql.md) — potrebna definicija iz tblAnaliza.",
-        ["GK-101..104"] = "ERROR_101-104 nisu u izvozu upita; tblAnaliza ih referencira — potreban izvorni SQL.",
+        ["GK-902"] = "Stavka GK bez datuma: PostingDate je NOT NULL u novoj šemi (strukturno pokriveno).",
+        ["GK-101/102"] = "Nepostojeći podkonto / roditelj podkonta: FK LedgerEntry.SubAccountId i SubAccount.ParentSubAccountId (strukturno pokriveno).",
         ["IZV-001"] = "Poređenje Σ stavki izvoda sa GK zahteva znak strane (odobrenje/zaduženje) po kontu izvoda — potvrditi sa vlasnicom.",
         ["IZV-009/011"] = "Pogrešna SZ na stavci izvoda: u novoj šemi CompanyId je obavezan i nasleđen od izvoda (strukturno pokriveno).",
         ["IZV-019"] = "Zavisi od legacy pomoćnih upita IzvodSumaZO/GK_2410_Sum; delimično pokriveno kroz IZV-014.",

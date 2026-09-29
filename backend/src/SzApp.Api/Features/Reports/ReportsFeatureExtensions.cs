@@ -58,6 +58,16 @@ public static class ReportsFeatureExtensions
             return Results.Content(html, "text/html; charset=utf-8", Encoding.UTF8);
         }).AddEndpointFilter<AntiforgeryEndpointFilter>();
 
+        // ERR-01/03: read-only, run on demand. Upravnik/Root; allCompanies (no company filter) is Root only.
+        root.MapGet("/consistency-checks", (int companyId, bool? allCompanies, string? checkId,
+                ClaimsPrincipal principal, SzApp.Data.SzAppDbContext db, CancellationToken ct) =>
+            {
+                var all = allCompanies == true && principal.IsInRole(SecurityConstants.RootRole);
+                return ConsistencyChecks.RunAsync(db, all ? null : companyId, checkId, ct);
+            })
+            .WithTags("Consistency checks")
+            .RequireAuthorization(SecurityConstants.CompanyAdminPolicy);
+
         return endpoints;
     }
 
