@@ -183,7 +183,7 @@ export function BillingWorkspace({ companyId, canPost }: { companyId: number; ca
         onClose={() => setEmailBatch(null)}
         onConfirm={() => {
           if (emailBatch && preview && preview.withEmail > 0) {
-            emailSend.mutate(emailBatch.id, { onSuccess: (result) => setPdfMessage(t('invoicePdf.sent', result)) })
+            emailSend.mutate(emailBatch.id, { onSuccess: (result) => setPdfMessage(t('invoicePdf.sent', { enqueued: result.enqueued, skipped: result.skipped })) })
           }
           setEmailBatch(null)
         }}
