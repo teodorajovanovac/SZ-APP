@@ -143,6 +143,8 @@ public sealed record AcceptBankStatementLineRequest(
 /// <summary>Re-run auto-matching for one line with a chosen partner (e.g. after "/" partner search).</summary>
 public sealed record AssignPartnerRequest(int PartnerAccountId, string RowVersion);
 
+public sealed record SavePayerAccountRequest(int PartnerAccountId);
+
 public sealed record CreateTemplateFromLineRequest(int PartnerAccountId, string? Name, string? SubAccountId);
 
 public sealed record BankTemplateConditionResponse(string Field, string Function, string Value);
