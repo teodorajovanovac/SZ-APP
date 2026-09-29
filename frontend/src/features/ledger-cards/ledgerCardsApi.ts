@@ -52,6 +52,7 @@ export interface SearchResult {
   unitId: number | null
   paymentReference: string | null
   balance: number | null
+  partnerId: number | null
 }
 
 export interface ChartAccount {
