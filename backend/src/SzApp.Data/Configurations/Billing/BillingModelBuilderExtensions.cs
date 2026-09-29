@@ -190,6 +190,20 @@ public static class BillingModelBuilderExtensions
             entity.HasOne<BillingInvoice>().WithMany().HasForeignKey(x => x.InvoiceId).OnDelete(DeleteBehavior.NoAction);
         });
 
+        builder.Entity<BenefitArchive>(entity =>
+        {
+            entity.ToTable("BenefitArchive", "billing");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).UseIdentityColumn();
+            entity.Property(x => x.OriginalAmount).HasPrecision(18, 2);
+            entity.Property(x => x.Note).HasMaxLength(255);
+            entity.HasIndex(x => new { x.CompanyId, x.CustomerId, x.PeriodYYMM });
+            entity.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.NoAction);
+            entity.HasOne<Partner>().WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.NoAction);
+            entity.HasOne<BillingInvoice>().WithMany().HasForeignKey(x => x.InvoiceId).OnDelete(DeleteBehavior.NoAction);
+            entity.HasOne<BillingInvoiceLine>().WithMany().HasForeignKey(x => x.InvoiceLineId).OnDelete(DeleteBehavior.NoAction);
+        });
+
         builder.Entity<InterestRate>(entity =>
         {
             entity.ToTable("InterestRate", "billing", table =>
