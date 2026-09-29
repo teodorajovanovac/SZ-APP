@@ -8261,16 +8261,11 @@
         }
       },
       "GenerateNoticesRequest": {
-        "required": [
-          "notices"
-        ],
         "type": "object",
         "properties": {
-          "notices": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/NoticeSeedRequest"
-            }
+          "confirm": {
+            "type": "boolean",
+            "default": false
           }
         }
       },
@@ -9748,69 +9743,6 @@
           }
         }
       },
-      "NoticeLineSeedRequest": {
-        "required": [
-          "documentRef",
-          "debit",
-          "credit",
-          "text",
-          "dueDate",
-          "invoiceId",
-          "invoiceDate",
-          "unitAddress"
-        ],
-        "type": "object",
-        "properties": {
-          "documentRef": {
-            "type": "string"
-          },
-          "debit": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "credit": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "text": {
-            "type": "string"
-          },
-          "dueDate": {
-            "type": "string",
-            "format": "date"
-          },
-          "invoiceId": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "null",
-              "integer",
-              "string"
-            ],
-            "format": "int32"
-          },
-          "invoiceDate": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "date"
-          },
-          "unitAddress": {
-            "type": [
-              "null",
-              "string"
-            ]
-          }
-        }
-      },
       "NoticeResponse": {
         "required": [
           "id",
@@ -9897,58 +9829,6 @@
           },
           "rowVersion": {
             "type": "string"
-          }
-        }
-      },
-      "NoticeSeedRequest": {
-        "required": [
-          "partnerAccountId",
-          "unpaidInvoiceCount",
-          "debt",
-          "invoiceText",
-          "paymentReference",
-          "lines"
-        ],
-        "type": "object",
-        "properties": {
-          "partnerAccountId": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32"
-          },
-          "unpaidInvoiceCount": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32"
-          },
-          "debt": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "invoiceText": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "paymentReference": {
-            "type": "string"
-          },
-          "lines": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/NoticeLineSeedRequest"
-            }
           }
         }
       },

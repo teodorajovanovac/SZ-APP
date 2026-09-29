@@ -880,29 +880,23 @@ public sealed class BillingService(
     public Task<NoticeGenerationResponse> GenerateNoticesAsync(int companyId, int batchId, GenerateNoticesRequest request, CancellationToken ct) =>
         ExecuteSerializableAsync(() => GenerateNoticesCoreAsync(companyId, batchId, request, ct), ct);
 
+    // FIN-12: debt/lines/count are computed here from the general ledger (9.5), never taken from
+    // the client. Regenerating an already-generated batch requires Confirm (legacy: confirm, then
+    // delete-and-recreate).
     private async Task<NoticeGenerationResponse> GenerateNoticesCoreAsync(int companyId, int batchId, GenerateNoticesRequest request, CancellationToken ct)
     {
         await LockNoticeBatchAsync(batchId, ct);
-        var batch = await db.Set<NoticeBatch>().Include(x => x.Notices).SingleOrDefaultAsync(x => x.Id == batchId && x.CompanyId == companyId, ct)
+        var batch = await db.Set<NoticeBatch>().Include(x => x.Notices).ThenInclude(x => x.Lines)
+                .SingleOrDefaultAsync(x => x.Id == batchId && x.CompanyId == companyId, ct)
             ?? throw new DomainRuleException("notice.batch-not-found", "Serija opomena ne postoji.");
-        var normalized = request.Notices.OrderBy(x => x.PartnerAccountId).ToArray();
-        var fingerprint = BillingCalculator.CreateDeterministicKey(normalized);
-        if (batch.GenerationFingerprint is not null)
-        {
-            if (batch.GenerationFingerprint != fingerprint) throw new DomainRuleException("notice.batch-input-changed", "Opomene su već generisane sa drugačijim ulazom.");
-            return new(batchId, true, batch.Notices.OrderBy(x => x.Id).Select(x => x.Id).ToArray());
-        }
 
-        // SEC-06: NoticeLine.InvoiceId comes from the client -- validate every referenced invoice
-        // belongs to this company before it's written (one query, not per-line).
-        var noticeInvoiceIds = normalized.SelectMany(x => x.Lines)
-            .Select(x => x.InvoiceId).Where(id => id is not null).Select(id => id!.Value).Distinct().ToArray();
-        if (noticeInvoiceIds.Length > 0)
+        if (batch.Notices.Count > 0)
         {
-            var validInvoiceCount = await db.Invoices.AsNoTracking()
-                .CountAsync(x => noticeInvoiceIds.Contains(x.Id) && x.CompanyId == companyId, ct);
-            if (validInvoiceCount != noticeInvoiceIds.Length)
-                throw new DomainRuleException("notice.invoice-not-found", "Račun u stavci opomene ne pripada aktivnoj kompaniji.");
+            if (!request.Confirm)
+                throw new DomainRuleException("notice.regenerate-confirm-required", "Opomene za ovu seriju već postoje. Potvrdite ponovno generisanje.");
+            db.RemoveRange(batch.Notices.SelectMany(x => x.Lines));
+            db.RemoveRange(batch.Notices);
+            batch.Notices.Clear();
         }
 
         var noticeTypeCode = await db.ShortLists.AsNoTracking().Where(x => x.Id == batch.NoticeTypeId).Select(x => x.IndexValue).SingleAsync(ct);
@@ -911,41 +905,48 @@ public sealed class BillingService(
             && batch.AditionalCostsLowerLimit is { } lowerLimit && batch.AditionalCostsUpperAmount is { } upperAmount
             ? new(lowerAmount, lowerLimit, upperAmount)
             : null;
-        foreach (var seed in normalized.Where(x => x.UnpaidInvoiceCount >= batch.MinUnpaidInvoiceCount && x.Debt > batch.DebtTolerance))
+
+        var glLines = await (
+                from e in db.LedgerEntries.AsNoTracking()
+                join pa in db.Set<PartnerAccount>().AsNoTracking() on EF.Property<int?>(e, "PartnerAccountId") equals (int?)pa.Id
+                where e.CompanyId == companyId && e.Account == LedgerAccounts.Customers && e.JournalEntry.IsPosted
+                select new NoticeGlLine(pa.Id, pa.AccountNumber, e.DocumentRef, e.InvoiceId, e.DebitAmount, e.CreditAmount,
+                    e.PostingDate, e.DueDate, e.Description ?? e.Note))
+            .ToArrayAsync(ct);
+
+        var candidates = NoticeGenerator.Generate(glLines, batch.UpToPaymentDate, batch.UpToClaimDate,
+            batch.DebtTolerance, batch.DebtToleranceByMonth, batch.MinUnpaidInvoiceCount);
+
+        foreach (var candidate in candidates)
         {
             // P11: the cost is computed here from the batch snapshot, never taken from the client.
-            var cost = NoticeCostCalculator.Cost(FinanceRounding.Money(seed.Debt), thresholds, carriesCost);
-            if (!await db.Set<PartnerAccount>().AnyAsync(x => x.Id == seed.PartnerAccountId && x.CompanyId == companyId, ct))
-                throw new DomainRuleException("notice.partner-account-not-found", "Konto partnera ne pripada aktivnoj kompaniji.");
+            var cost = NoticeCostCalculator.Cost(candidate.Debt, thresholds, carriesCost);
+            var raw = $"{companyId}-{candidate.AccountNumber}-P{batch.Date:yyyyMMdd}";
             var notice = new Notice
             {
                 CompanyId = companyId,
-                PartnerAccountId = seed.PartnerAccountId,
-                UnpaidInvoiceCount = seed.UnpaidInvoiceCount,
-                Debt = FinanceRounding.Money(seed.Debt),
-                InvoiceText = Trim(seed.InvoiceText, 255),
-                PaymentReference = Required(seed.PaymentReference, 50, "Poziv na broj"),
+                PartnerAccountId = candidate.PartnerAccountId,
+                UnpaidInvoiceCount = candidate.Lines.Count,
+                Debt = candidate.Debt,
+                PaymentReference = Kb97.WithControl(raw),
                 AdditionalCosts = cost,
-                Total = BillingCalculator.CalculateNoticeTotal(FinanceRounding.Money(seed.Debt), cost)
+                Total = BillingCalculator.CalculateNoticeTotal(candidate.Debt, cost)
             };
-            foreach (var line in seed.Lines)
+            foreach (var line in candidate.Lines)
             {
                 notice.Lines.Add(new NoticeLine
                 {
-                    DocumentRef = Required(line.DocumentRef, 255, "Dokument"),
-                    Debit = FinanceRounding.Money(line.Debit),
-                    Credit = FinanceRounding.Money(line.Credit),
-                    Sum = FinanceRounding.Money(line.Debit - line.Credit),
-                    Text = Required(line.Text, 255, "Opis"),
-                    DueDate = line.DueDate,
-                    InvoiceId = line.InvoiceId,
-                    InvoiceDate = line.InvoiceDate,
-                    UnitAddress = Trim(line.UnitAddress, 255)
+                    DocumentRef = Trim(line.DocumentRef, 255) ?? string.Empty,
+                    Debit = line.Debit,
+                    Credit = line.Credit,
+                    Sum = line.Sum,
+                    Text = Trim(line.Description, 255) ?? Trim(line.DocumentRef, 255) ?? string.Empty,
+                    DueDate = line.DueDate ?? batch.Date,
+                    InvoiceId = line.InvoiceId
                 });
             }
             batch.Notices.Add(notice);
         }
-        batch.GenerationFingerprint = fingerprint;
         await db.SaveChangesAsync(ct);
         return new(batchId, false, batch.Notices.OrderBy(x => x.Id).Select(x => x.Id).ToArray());
     }

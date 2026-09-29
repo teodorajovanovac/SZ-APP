@@ -259,24 +259,6 @@ public sealed record CreateNoticeBatchRequest(
     int? InvoiceBatchId,
     string? CustomCaptionOnSlip);
 
-public sealed record NoticeLineSeedRequest(
-    string DocumentRef,
-    decimal Debit,
-    decimal Credit,
-    string Text,
-    DateOnly DueDate,
-    int? InvoiceId,
-    DateOnly? InvoiceDate,
-    string? UnitAddress);
-
-public sealed record NoticeSeedRequest(
-    int PartnerAccountId,
-    int UnpaidInvoiceCount,
-    decimal Debt,
-    string? InvoiceText,
-    string PaymentReference,
-    IReadOnlyList<NoticeLineSeedRequest> Lines);
-
 /// <summary>P11 NoticeAditionalCosts row. CompanyId null = global (Root only).</summary>
 public sealed record NoticeAditionalCostResponse(
     int Id,
@@ -296,7 +278,12 @@ public sealed record SaveNoticeAditionalCostRequest(
     decimal AditionalCostsUpperAmount,
     string? RowVersion);
 
-public sealed record GenerateNoticesRequest(IReadOnlyList<NoticeSeedRequest> Notices);
+/// <summary>
+/// FIN-12: debt/lines are computed server-side from the general ledger (9.5); the client sends
+/// nothing but the regeneration confirmation. Confirm is required when the batch already has notices
+/// (legacy: regenerating for company+date+title asks to confirm, then delete-and-recreate).
+/// </summary>
+public sealed record GenerateNoticesRequest(bool Confirm = false);
 public sealed record NoticeGenerationResponse(int BatchId, bool AlreadyGenerated, IReadOnlyList<int> NoticeIds);
 public sealed record NoticeResponse(
     int Id,
