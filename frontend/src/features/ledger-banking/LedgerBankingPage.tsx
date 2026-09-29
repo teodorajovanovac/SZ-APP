@@ -12,6 +12,8 @@ import { ServerDataTable } from '../../shared/components/ServerDataTable'
 import { ledgerBankingApi } from './ledgerBankingApi'
 import { canPostJournal, canPostStatement, formatMoney } from './ledgerBankingFormat'
 import type { BankStatementSummary, JournalEntrySummary, PostingPeriodLock } from './types'
+import { BankStatementUpload } from './BankStatementUpload'
+import { BankStatementMatchingDialog } from './BankStatementMatchingDialog'
 
 const statementStatusColor: Record<BankStatementSummary['status'], 'default' | 'warning' | 'info' | 'success'> = {
   Imported: 'default',
@@ -196,6 +198,7 @@ function StatementPanel({ companyId, canPost }: { companyId: number; canPost: bo
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 25 })
   const [sorting, setSorting] = useState<SortingState>([])
   const [pendingStatement, setPendingStatement] = useState<BankStatementSummary | null>(null)
+  const [openStatementId, setOpenStatementId] = useState<number | null>(null)
   const statements = useQuery({
     queryKey: ['bank-statements', companyId, pagination],
     queryFn: () => ledgerBankingApi.statements.list(companyId, pagination.pageIndex, pagination.pageSize),
@@ -231,17 +234,23 @@ function StatementPanel({ companyId, canPost }: { companyId: number; canPost: bo
       {
         id: 'actions',
         header: t('ledgerBanking.statementColumns.action'),
-        cell: ({ row }) =>
-          canPost ? (
-            <Button
-              size="small"
-              variant="contained"
-              disabled={!canPostStatement(row.original) || post.isPending}
-              onClick={() => setPendingStatement(row.original)}
-            >
-              {t('ledgerBanking.post')}
+        cell: ({ row }) => (
+          <Stack direction="row" spacing={1}>
+            <Button size="small" onClick={() => setOpenStatementId(row.original.id)}>
+              {t('bankMatch_.linesPanel')}
             </Button>
-          ) : null,
+            {canPost ? (
+              <Button
+                size="small"
+                variant="contained"
+                disabled={!canPostStatement(row.original) || post.isPending}
+                onClick={() => setPendingStatement(row.original)}
+              >
+                {t('ledgerBanking.post')}
+              </Button>
+            ) : null}
+          </Stack>
+        ),
       },
     ],
     [post, canPost, t],
@@ -250,6 +259,7 @@ function StatementPanel({ companyId, canPost }: { companyId: number; canPost: bo
   return (
     <Stack spacing={2}>
       <Typography variant="body2" color="text.secondary">{t('ledgerBanking.statementsHint')}</Typography>
+      <BankStatementUpload companyId={companyId} onImported={setOpenStatementId} />
       {statements.isError ? <Alert severity="error">{t('ledgerBanking.loadFailed')}</Alert> : null}
       <MutationError error={post.error} />
       <ServerDataTable
@@ -279,6 +289,12 @@ function StatementPanel({ companyId, canPost }: { companyId: number; canPost: bo
           if (pendingStatement) post.mutate(pendingStatement)
           setPendingStatement(null)
         }}
+      />
+      <BankStatementMatchingDialog
+        companyId={companyId}
+        statementId={openStatementId}
+        canPost={canPost}
+        onClose={() => setOpenStatementId(null)}
       />
     </Stack>
   )

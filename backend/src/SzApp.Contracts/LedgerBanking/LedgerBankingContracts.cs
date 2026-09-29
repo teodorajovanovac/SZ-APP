@@ -94,21 +94,79 @@ public sealed record BankStatementLineResponse(
     int Id,
     int LineNumber,
     string PayerRecipientName,
+    string? BankAccountNumber,
+    string? Info,
+    int? Code,
     decimal Debit,
     decimal Credit,
     string? PaymentReference,
     string Status,
-    int? PartnerAccountId,
-    string? SubAccountId,
-    string? CounterAccount,
+    string? MatchSource,
+    bool IsConfidentMatch,
+    string? MatchNote,
     string? BankRef,
+    string RowVersion,
+    IReadOnlyCollection<BankStatementAllocationResponse> Allocations);
+
+public sealed record BankStatementAllocationResponse(
+    int Id,
+    string Account,
+    int? PartnerAccountId,
+    string? PartnerName,
+    decimal Amount,
+    string Kind,
+    string? SubAccountId,
+    string? Parameters,
+    string? DocumentRef,
+    int? InvoiceId,
+    int? SupplierInvoiceId,
+    int? CollectionPriority,
+    int? ClosesDocumentType);
+
+public sealed record BankStatementAllocationRequest(
+    string Account,
+    int? PartnerAccountId,
+    decimal Amount,
+    string? SubAccountId,
+    string? Parameters,
+    string? DocumentRef,
+    int? InvoiceId,
+    int? SupplierInvoiceId,
+    int? CollectionPriority,
+    int? ClosesDocumentType);
+
+/// <summary>Accept the stored proposals as they are (Allocations null) or replace them with a manual split.</summary>
+public sealed record AcceptBankStatementLineRequest(
+    IReadOnlyCollection<BankStatementAllocationRequest>? Allocations,
     string RowVersion);
 
-public sealed record MatchBankStatementLineRequest(
+/// <summary>Re-run auto-matching for one line with a chosen partner (e.g. after "/" partner search).</summary>
+public sealed record AssignPartnerRequest(int PartnerAccountId, string RowVersion);
+
+public sealed record SavePayerAccountRequest(int PartnerAccountId);
+
+public sealed record CreateTemplateFromLineRequest(int PartnerAccountId, string? Name, string? SubAccountId);
+
+public sealed record BankTemplateConditionResponse(string Field, string Function, string Value);
+
+public sealed record BankTemplateResponse(
+    int Id,
+    string Name,
     int? PartnerAccountId,
     string? SubAccountId,
-    string CounterAccount,
-    string RowVersion);
+    bool IsActive,
+    IReadOnlyCollection<BankTemplateConditionResponse> Conditions);
+
+public sealed record BankStatementFormatResponse(int BankCode, string Name, bool IsSupported);
+
+public sealed record BankStatementImportResultResponse(
+    BankStatementResponse Statement,
+    bool AlreadyImported,
+    int BankCode,
+    string FormatName,
+    IReadOnlyCollection<string> Warnings);
+
+public sealed record MatchPartnerOptionResponse(int PartnerAccountId, string Account, int AccountNumber, string PartnerName);
 
 public sealed record BankStatementResponse(
     BankStatementSummaryResponse Header,

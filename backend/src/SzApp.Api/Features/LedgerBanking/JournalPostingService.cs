@@ -16,6 +16,7 @@ public interface IJournalPostingService
     Task<PostingResultResponse> PostAsync(int companyId, int journalEntryId, int staffId, byte[] expectedRowVersion, CancellationToken cancellationToken);
     Task<PostingResultResponse> ReverseAsync(int companyId, int journalEntryId, int staffId, byte[] expectedRowVersion, CancellationToken cancellationToken);
     Task<LedgerPostingResult> PostSourceAsync(LedgerPostingRequest request, int staffId, CancellationToken cancellationToken);
+    Task<JournalEntry> PostLinesAsync(int companyId, DateOnly postingDate, string description, IReadOnlyList<PostingLine> lines, int staffId, int? reversalOfId, CancellationToken cancellationToken);
 }
 
 public sealed class JournalPostingService(
@@ -200,6 +201,44 @@ public sealed class JournalPostingService(
             });
             await dbContext.SaveChangesAsync(cancellationToken);
             return new LedgerPostingResult(journal.Id, false);
+        }, cancellationToken);
+
+    /// <summary>
+    /// Posts already-built document lines (DocumentPostingRules / BankStatementPostingRules) as one
+    /// journal: validates accounts, partners and sub-accounts, period guard, balance. Runs inside the
+    /// caller's transaction when there is one.
+    /// </summary>
+    public Task<JournalEntry> PostLinesAsync(
+        int companyId,
+        DateOnly postingDate,
+        string description,
+        IReadOnlyList<PostingLine> lines,
+        int staffId,
+        int? reversalOfId,
+        CancellationToken cancellationToken) =>
+        ExecuteSerializableAsync(async () =>
+        {
+            if (lines.Count == 0)
+            {
+                throw new DomainRuleException("posting.empty", "Dokument nema stavki za knjiženje.");
+            }
+
+            await EnsurePostingAccountsAsync(lines.Select(x => x.Account), cancellationToken);
+            await EnsurePartnerAccountsAsync(companyId, lines.Select(x => x.PartnerAccountId), cancellationToken);
+            await EnsureSubAccountsAsync(lines.Select(x => x.SubAccountId), cancellationToken);
+            var journal = new JournalEntry
+            {
+                CompanyId = companyId,
+                PostingDate = postingDate,
+                Description = Clip(description, 255),
+                Currency = "RSD",
+                ReversalOfId = reversalOfId,
+                IsPosted = false
+            };
+            await AddLinesAsync(journal, lines, cancellationToken);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            await PostTrackedJournalAsync(journal, staffId, cancellationToken);
+            return journal;
         }, cancellationToken);
 
     private async Task PostTrackedJournalAsync(JournalEntry journal, int staffId, CancellationToken cancellationToken)

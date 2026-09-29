@@ -13,6 +13,7 @@ public static class LedgerBankingModelBuilderExtensions
         new SubAccountConfiguration().Configure(builder.Entity<SubAccount>());
         new BankStatementConfiguration().Configure(builder.Entity<BankStatement>());
         new BankStatementLineConfiguration().Configure(builder.Entity<BankStatementLine>());
+        new BankStatementLineAllocationConfiguration().Configure(builder.Entity<BankStatementLineAllocation>());
         new BankInFlowConfiguration().Configure(builder.Entity<BankInFlow>());
         new BankStatementPostingTemplateConfiguration().Configure(builder.Entity<BankStatementPostingTemplate>());
         new PostingSchemeConfiguration().Configure(builder.Entity<PostingScheme>());
@@ -77,6 +78,7 @@ public sealed class BankStatementConfiguration : IEntityTypeConfiguration<BankSt
         entity.Property(x => x.Debit).HasPrecision(18, 2);
         entity.Property(x => x.Credit).HasPrecision(18, 2);
         entity.Property(x => x.Note).HasMaxLength(255);
+        entity.Property(x => x.SourceFileName).HasMaxLength(255);
         entity.Property(x => x.Status).HasConversion<int>();
         entity.Property(x => x.RowVersion).IsRowVersion();
         entity.HasAlternateKey(x => new { x.Id, x.CompanyId });
@@ -115,6 +117,8 @@ public sealed class BankStatementLineConfiguration : IEntityTypeConfiguration<Ba
         entity.Property(x => x.CounterAccount).HasMaxLength(10).IsUnicode(false);
         entity.Property(x => x.Status).HasConversion<int>();
         entity.Property(x => x.BankRef).HasMaxLength(50);
+        entity.Property(x => x.MatchSource).HasMaxLength(20).IsUnicode(false);
+        entity.Property(x => x.MatchNote).HasMaxLength(255);
         entity.Property(x => x.RowVersion).IsRowVersion();
         entity.HasAlternateKey(x => new { x.Id, x.CompanyId });
         entity.HasIndex(x => new { x.BankStatementId, x.LineNumber }).IsUnique();
@@ -128,6 +132,32 @@ public sealed class BankStatementLineConfiguration : IEntityTypeConfiguration<Ba
         entity.HasOne(x => x.SubAccount).WithMany().HasForeignKey(x => x.SubAccountId).OnDelete(DeleteBehavior.NoAction);
         entity.HasOne<PartnerAccount>().WithMany().HasForeignKey(x => x.PartnerAccountId).OnDelete(DeleteBehavior.NoAction);
         entity.HasOne<ChartAccount>().WithMany().HasForeignKey(x => x.CounterAccount).OnDelete(DeleteBehavior.NoAction);
+    }
+}
+
+public sealed class BankStatementLineAllocationConfiguration : IEntityTypeConfiguration<BankStatementLineAllocation>
+{
+    public void Configure(EntityTypeBuilder<BankStatementLineAllocation> entity)
+    {
+        entity.ToTable("BankStatementLineAllocation", "finance", table =>
+            table.HasCheckConstraint("CK_BankStatementLineAllocation_Amount", "[Amount] <> 0"));
+        entity.HasKey(x => x.Id);
+        entity.Property(x => x.Id).UseIdentityColumn();
+        entity.Property(x => x.Account).HasMaxLength(10).IsUnicode(false);
+        entity.Property(x => x.Amount).HasPrecision(18, 2);
+        entity.Property(x => x.Kind).HasMaxLength(20).IsUnicode(false);
+        entity.Property(x => x.SubAccountId).HasMaxLength(10).IsUnicode(false);
+        entity.Property(x => x.Parameters).HasMaxLength(25);
+        entity.Property(x => x.DocumentRef).HasMaxLength(50);
+        entity.HasIndex(x => new { x.BankStatementLineId, x.SortIndex });
+        entity.HasOne(x => x.BankStatementLine).WithMany(x => x.Allocations)
+            .HasForeignKey(x => new { x.BankStatementLineId, x.CompanyId })
+            .HasPrincipalKey(x => new { x.Id, x.CompanyId })
+            .OnDelete(DeleteBehavior.Cascade);
+        entity.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.NoAction);
+        entity.HasOne<ChartAccount>().WithMany().HasForeignKey(x => x.Account).OnDelete(DeleteBehavior.NoAction);
+        entity.HasOne<PartnerAccount>().WithMany().HasForeignKey(x => x.PartnerAccountId).OnDelete(DeleteBehavior.NoAction);
+        entity.HasOne<SubAccount>().WithMany().HasForeignKey(x => x.SubAccountId).OnDelete(DeleteBehavior.NoAction);
     }
 }
 

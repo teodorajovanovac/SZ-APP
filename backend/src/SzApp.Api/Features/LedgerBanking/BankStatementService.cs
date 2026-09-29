@@ -7,26 +7,132 @@ using SzApp.Data.Entities;
 using SzApp.Data.Entities.LedgerBanking;
 using SzApp.Domain;
 using SzApp.Domain.LedgerBanking;
+using SzApp.Domain.LedgerBanking.StatementParsing;
 
 namespace SzApp.Api.Features.LedgerBanking;
 
 public interface IBankStatementService
 {
     Task<BankStatementResponse> ImportAsync(int companyId, BankStatementImportRequest request, CancellationToken cancellationToken);
-    Task<BankStatementLineResponse> MatchAsync(int companyId, int lineId, MatchBankStatementLineRequest request, CancellationToken cancellationToken);
-    Task<BankStatementLineResponse> IgnoreAsync(int companyId, int lineId, byte[] expectedRowVersion, CancellationToken cancellationToken);
+    Task<BankStatementImportResultResponse> ImportFileAsync(int companyId, string fileName, byte[] content, int? bankCode, int? bankAccountId, CancellationToken cancellationToken);
+    Task<BankStatementResponse?> GetAsync(int companyId, int statementId, CancellationToken cancellationToken);
+    Task<BankStatementResponse> RematchAsync(int companyId, int statementId, CancellationToken cancellationToken);
+    Task<BankStatementLineResponse> AcceptLineAsync(int companyId, int lineId, AcceptBankStatementLineRequest request, CancellationToken cancellationToken);
+    Task<BankStatementLineResponse> ReopenLineAsync(int companyId, int lineId, byte[] expectedRowVersion, CancellationToken cancellationToken);
+    Task<BankStatementLineResponse> AssignPartnerAsync(int companyId, int lineId, AssignPartnerRequest request, CancellationToken cancellationToken);
+    Task<BankStatementResponse> AcceptConfidentAsync(int companyId, int statementId, CancellationToken cancellationToken);
+    Task SavePayerAccountAsync(int companyId, int lineId, int partnerAccountId, CancellationToken cancellationToken);
+    Task<BankTemplateResponse> CreateTemplateFromLineAsync(int companyId, int lineId, CreateTemplateFromLineRequest request, CancellationToken cancellationToken);
     Task<PostingResultResponse> PostAsync(int companyId, int statementId, int staffId, byte[] expectedRowVersion, CancellationToken cancellationToken);
+    Task<PostingResultResponse> UnpostAsync(int companyId, int statementId, int staffId, byte[] expectedRowVersion, CancellationToken cancellationToken);
 }
 
-public sealed class BankStatementService(
+public sealed partial class BankStatementService(
     SzAppDbContext dbContext,
-    LedgerMutationScope mutationScope,
-    TimeProvider timeProvider,
-    PostingPeriodGuard periodGuard) : IBankStatementService
+    BankStatementMatchingService matching,
+    IJournalPostingService journals) : IBankStatementService
 {
+    /// <summary>Manual/JSON import (no file). Same checks as the file import, then auto-matching.</summary>
     public async Task<BankStatementResponse> ImportAsync(
         int companyId,
         BankStatementImportRequest request,
+        CancellationToken cancellationToken)
+    {
+        var (statement, _) = await CreateAsync(companyId, request, null, cancellationToken);
+        return await GetAsync(companyId, statement.Id, cancellationToken) ?? throw new KeyNotFoundException();
+    }
+
+    /// <summary>
+    /// GAP-04: parse a bank file (format chosen or detected), resolve the company's bank account,
+    /// check the sum (strict), duplicates (account, number, year) and continuity with the previous
+    /// statement (FIN-14, warning only), create the statement (Imported) and propose matches.
+    /// </summary>
+    public async Task<BankStatementImportResultResponse> ImportFileAsync(
+        int companyId,
+        string fileName,
+        byte[] content,
+        int? bankCode,
+        int? bankAccountId,
+        CancellationToken cancellationToken)
+    {
+        var parser = BankStatementParsers.Resolve(fileName, bankCode);
+        var parsed = BankStatementParsers.Parse(fileName, content, parser.BankCode);
+        var warnings = new List<string>();
+        var bankAccount = await ResolveCompanyBankAccountAsync(companyId, parsed.AccountNumber, bankAccountId, cancellationToken);
+
+        if (parsed.DeclaredCount is { } count && count != parsed.Lines.Count)
+        {
+            throw new DomainRuleException("statement.count-mismatch", $"Izvod najavljuje {count} stavki, a sadrži {parsed.Lines.Count}.");
+        }
+
+        var existing = await dbContext.Set<BankStatement>().AsNoTracking()
+            .Where(x => x.CompanyId == companyId && x.BankAccountId == bankAccount.Id &&
+                        x.StatementNumber == parsed.StatementNumber && x.Date.Year == parsed.Date.Year)
+            .Select(x => new { x.Id, x.Date })
+            .FirstOrDefaultAsync(cancellationToken);
+        if (existing is not null)
+        {
+            if (existing.Date != parsed.Date)
+            {
+                throw new DomainRuleException("statement.duplicate", $"Izvod br. {parsed.StatementNumber}/{parsed.Date.Year} za ovaj račun je već uvezen (datum {existing.Date:dd.MM.yyyy}).");
+            }
+
+            var already = await GetAsync(companyId, existing.Id, cancellationToken) ?? throw new KeyNotFoundException();
+            return new BankStatementImportResultResponse(already, true, parser.BankCode, parser.Name,
+                [$"Izvod br. {parsed.StatementNumber}/{parsed.Date.Year} je već uvezen."]);
+        }
+
+        var previous = await dbContext.Set<BankStatement>().AsNoTracking()
+            .Where(x => x.CompanyId == companyId && x.BankAccountId == bankAccount.Id &&
+                        (x.Date < parsed.Date || (x.Date == parsed.Date && x.StatementNumber < parsed.StatementNumber)))
+            .OrderByDescending(x => x.Date).ThenByDescending(x => x.StatementNumber)
+            .Select(x => new { x.StatementNumber, x.Date, x.NewBalance })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var debit = FinanceRounding.Money(parsed.Lines.Sum(x => x.Debit));
+        var credit = FinanceRounding.Money(parsed.Lines.Sum(x => x.Credit));
+        decimal previousBalance;
+        decimal newBalance;
+        if (parsed.PreviousBalance is { } fromFile)
+        {
+            previousBalance = fromFile;
+            newBalance = parsed.NewBalance ?? fromFile + credit - debit;
+            if (previous is not null && FinanceRounding.Money(previous.NewBalance) != FinanceRounding.Money(fromFile))
+            {
+                warnings.Add($"Prethodno stanje {fromFile:N2} ne odgovara novom stanju prethodnog izvoda br. {previous.StatementNumber} ({previous.NewBalance:N2}) — proverite da li nedostaje izvod.");
+            }
+        }
+        else
+        {
+            // 170 TXT carries no balances (owner decision): continue from the previous statement.
+            previousBalance = previous?.NewBalance ?? 0m;
+            newBalance = previousBalance + credit - debit;
+            warnings.Add(previous is null
+                ? "Fajl nema stanja, a nema ni prethodnog izvoda — početno stanje je uzeto kao 0. Proverite."
+                : $"Fajl nema stanja — početno stanje preuzeto sa izvoda br. {previous.StatementNumber} ({previousBalance:N2}).");
+        }
+
+        var request = new BankStatementImportRequest(
+            bankAccount.Id,
+            LedgerAccounts.Bank,
+            parsed.StatementNumber,
+            parsed.Date.Year.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            parsed.Date,
+            previousBalance,
+            newBalance,
+            parsed.DeclaredDebit ?? debit,
+            parsed.DeclaredCredit ?? credit,
+            parsed.Lines.Select(x => new BankStatementLineImportRequest(
+                x.LineNumber, x.PayerName, x.PayerAccount, x.Debit, x.Credit, x.Info, x.Code, x.PaymentReference, null, null)).ToArray());
+        var (statement, alreadyImported) = await CreateAsync(companyId, request, StatementText.ClipOrNull(Path.GetFileName(fileName), 255), cancellationToken);
+        var response = await GetAsync(companyId, statement.Id, cancellationToken) ?? throw new KeyNotFoundException();
+        return new BankStatementImportResultResponse(response, alreadyImported, parser.BankCode, parser.Name, warnings);
+    }
+
+    private async Task<(BankStatement Statement, bool AlreadyImported)> CreateAsync(
+        int companyId,
+        BankStatementImportRequest request,
+        string? sourceFileName,
         CancellationToken cancellationToken)
     {
         if (request.Lines.Select(x => x.LineNumber).Distinct().Count() != request.Lines.Count)
@@ -46,13 +152,14 @@ public sealed class BankStatementService(
         {
             throw new DomainRuleException("statement.invalid-bank-account", "Bankovni račun ne pripada kompaniji ili nije aktivan.");
         }
-        await EnsurePostingAccountAsync(request.LedgerAccount, cancellationToken);
 
+        await EnsurePostingAccountsAsync([request.LedgerAccount.Trim()], cancellationToken);
+        var suffix = request.StatementSuffix?.Trim();
         var existing = await dbContext.Set<BankStatement>().AsNoTracking().Include(x => x.Lines)
             .SingleOrDefaultAsync(x => x.CompanyId == companyId &&
                                        x.BankAccountId == request.BankAccountId &&
                                        x.StatementNumber == request.StatementNumber &&
-                                       x.StatementSuffix == request.StatementSuffix &&
+                                       x.StatementSuffix == suffix &&
                                        x.Date == request.Date, cancellationToken);
         if (existing is not null)
         {
@@ -63,7 +170,7 @@ public sealed class BankStatementService(
                 throw new DomainRuleException("statement.duplicate-conflict", "Izvod sa istim identitetom već postoji sa drugačijim sadržajem.");
             }
 
-            return MapStatement(existing);
+            return (existing, true);
         }
 
         var statement = new BankStatement
@@ -72,7 +179,7 @@ public sealed class BankStatementService(
             BankAccountId = request.BankAccountId,
             LedgerAccount = request.LedgerAccount.Trim(),
             StatementNumber = request.StatementNumber,
-            StatementSuffix = request.StatementSuffix?.Trim(),
+            StatementSuffix = suffix,
             Date = request.Date,
             PreviousBalance = totals.PreviousBalance,
             NewBalance = totals.NewBalance,
@@ -80,6 +187,7 @@ public sealed class BankStatementService(
             Credit = totals.Credit,
             CountDebitEntry = totals.DebitCount,
             CountCreditEntry = totals.CreditCount,
+            SourceFileName = sourceFileName,
             Status = BankStatementStatus.Imported
         };
 
@@ -89,212 +197,69 @@ public sealed class BankStatementService(
             {
                 CompanyId = companyId,
                 LineNumber = line.LineNumber,
-                PayerRecipientName = line.PayerRecipientName.Trim(),
-                BankAccountNumber = line.BankAccountNumber?.Trim(),
+                PayerRecipientName = StatementText.Clip(line.PayerRecipientName, 255),
+                BankAccountNumber = StatementText.ClipOrNull(StatementText.NormalizeAccount(line.BankAccountNumber), 50),
                 Debit = FinanceRounding.Money(line.Debit),
                 Credit = FinanceRounding.Money(line.Credit),
-                Info = line.Info?.Trim(),
+                Info = StatementText.ClipOrNull(line.Info, 255),
                 Code = line.Code,
-                PaymentReference = line.PaymentReference?.Trim(),
-                PaymentReferenceOut = line.PaymentReferenceOut?.Trim(),
-                BankRef = line.BankRef?.Trim(),
+                PaymentReference = StatementText.ClipOrNull(line.PaymentReference, 50),
+                PaymentReferenceOut = StatementText.ClipOrNull(line.PaymentReferenceOut, 50),
+                BankRef = StatementText.ClipOrNull(line.BankRef, 50),
                 Status = BankStatementLineStatus.Pending
             });
         }
 
         dbContext.Set<BankStatement>().Add(statement);
+        await matching.MatchStatementAsync(statement, cancellationToken); // GAP-05: proposals right after import
         try
         {
             await dbContext.SaveChangesAsync(cancellationToken);
         }
         catch (DbUpdateException exception) when (exception.InnerException is SqlException { Number: 2601 or 2627 })
         {
-            // The unconditional unique index on (CompanyId, BankAccountId, StatementNumber,
-            // StatementSuffix, Date) is the real dedup guard for concurrent imports racing
-            // past the plain read above - translate the violation into a clear message
-            // instead of letting it surface as an opaque conflict.
-            throw new DbUpdateException("Ovaj izvod je već uvezen.", exception.InnerException);
-        }
-        return MapStatement(statement);
-    }
-
-    public async Task<BankStatementLineResponse> MatchAsync(
-        int companyId,
-        int lineId,
-        MatchBankStatementLineRequest request,
-        CancellationToken cancellationToken)
-    {
-        var line = await dbContext.Set<BankStatementLine>().Include(x => x.BankStatement)
-            .SingleOrDefaultAsync(x => x.Id == lineId && x.CompanyId == companyId, cancellationToken)
-            ?? throw new KeyNotFoundException("Stavka izvoda nije pronađena.");
-        EnsureStatementMutable(line.BankStatement);
-        EnsureExpectedVersion(Convert.FromBase64String(request.RowVersion), line.RowVersion);
-        await EnsurePostingAccountAsync(request.CounterAccount, cancellationToken);
-        if (request.PartnerAccountId.HasValue && !await dbContext.Set<PartnerAccount>().AnyAsync(
-                x => x.Id == request.PartnerAccountId && x.CompanyId == companyId, cancellationToken))
-        {
-            throw new DomainRuleException("statement.partner-account-not-found", "Konto partnera ne pripada aktivnoj kompaniji.");
+            // The unique index is the real dedup guard for concurrent imports racing past the read above.
+            throw new DomainRuleException("statement.duplicate", "Ovaj izvod je već uvezen.");
         }
 
-        line.PartnerAccountId = request.PartnerAccountId;
-        line.SubAccountId = NullIfWhiteSpace(request.SubAccountId);
-        line.CounterAccount = request.CounterAccount.Trim();
-        line.Status = BankStatementLineStatus.Matched;
-        UpdateStatementStatus(line.BankStatement);
-        await dbContext.SaveChangesAsync(cancellationToken);
-        return MapLine(line);
+        return (statement, false);
     }
 
-    public async Task<BankStatementLineResponse> IgnoreAsync(
-        int companyId,
-        int lineId,
-        byte[] expectedRowVersion,
-        CancellationToken cancellationToken)
+    private async Task<BankAccount> ResolveCompanyBankAccountAsync(int companyId, string? fileAccount, int? bankAccountId, CancellationToken ct)
     {
-        var line = await dbContext.Set<BankStatementLine>().Include(x => x.BankStatement)
-            .SingleOrDefaultAsync(x => x.Id == lineId && x.CompanyId == companyId, cancellationToken)
-            ?? throw new KeyNotFoundException("Stavka izvoda nije pronađena.");
-        EnsureStatementMutable(line.BankStatement);
-        EnsureExpectedVersion(expectedRowVersion, line.RowVersion);
+        var accounts = await dbContext.Set<BankAccount>().AsNoTracking()
+            .Where(x => x.CompanyId == companyId && x.PartnerId == null && x.IsActive)
+            .ToArrayAsync(ct);
+        var normalized = StatementText.NormalizeAccount(fileAccount);
+        var byFile = normalized is null ? null : accounts.FirstOrDefault(x => StatementText.NormalizeAccount(x.AccountNumber) == normalized);
+        if (bankAccountId is { } chosenId)
+        {
+            var chosen = accounts.FirstOrDefault(x => x.Id == chosenId)
+                         ?? throw new DomainRuleException("statement.invalid-bank-account", "Bankovni račun ne pripada kompaniji ili nije aktivan.");
+            if (normalized is not null && StatementText.NormalizeAccount(chosen.AccountNumber) != normalized)
+            {
+                throw new DomainRuleException("statement.account-mismatch", $"Račun iz fajla ({normalized}) ne odgovara izabranom računu ({chosen.AccountNumber}).");
+            }
 
-        line.PartnerAccountId = null;
-        line.SubAccountId = null;
-        line.CounterAccount = null;
-        line.Status = BankStatementLineStatus.Ignored;
-        UpdateStatementStatus(line.BankStatement);
-        await dbContext.SaveChangesAsync(cancellationToken);
-        return MapLine(line);
+            return chosen;
+        }
+
+        return byFile ?? throw new DomainRuleException("statement.unknown-account",
+            normalized is null
+                ? "Račun nije naveden u fajlu — izaberite račun ručno."
+                : $"Račun {normalized} nije aktivan tekući račun ove kompanije.");
     }
 
-    public Task<PostingResultResponse> PostAsync(
-        int companyId,
-        int statementId,
-        int staffId,
-        byte[] expectedRowVersion,
-        CancellationToken cancellationToken) =>
-        ExecuteSerializableAsync(async () =>
+    private async Task EnsurePostingAccountsAsync(IEnumerable<string> accounts, CancellationToken cancellationToken)
+    {
+        var codes = accounts.Distinct(StringComparer.Ordinal).ToArray();
+        var count = await dbContext.Set<ChartAccount>().AsNoTracking()
+            .CountAsync(x => codes.Contains(x.Account) && x.IsActive && !x.IsSynthetic, cancellationToken);
+        if (count != codes.Length)
         {
-            await dbContext.Database.ExecuteSqlInterpolatedAsync(
-                $"SELECT 1 FROM [finance].[BankStatement] WITH (UPDLOCK, HOLDLOCK) WHERE [Id] = {statementId}",
-                cancellationToken);
-            var statement = await dbContext.Set<BankStatement>().Include(x => x.Lines)
-                .SingleOrDefaultAsync(x => x.Id == statementId && x.CompanyId == companyId, cancellationToken)
-                ?? throw new KeyNotFoundException("Izvod nije pronađen.");
-            EnsureExpectedVersion(expectedRowVersion, statement.RowVersion);
-
-            if (statement.Status == BankStatementStatus.Posted && statement.JournalEntryId.HasValue)
-            {
-                var postedJournal = await dbContext.JournalEntries.AsNoTracking()
-                    .SingleAsync(x => x.Id == statement.JournalEntryId.Value, cancellationToken);
-                return new PostingResultResponse(postedJournal.Id, true, Convert.ToBase64String(postedJournal.RowVersion));
-            }
-
-            if (statement.Status != BankStatementStatus.Ready || statement.Lines.Any(x => x.Status == BankStatementLineStatus.Pending))
-            {
-                throw new DomainRuleException("statement.not-ready", "Sve stavke izvoda moraju biti uparene ili ignorisane.");
-            }
-
-            var matched = statement.Lines.Where(x => x.Status == BankStatementLineStatus.Matched).ToArray();
-            if (matched.Length == 0)
-            {
-                throw new DomainRuleException("statement.no-matched-lines", "Izvod mora imati najmanje jednu uparenu stavku za knjiženje.");
-            }
-
-            var accounts = matched.Select(x => x.CounterAccount!).Append(statement.LedgerAccount);
-            await EnsurePostingAccountsAsync(accounts, cancellationToken);
-
-            var journal = new JournalEntry
-            {
-                CompanyId = companyId,
-                PostingDate = statement.Date,
-                Description = $"Izvod {statement.StatementNumber}{statement.StatementSuffix}",
-                Currency = "RSD",
-                IsPosted = false
-            };
-            var priority = 0;
-            var lineSources = new List<(LedgerEntry LedgerLine, BankStatementLine BankLine)>();
-            foreach (var bankLine in matched.OrderBy(x => x.LineNumber))
-            {
-                var amount = FinanceRounding.Money(bankLine.Debit + bankLine.Credit);
-                var bankLedgerLine = new LedgerEntry
-                {
-                    CompanyId = companyId,
-                    Account = statement.LedgerAccount,
-                    PostingDate = statement.Date,
-                    DebitAmount = bankLine.Credit > 0m ? amount : 0m,
-                    CreditAmount = bankLine.Debit > 0m ? amount : 0m,
-                    DocumentRef = bankLine.BankRef,
-                    Parameters = bankLine.PaymentReference,
-                    Description = bankLine.PayerRecipientName,
-                    Priority = ++priority
-                };
-                var counterLine = new LedgerEntry
-                {
-                    CompanyId = companyId,
-                    Account = bankLine.CounterAccount!,
-                    PostingDate = statement.Date,
-                    DebitAmount = bankLine.Debit > 0m ? amount : 0m,
-                    CreditAmount = bankLine.Credit > 0m ? amount : 0m,
-                    DocumentRef = bankLine.BankRef,
-                    Parameters = bankLine.PaymentReference,
-                    Description = bankLine.PayerRecipientName,
-                    Priority = ++priority
-                };
-                journal.Lines.Add(bankLedgerLine);
-                journal.Lines.Add(counterLine);
-                lineSources.Add((bankLedgerLine, bankLine));
-                lineSources.Add((counterLine, bankLine));
-            }
-
-            await periodGuard.EnsureOpenAsync(companyId, [statement.Date], cancellationToken); // FIN-01
-            journal.Balance = LedgerBankingRules.ValidateJournal(
-                journal.Lines.Select(x => new PostingAmounts(x.DebitAmount, x.CreditAmount)));
-            dbContext.JournalEntries.Add(journal);
-            foreach (var (ledgerLine, bankLine) in lineSources)
-            {
-                SetLedgerSource(ledgerLine, bankLine);
-            }
-            await dbContext.SaveChangesAsync(cancellationToken);
-
-            journal.IsPosted = true;
-            journal.PostedUserId = staffId;
-            journal.PostedAt = timeProvider.GetUtcNow();
-            statement.JournalEntryId = journal.Id;
-            statement.Status = BankStatementStatus.Posted;
-            foreach (var line in matched)
-            {
-                line.Status = BankStatementLineStatus.Posted;
-                if (line.Credit > 0m)
-                {
-                    dbContext.Set<BankInFlow>().Add(new BankInFlow
-                    {
-                        CompanyId = companyId,
-                        BankAccountId = statement.BankAccountId,
-                        DateInFlow = statement.Date,
-                        ReferenceNumber = line.PaymentReference ?? line.BankRef ?? $"{statement.StatementNumber}/{line.LineNumber}",
-                        Currency = "RSD",
-                        OriginalAmount = line.Credit,
-                        AmountLocalCurrency = line.Credit,
-                        PartnerAccountId = line.PartnerAccountId,
-                        InvoiceDescription = line.Info,
-                        BankStatementLineId = line.Id
-                    });
-                }
-            }
-
-            using var scope = mutationScope.AllowPosting();
-            await SetPostingSessionContextAsync(true, cancellationToken);
-            try
-            {
-                await dbContext.SaveChangesAsync(cancellationToken);
-            }
-            finally
-            {
-                await SetPostingSessionContextAsync(false, cancellationToken);
-            }
-
-            return new PostingResultResponse(journal.Id, false, Convert.ToBase64String(journal.RowVersion));
-        }, cancellationToken);
+            throw new DomainRuleException("journal.invalid-account", "Konto ne postoji, nije aktivan ili je sintetički.");
+        }
+    }
 
     private async Task<T> ExecuteSerializableAsync<T>(Func<Task<T>> operation, CancellationToken cancellationToken)
     {
@@ -308,50 +273,6 @@ public sealed class BankStatementService(
         });
     }
 
-    private Task SetPostingSessionContextAsync(bool enabled, CancellationToken cancellationToken) =>
-        dbContext.Database.ExecuteSqlInterpolatedAsync(
-            $"EXEC sys.sp_set_session_context @key=N'szapp_allow_posting', @value={(enabled ? 1 : (int?)null)}",
-            cancellationToken);
-
-    private async Task EnsurePostingAccountsAsync(IEnumerable<string> accounts, CancellationToken cancellationToken)
-    {
-        var codes = accounts.Distinct(StringComparer.Ordinal).ToArray();
-        var count = await dbContext.Set<ChartAccount>().AsNoTracking()
-            .CountAsync(x => codes.Contains(x.Account) && x.IsActive && !x.IsSynthetic, cancellationToken);
-        if (count != codes.Length)
-        {
-            throw new DomainRuleException("journal.invalid-account", "Konto ne postoji, nije aktivan ili je sintetički.");
-        }
-    }
-
-    private Task EnsurePostingAccountAsync(string account, CancellationToken cancellationToken) =>
-        EnsurePostingAccountsAsync([account.Trim()], cancellationToken);
-
-    private void SetLedgerSource(LedgerEntry ledgerLine, BankStatementLine bankLine)
-    {
-        var entry = dbContext.Entry(ledgerLine);
-        entry.Property("BankStatementLineId").CurrentValue = bankLine.Id;
-        entry.Property("PartnerAccountId").CurrentValue = bankLine.PartnerAccountId;
-        entry.Property("SubAccountId").CurrentValue = bankLine.SubAccountId;
-    }
-
-    private static void UpdateStatementStatus(BankStatement statement)
-    {
-        statement.Status = statement.Lines.All(x => x.Status is BankStatementLineStatus.Matched or BankStatementLineStatus.Ignored)
-            ? BankStatementStatus.Ready
-            : statement.Lines.Any(x => x.Status is BankStatementLineStatus.Matched or BankStatementLineStatus.Ignored)
-                ? BankStatementStatus.PartiallyMatched
-                : BankStatementStatus.Imported;
-    }
-
-    private static void EnsureStatementMutable(BankStatement statement)
-    {
-        if (statement.Status == BankStatementStatus.Posted)
-        {
-            throw new DomainRuleException("statement.posted-immutable", "Knjižen izvod se ne može menjati.");
-        }
-    }
-
     private static void EnsureExpectedVersion(byte[] expected, byte[] current)
     {
         if (expected.Length == 0 || !expected.AsSpan().SequenceEqual(current))
@@ -360,36 +281,15 @@ public sealed class BankStatementService(
         }
     }
 
-    private static string? NullIfWhiteSpace(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-
-    internal static BankStatementResponse MapStatement(BankStatement statement) => new(
-        new BankStatementSummaryResponse(
-            statement.Id,
-            statement.BankAccountId,
-            statement.StatementNumber,
-            statement.StatementSuffix,
-            statement.Date,
-            statement.PreviousBalance,
-            statement.NewBalance,
-            statement.Debit,
-            statement.Credit,
-            statement.Lines.Count,
-            statement.Status.ToString(),
-            statement.JournalEntryId,
-            Convert.ToBase64String(statement.RowVersion)),
-        statement.Lines.OrderBy(x => x.LineNumber).Select(MapLine).ToArray());
-
-    internal static BankStatementLineResponse MapLine(BankStatementLine line) => new(
-        line.Id,
-        line.LineNumber,
-        line.PayerRecipientName,
-        line.Debit,
-        line.Credit,
-        line.PaymentReference,
-        line.Status.ToString(),
-        line.PartnerAccountId,
-        line.SubAccountId,
-        line.CounterAccount,
-        line.BankRef,
-        Convert.ToBase64String(line.RowVersion));
+    internal static byte[] DecodeVersion(string value)
+    {
+        try
+        {
+            return Convert.FromBase64String(value);
+        }
+        catch (FormatException exception)
+        {
+            throw new Microsoft.AspNetCore.Http.BadHttpRequestException("RowVersion nije ispravan Base64.", exception);
+        }
+    }
 }
