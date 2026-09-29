@@ -1,14 +1,17 @@
-import { Alert, Chip, Paper, Stack, Typography } from '@mui/material'
+import { useState } from 'react'
+import { Alert, Box, Button, Chip, Paper, Stack, Typography } from '@mui/material'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { apiRequest } from '../../api/generated/client'
 import { getErrorMessage } from '../../api/problemDetails'
 import { formatDate } from '../../shared/format/date'
 import { formatMoney } from '../../shared/format/money'
+import { downloadInvoicePdf } from './billingApi'
 import type { InvoiceSummary } from './types'
 
 export function InvoiceDetail({ companyId, invoiceId }: { companyId: number; invoiceId: number }) {
   const { t } = useTranslation()
+  const [downloadError, setDownloadError] = useState(false)
   const query = useQuery({
     queryKey: ['companies', companyId, 'invoices', invoiceId],
     queryFn: () => apiRequest<InvoiceSummary>(`/api/v1/companies/${companyId}/invoices/${invoiceId}`),
@@ -27,6 +30,12 @@ export function InvoiceDetail({ companyId, invoiceId }: { companyId: number; inv
         <Typography color="text.secondary">{invoice.address}, {invoice.postalCode} {invoice.city}</Typography>
         <Typography>{t('billing_.detail.dueDate')}: {formatDate(invoice.dueDate)}</Typography>
         <Typography fontWeight={700}>{t('billing_.detail.total')}: {formatMoney(invoice.invoiceTotal, invoice.currency)}</Typography>
+        <Box>
+          <Button variant="outlined" onClick={() => { setDownloadError(false); downloadInvoicePdf(companyId, invoice.id, invoice.sequenceNumber).catch(() => setDownloadError(true)) }}>
+            {t('invoicePdf.download')}
+          </Button>
+        </Box>
+        {downloadError ? <Alert severity="error">{t('invoicePdf.failed')}</Alert> : null}
       </Stack>
     </Paper>
   )
