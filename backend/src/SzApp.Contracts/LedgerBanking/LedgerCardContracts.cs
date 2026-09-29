@@ -54,4 +54,5 @@ public sealed record SearchResultResponse(
     string? Account,
     int? UnitId,
     string? PaymentReference,
-    decimal? Balance);
+    decimal? Balance,
+    int? PartnerId = null);

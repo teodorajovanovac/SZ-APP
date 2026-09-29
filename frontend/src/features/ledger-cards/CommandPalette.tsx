@@ -9,6 +9,8 @@ import { ledgerCardsApi, type SearchResult } from './ledgerCardsApi'
 
 function targetOf(r: SearchResult): string {
   if (r.type === 'unit' && r.unitId != null) return `/units/${r.companyId}/${r.unitId}`
+  // A partner with no ledger account yet has nowhere to show a card -- send it to the partner record instead.
+  if (r.type === 'partner' && r.partnerAccountId == null && r.partnerId != null) return `/partners/${r.companyId}/${r.partnerId}`
   const params = new URLSearchParams({ companyId: String(r.companyId), account: r.account ?? '2040', partner: r.title })
   if (r.partnerAccountId != null) params.set('partnerAccountId', String(r.partnerAccountId))
   if (r.type === 'payment' && r.paymentReference) params.set('paymentReference', r.paymentReference)

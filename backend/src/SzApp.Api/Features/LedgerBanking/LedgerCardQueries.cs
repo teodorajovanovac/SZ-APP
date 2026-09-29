@@ -226,6 +226,15 @@ public static class LedgerCardQueries
             .Select(pa => new { pa.Id, pa.Account, pa.AccountNumber, pa.Partner.Name, pa.Partner.TaxNumber })
             .ToListAsync(ct);
 
+        // Partners of this company that have no ledger account yet -- still findable, they open the partner detail.
+        var partnersWithoutAccount = await db.Set<Partner>().AsNoTracking()
+            .Where(p => p.CompanyId == companyId
+                && (p.Name.Contains(term) || p.ShortName.Contains(term) || p.TaxNumber == term || p.RegistrationNumber == term)
+                && !db.Set<PartnerAccount>().Any(pa => pa.CompanyId == companyId && pa.PartnerId == p.Id))
+            .OrderBy(p => p.Name).Take(10)
+            .Select(p => new { p.Id, p.Name, p.TaxNumber })
+            .ToListAsync(ct);
+
         var reference = NormalizeReference(term);
         var payments = reference.Length < 3 ? [] : await (
                 from x in Posted(db, companyId)
@@ -251,6 +260,8 @@ public static class LedgerCardQueries
         return accounts.Select(x => new SearchResultResponse("partner", x.Name,
                 $"{x.Account} / {x.AccountNumber}" + (x.TaxNumber is null ? "" : $" · PIB {x.TaxNumber}"),
                 companyId, x.Id, x.Account, null, null, balances.GetValueOrDefault(x.Id)))
+            .Concat(partnersWithoutAccount.Select(x => new SearchResultResponse("partner", x.Name,
+                x.TaxNumber is null ? null : $"PIB {x.TaxNumber}", companyId, null, null, null, null, null, x.Id)))
             .Concat(payments.Select(x => new SearchResultResponse("payment", x.Parameters!, $"{x.Name} · {x.Account}",
                 companyId, x.PartnerAccountId, x.Account, null, x.Parameters, x.Balance)))
             .Concat(units.Select(x => new SearchResultResponse("unit", x.Name ?? $"#{x.Id}", x.EntranceName,
