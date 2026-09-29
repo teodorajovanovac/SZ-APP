@@ -1813,6 +1813,88 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/invoice-batches/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    companyId: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["GenerateInvoicesV2Request"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["InvoiceBatchPreviewV2Response"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/invoice-batches/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    companyId: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["GenerateInvoicesV2Request"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GenerateInvoicesV2Response"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/invoice-batches/{batchId}/preview": {
         parameters: {
             query?: never;
@@ -6091,6 +6173,19 @@ export interface components {
             paymentReference: null | string;
             unitTypeIds: (number | string)[];
         };
+        CustomerInvoicePreviewV2: {
+            /** Format: int32 */
+            customerId: number | string;
+            customerName: string;
+            /** Format: double */
+            net: number | string;
+            /** Format: double */
+            vat: number | string;
+            /** Format: double */
+            interest: number | string;
+            /** Format: double */
+            total: number | string;
+        };
         DecidePlatformEventRequest: {
             reason: null | string;
             emergencyOverride: boolean;
@@ -6117,6 +6212,30 @@ export interface components {
             folder: null | string;
             fileName: null | string;
             isCurrent: boolean;
+        };
+        GenerateInvoicesV2Request: {
+            /** Format: int32 */
+            periodYYMM: number | string;
+            extraordinaryMarker: null | string;
+            place: string;
+            /** Format: date */
+            issueDate: string;
+            /** Format: date */
+            dueDate: string;
+            /** Format: date */
+            serviceDateFrom: string;
+            /** Format: date */
+            serviceDateTo: string;
+            /** Format: date */
+            transactionDate: string;
+            /** Format: double */
+            exchangeRateNbs: number | string;
+        };
+        GenerateInvoicesV2Response: {
+            /** Format: int32 */
+            invoiceBatchId: number | string;
+            alreadyGenerated: boolean;
+            invoiceIds: (number | string)[];
         };
         GenerateNoticesRequest: {
             notices: components["schemas"]["NoticeSeedRequest"][];
@@ -6230,6 +6349,23 @@ export interface components {
             /** Format: double */
             totalAmount: number | string;
             invoices: components["schemas"]["InvoicePreviewResponse"][];
+        };
+        InvoiceBatchPreviewV2Response: {
+            /** Format: int32 */
+            companyId: number | string;
+            /** Format: int32 */
+            periodYYMM: number | string;
+            /** Format: int32 */
+            customerCount: number | string;
+            /** Format: double */
+            netTotal: number | string;
+            /** Format: double */
+            vatTotal: number | string;
+            /** Format: double */
+            interestTotal: number | string;
+            /** Format: double */
+            total: number | string;
+            customers: components["schemas"]["CustomerInvoicePreviewV2"][];
         };
         InvoiceBatchResponse: {
             /** Format: int32 */
