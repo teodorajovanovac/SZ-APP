@@ -59,59 +59,28 @@ export interface CreateInvoiceBatch {
   paymentPurpose: string | null
 }
 
-export interface InvoiceLineSeed {
-  supplierInvoiceId: number | null
-  name: string
-  quantity: number
-  unitOfMeasureId: number | null
-  unitPrice: number
-  vatRate: number
-  k1: number
-  k2: number
-  k3: number
-  k4: number
-  k5: number
-  sortIndex: number
+/** Item 8 wizard request: the server computes all amounts (audit 9.1 R0..R3). */
+export interface GenerateInvoicesRequest {
+  periodYYMM: number
+  extraordinaryMarker: string | null
+  place: string
+  issueDate: string
+  dueDate: string
+  serviceDateFrom: string
+  serviceDateTo: string
+  transactionDate: string
+  exchangeRateNbs: number
 }
-
-export interface InvoiceSeed {
-  partnerId: number
-  sequenceNumber: string
-  partnerName: string
-  address: string
-  postalCode: string | null
-  city: string
-  taxNumber: string | null
-  registrationNumber: string | null
-  currency: string
-  invoiceDeliveryLocation: string | null
-  deliveryLocation: string | null
-  paymentReference: string | null
-  previousBalance: number
-  benefitAmount: number
-  interestAmount: number
-  sortIndex: number
-  contractIds: number[]
-  lines: InvoiceLineSeed[]
-}
-
-export interface InvoiceGenerationRequest { invoices: InvoiceSeed[] }
 
 export interface InvoiceBatchPreview {
-  batchId: number
-  fingerprint: string
-  invoiceCount: number
-  netAmount: number
-  vatAmount: number
-  interestAmount: number
-  totalAmount: number
-  invoices: Array<{
-    partnerId: number
-    sequenceNumber: string
-    netAmount: number
-    benefitAmount: number
-    vatAmount: number
-    interestAmount: number
-    totalAmount: number
-  }>
+  companyId: number
+  periodYYMM: number
+  customerCount: number
+  netTotal: number
+  vatTotal: number
+  interestTotal: number
+  total: number
+  customers: Array<{ customerId: number; customerName: string; net: number; vat: number; interest: number; total: number }>
 }
+
+export interface GenerateInvoicesResult { invoiceBatchId: number; alreadyGenerated: boolean; invoiceIds: number[] }
