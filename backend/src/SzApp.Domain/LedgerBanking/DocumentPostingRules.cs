@@ -23,6 +23,7 @@ public static class LedgerAccounts
     public const string Revenue = "4900";
     public const string Suppliers = "4350";
     public const string Expenses = "5590";
+    public const string Bank = "2410";
 }
 
 /// <summary>Legacy Dobavljac_Racuni.TipDokumenta, stored as ShortList(SupplierDocumentType).IndexValue.</summary>
