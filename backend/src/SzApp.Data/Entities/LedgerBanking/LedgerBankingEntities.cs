@@ -41,6 +41,7 @@ public enum BankStatementLineStatus
 {
     Pending = 0,
     Matched = 1,
+    // FIN-15: never set any more -- every line must reach the ledger (9.3: legacy never ignored).
     Ignored = 2,
     Posted = 3
 }
@@ -61,6 +62,7 @@ public sealed class BankStatement : ICompanyOwned
     public int CountDebitEntry { get; set; }
     public int CountCreditEntry { get; set; }
     public string? Note { get; set; }
+    public string? SourceFileName { get; set; }
     public int? JournalEntryId { get; set; }
     public BankStatementStatus Status { get; set; }
     public byte[] RowVersion { get; set; } = [];
@@ -88,10 +90,41 @@ public sealed class BankStatementLine : ICompanyOwned
     public string? CounterAccount { get; set; }
     public BankStatementLineStatus Status { get; set; }
     public string? BankRef { get; set; }
+    /// <summary>How the partner was found (MatchSources) and whether Ctrl+Enter may accept it.</summary>
+    public string? MatchSource { get; set; }
+    public bool IsConfidentMatch { get; set; }
+    /// <summary>Shown to the user, e.g. the reference-vs-partner conflict (owner decision: never silent).</summary>
+    public string? MatchNote { get; set; }
     public byte[] RowVersion { get; set; } = [];
+    public ICollection<BankStatementLineAllocation> Allocations { get; } = new List<BankStatementLineAllocation>();
     public BankStatement BankStatement { get; set; } = null!;
     public Company Company { get; set; } = null!;
     public SubAccount? SubAccount { get; set; }
+}
+
+/// <summary>
+/// One part of a statement line: an auto-matching proposal (9.3 steps 1-6) or a manual split. The
+/// line is Matched once the user accepts; posting turns every part into one ledger line.
+/// Amount is in the line's direction (negative only for legacy "opposite direction" groups).
+/// </summary>
+public sealed class BankStatementLineAllocation : ICompanyOwned
+{
+    public int Id { get; set; }
+    public int CompanyId { get; set; }
+    public int BankStatementLineId { get; set; }
+    public int SortIndex { get; set; }
+    public string Account { get; set; } = string.Empty;
+    public int? PartnerAccountId { get; set; }
+    public decimal Amount { get; set; }
+    public string Kind { get; set; } = string.Empty;
+    public string? SubAccountId { get; set; }
+    public string? Parameters { get; set; }
+    public string? DocumentRef { get; set; }
+    public int? InvoiceId { get; set; }
+    public int? SupplierInvoiceId { get; set; }
+    public int? CollectionPriority { get; set; }
+    public int? ClosesDocumentType { get; set; }
+    public BankStatementLine BankStatementLine { get; set; } = null!;
 }
 
 public sealed class BankInFlow : ICompanyOwned
@@ -130,7 +163,8 @@ public sealed class BankStatementPostingTemplate
     public BankTemplateFunction Function { get; set; }
     public int? SetPartnerAccountId { get; set; }
     public string? SetSubAccountId { get; set; }
-    public string SetAccountCode { get; set; } = string.Empty;
+    // GAP-05: a template yields a partner; the account comes from the partner account. Kept optional.
+    public string? SetAccountCode { get; set; }
     public int SortIndex { get; set; }
     public bool IsActive { get; set; } = true;
     public Company? Company { get; set; }
