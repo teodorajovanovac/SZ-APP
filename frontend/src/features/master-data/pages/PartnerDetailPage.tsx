@@ -1,6 +1,6 @@
-import { Card, CardContent, Stack, Typography } from '@mui/material'
+import { Button, Card, CardContent, Stack, Typography } from '@mui/material'
 import { useTranslation } from 'react-i18next'
-import { useParams } from 'react-router-dom'
+import { Link as RouterLink, useParams } from 'react-router-dom'
 import { ApiProblemError } from '../../../api/generated/client'
 import { usePartnerDetail } from '../useMasterData'
 import { DetailField, DetailPageLayout } from './DetailPageLayout'
@@ -29,6 +29,9 @@ export function PartnerDetailPage() {
               {detail.data.shortName}
             </Typography>
             <Typography color="text.secondary">{detail.data.name}</Typography>
+            <Button component={RouterLink} to={`/kartice?companyId=${companyIdNum}&partnerId=${partnerIdNum}&account=2040`} variant="outlined" size="small" sx={{ mt: 1.5 }}>
+              {t('cards_.tabCard')}
+            </Button>
             <Stack component="dl" spacing={1} sx={{ mt: 2 }}>
               <DetailField label="PIB" value={detail.data.taxNumber} />
               <DetailField label="Matični broj" value={detail.data.registrationNumber} />
