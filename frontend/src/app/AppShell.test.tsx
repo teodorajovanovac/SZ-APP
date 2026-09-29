@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ThemeProvider } from '@mui/material/styles'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import type { CurrentUser } from '../api/generated/client'
 import { AuthContext, type AuthContextValue } from '../features/auth/authContext'
@@ -76,6 +76,8 @@ describe('AppShell', () => {
     await waitFor(() => expect(screen.getByRole('link', { name: 'Partneri' })).toBeInTheDocument())
     expect(screen.queryByRole('link', { name: 'Administracija' })).not.toBeInTheDocument()
     expect(screen.getByLabelText('Aktivna kompanija')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Odjavi se' })).toBeInTheDocument()
+    // Sign-out lives in the account menu opened from the sidebar footer.
+    fireEvent.click(screen.getByText('Revizor').closest('[role="button"]') ?? screen.getByText('Revizor'))
+    expect(await screen.findByRole('menuitem', { name: 'Odjavi se' })).toBeInTheDocument()
   })
 })

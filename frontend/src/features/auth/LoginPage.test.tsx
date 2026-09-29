@@ -26,7 +26,7 @@ function renderPage(auth: AuthContextValue = defaultAuth) {
 describe('LoginPage', () => {
   it('ima pristupačan naslov i označena polja', () => {
     renderPage()
-    expect(screen.getByRole('heading', { name: 'SZ Upravljanje', level: 1 })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Dobrodošli nazad', level: 1 })).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'E-pošta' })).toHaveAttribute('autocomplete', 'username')
     expect(screen.getByLabelText('Lozinka')).toHaveAttribute('type', 'password')
     expect(screen.getByRole('button', { name: 'Prijavi se' })).toBeInTheDocument()
