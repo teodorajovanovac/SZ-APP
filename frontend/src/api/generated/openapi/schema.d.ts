@@ -5315,6 +5315,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/consistency-checks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    allCompanies?: boolean;
+                    checkId?: string;
+                };
+                header?: never;
+                path: {
+                    companyId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ConsistencyReport"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/etl-runs": {
         parameters: {
             query?: never;
@@ -5880,6 +5920,33 @@ export interface components {
         };
         ConcurrencyCommandRequest: {
             rowVersion: string;
+        };
+        ConsistencyCheckResult: {
+            id: string;
+            legacy: string;
+            name: string;
+            critical: boolean;
+            /** Format: int32 */
+            count: number | string;
+            rows: components["schemas"]["ConsistencyRow"][];
+        };
+        ConsistencyNotTranslated: {
+            id: string;
+            reason: string;
+        };
+        ConsistencyReport: {
+            /** Format: int32 */
+            companyId: null | number | string;
+            checks: components["schemas"]["ConsistencyCheckResult"][];
+            notTranslated: components["schemas"]["ConsistencyNotTranslated"][];
+        };
+        ConsistencyRow: {
+            /** Format: int32 */
+            companyId: number | string;
+            key: string;
+            info: string;
+            /** Format: double */
+            amount: null | number | string;
         };
         CreateBenefitRequest: {
             /** Format: int32 */
