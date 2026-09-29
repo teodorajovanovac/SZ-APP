@@ -1,6 +1,7 @@
 import LockResetIcon from '@mui/icons-material/LockReset'
 import LogoutIcon from '@mui/icons-material/Logout'
 import MenuIcon from '@mui/icons-material/Menu'
+import SearchIcon from '@mui/icons-material/Search'
 import {
   AppBar,
   Autocomplete,
@@ -27,12 +28,13 @@ import {
   useMediaQuery,
 } from '@mui/material'
 import { alpha, useTheme } from '@mui/material/styles'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../features/auth/useAuth'
 import { ChangePasswordForm } from '../features/auth/ChangePasswordForm'
 import { FormDialog } from '../shared/components/FormDialog'
+import { CommandPalette } from '../features/ledger-cards/CommandPalette'
 import type { CompanyScope } from '../features/companies/companyScope'
 import { useActiveCompany } from '../features/companies/useActiveCompany'
 import { useCompanyScope } from '../features/companies/useCompanyScope'
@@ -74,6 +76,14 @@ export function AppShell() {
   const isDesktop = useMediaQuery(theme.breakpoints.up('lg'))
   const [mobileOpen, setMobileOpen] = useState(false)
   const [changingPassword, setChangingPassword] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setSearchOpen(true) }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
   const { t, i18n } = useTranslation()
   const { user, logout } = useAuth()
   const { companies, activeCompany } = useActiveCompany()
@@ -309,6 +319,12 @@ export function AppShell() {
               {languageSelect}
             </Stack>
           )}
+          <Tooltip title={t('search_.open')}>
+            <IconButton color="inherit" onClick={() => setSearchOpen(true)} aria-label={t('search_.open')}>
+              <SearchIcon />
+            </IconButton>
+          </Tooltip>
+          <CommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
           <Tooltip title={t('staffAdmin_.changePassword')}>
             <IconButton color="inherit" onClick={() => setChangingPassword(true)} aria-label={t('staffAdmin_.changePassword')}>
               <LockResetIcon />

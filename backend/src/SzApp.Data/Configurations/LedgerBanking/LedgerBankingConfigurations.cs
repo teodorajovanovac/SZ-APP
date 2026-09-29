@@ -269,6 +269,8 @@ public sealed class LedgerEntryBankingExtensionConfiguration : IEntityTypeConfig
         entity.Property<int?>("BankStatementLineId");
         entity.Property<string?>("SubAccountId").HasMaxLength(10).IsUnicode(false);
         entity.HasIndex("BankStatementLineId");
+        // PERF-04: Kartica partnera / stanja partnera.
+        entity.HasIndex("CompanyId", "PartnerAccountId", "PostingDate");
         entity.HasOne<BankStatementLine>().WithMany().HasForeignKey("BankStatementLineId").OnDelete(DeleteBehavior.NoAction);
         entity.HasOne<SubAccount>().WithMany().HasForeignKey("SubAccountId").OnDelete(DeleteBehavior.NoAction);
         entity.HasOne<PartnerAccount>().WithMany().HasForeignKey("PartnerAccountId").OnDelete(DeleteBehavior.NoAction);

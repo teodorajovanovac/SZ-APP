@@ -189,6 +189,9 @@ public sealed class SzAppDbContext(DbContextOptions<SzAppDbContext> options)
             entity.Property(x => x.Parameters).HasMaxLength(25);
             entity.Property(x => x.Description).HasMaxLength(255);
             entity.HasIndex(x => new { x.CompanyId, x.PostingDate });
+            // PERF-04: Kartica konta / bilans.
+            entity.HasIndex(x => new { x.CompanyId, x.Account, x.PostingDate })
+                .IncludeProperties(x => new { x.DebitAmount, x.CreditAmount });
             entity.HasIndex(x => x.JournalEntryId);
             entity.HasOne(x => x.JournalEntry).WithMany(x => x.Lines)
                 .HasForeignKey(x => new { x.JournalEntryId, x.CompanyId })

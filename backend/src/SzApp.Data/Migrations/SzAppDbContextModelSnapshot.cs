@@ -3374,6 +3374,12 @@ namespace SzApp.Data.Migrations
 
                     b.HasIndex("JournalEntryId", "CompanyId");
 
+                    b.HasIndex("CompanyId", "Account", "PostingDate");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("CompanyId", "Account", "PostingDate"), new[] { "DebitAmount", "CreditAmount" });
+
+                    b.HasIndex("CompanyId", "PartnerAccountId", "PostingDate");
+
                     b.ToTable("LedgerEntry", "finance", t =>
                         {
                             t.HasTrigger("TR_LedgerEntry_PostedGuard");
