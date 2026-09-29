@@ -2,6 +2,7 @@ import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
 import { interestNoticeResources } from './i18n.interestNotices'
 import { cardsResources } from './i18n.cards'
+import { billing2Resources } from './i18n.billing2'
 
 export const resources = {
   'sr-Latn': {
@@ -1382,5 +1383,6 @@ void i18n.use(initReactI18next).init({
 })
 for (const [lng, bundle] of Object.entries(interestNoticeResources)) i18n.addResourceBundle(lng, 'translation', bundle, true, false)
 for (const [lng, bundle] of Object.entries(cardsResources)) i18n.addResourceBundle(lng, 'translation', bundle, true, false)
+for (const [lng, bundle] of Object.entries(billing2Resources)) i18n.addResourceBundle(lng, 'translation', bundle, true, false)
 
 export default i18n

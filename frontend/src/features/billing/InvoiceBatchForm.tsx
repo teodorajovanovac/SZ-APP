@@ -11,6 +11,15 @@ import { useQueryClient } from '@tanstack/react-query'
 import { formatMoney } from '../../shared/format/money'
 import { interestPresetsQuery, resolveInterestPeriod, useCreateInvoiceBatch, useRunInterest } from './billingApi'
 import { InterestPeriodFields } from './InterestPeriodFields'
+import { InvoiceBatchPreview } from './InvoiceBatchPreview'
+import type { GenerateInvoicesRequest } from './types'
+import { useState } from 'react'
+
+/** Item 8: the wizard defaults to next month. */
+function nextPeriodYYMM() {
+  const p = currentPeriodYYMM()
+  return p % 100 === 12 ? (Math.floor(p / 100) + 1) * 100 + 1 : p + 1
+}
 
 const schema = z.object({
   periodYYMM: z
@@ -58,10 +67,11 @@ export function InvoiceBatchForm({ companyId, onCreated }: { companyId: number; 
   const create = useCreateInvoiceBatch(companyId)
   const runInterest = useRunInterest(companyId)
   const queryClient = useQueryClient()
+  const [generation, setGeneration] = useState<GenerateInvoicesRequest | null>(null)
   const { control, handleSubmit, reset, formState, setValue } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      periodYYMM: currentPeriodYYMM(), caption: '', place: '', issueDate: '', serviceDateFrom: '', serviceDateTo: '', transactionDate: '', dueDate: '', exchangeRateNbs: 1,
+      periodYYMM: nextPeriodYYMM(), caption: '', place: '', issueDate: '', serviceDateFrom: '', serviceDateTo: '', transactionDate: '', dueDate: '', exchangeRateNbs: 1,
       interestEnabled: true, previousValueDate: '', balanceAsOfDate: '', interestPreset: '', interestStart: '', interestEnd: '',
     },
   })
@@ -83,6 +93,10 @@ export function InvoiceBatchForm({ companyId, onCreated }: { companyId: number; 
     if (interestEnabled) {
       await runInterest.mutateAsync({ invoiceBatchId: created.id, periodStart: period.start, periodEnd: period.end })
     }
+    setGeneration({
+      periodYYMM: value.periodYYMM, extraordinaryMarker: null, place: value.place, issueDate: value.issueDate, dueDate: value.dueDate,
+      serviceDateFrom: value.serviceDateFrom, serviceDateTo: value.serviceDateTo, transactionDate: value.transactionDate, exchangeRateNbs: value.exchangeRateNbs,
+    })
     reset()
     onCreated?.()
   }
@@ -95,7 +109,7 @@ export function InvoiceBatchForm({ companyId, onCreated }: { companyId: number; 
       {runInterest.data && formState.isSubmitSuccessful ? (
         <Alert severity="info">{t('interest_.runDone', { total: formatMoney(runInterest.data.totalInterest), count: runInterest.data.totals.length })}</Alert>
       ) : null}
-      {create.isSuccess && formState.isSubmitSuccessful ? <Alert severity="success">{t('billingUi.created')}</Alert> : null}
+      {create.isSuccess && formState.isSubmitSuccessful ? <Alert severity="success">{t('billing2_.created')}</Alert> : null}
       <Grid container spacing={2} columnSpacing={3}>
         <SectionHeading>{t('billingUi.sectionIdentification')}</SectionHeading>
         <Grid size={{ xs: 12, sm: 4 }}>
@@ -136,6 +150,7 @@ export function InvoiceBatchForm({ companyId, onCreated }: { companyId: number; 
       <Stack direction="row" justifyContent="flex-end">
         <Button type="submit" variant="contained" disabled={create.isPending}>{t('billing_.form.submit')}</Button>
       </Stack>
+      {generation ? <InvoiceBatchPreview companyId={companyId} request={generation} /> : null}
     </Stack>
   )
 }
