@@ -12,7 +12,7 @@ using SzApp.Data;
 namespace SzApp.Data.Migrations
 {
     [DbContext(typeof(SzAppDbContext))]
-    [Migration("20260929150511_BankStatementImportAndMatching")]
+    [Migration("20260929150723_BankStatementImportAndMatching")]
     partial class BankStatementImportAndMatching
     {
         /// <inheritdoc />
@@ -3376,6 +3376,12 @@ namespace SzApp.Data.Migrations
                     b.HasIndex("CompanyId", "PostingDate");
 
                     b.HasIndex("JournalEntryId", "CompanyId");
+
+                    b.HasIndex("CompanyId", "Account", "PostingDate");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("CompanyId", "Account", "PostingDate"), new[] { "DebitAmount", "CreditAmount" });
+
+                    b.HasIndex("CompanyId", "PartnerAccountId", "PostingDate");
 
                     b.ToTable("LedgerEntry", "finance", t =>
                         {
