@@ -216,7 +216,8 @@ public sealed class InvoiceGenerationService(SzAppDbContext db, TimeProvider tim
         // Cat1=1 == SupplierDocumentType 1 "Predviđeni troškovi" (data-model.md; type 2 is never invoiced).
         var supplierInvoices = await db.Set<SupplierInvoice>().AsNoTracking().Include(x => x.UnitTypes)
             .Where(x => x.CompanyId == companyId && x.PeriodYYMM == periodYYMM
-                && x.DocumentTypeId == SupplierDocumentTypes.Planned && x.CalculationTypeId != 99
+                && db.ShortLists.Any(t => t.Id == x.DocumentTypeId && t.TableName == "SupplierDocumentType" && t.IndexValue == SupplierDocumentTypes.Planned)
+                && x.CalculationTypeId != 99
                 && x.ExtraordinaryInvoiceMarker == marker)
             .ToListAsync(ct);
         // ponytail: VAT rate is 0 -- SupplierInvoice has no PDV column in data-model.md and no issuer is in VAT today (P4).
