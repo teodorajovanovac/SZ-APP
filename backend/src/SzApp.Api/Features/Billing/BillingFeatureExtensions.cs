@@ -14,6 +14,7 @@ public static class BillingFeatureExtensions
     public static IServiceCollection AddBillingFeature(this IServiceCollection services)
     {
         services.AddScoped<BillingService>();
+        services.AddScoped<InvoiceGenerationService>();
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddScoped<ILedgerPostingGateway, UnavailableLedgerPostingGateway>();
         services.TryAddScoped<INoticeWorkflowGateway, UnavailableNoticeWorkflowGateway>();
@@ -52,6 +53,14 @@ public static class BillingFeatureExtensions
         batches.MapPost("/", (int companyId, CreateInvoiceBatchRequest request, ClaimsPrincipal principal, BillingService service, CancellationToken ct) =>
                 service.CreateInvoiceBatchAsync(companyId, StaffId(principal), request, ct))
             .RequireAuthorization(SecurityConstants.CompanyWritePolicy).AddEndpointFilter<AntiforgeryEndpointFilter>();
+        // Item 8 wizard: server-computed invoices (R0..R3). Single-company scope (route companyId).
+        batches.MapPost("/preview", (int companyId, GenerateInvoicesV2Request request, InvoiceGenerationService service, CancellationToken ct) =>
+                service.PreviewAsync(companyId, request.PeriodYYMM, request.ExtraordinaryMarker, request.ExchangeRateNbs, ct))
+            .RequireAuthorization(SecurityConstants.CompanyWritePolicy).AddEndpointFilter<AntiforgeryEndpointFilter>();
+        batches.MapPost("/generate", (int companyId, GenerateInvoicesV2Request request, ClaimsPrincipal principal, InvoiceGenerationService service, CancellationToken ct) =>
+                service.GenerateAsync(companyId, StaffId(principal), request, ct))
+            .RequireAuthorization(SecurityConstants.CompanyWritePolicy)
+            .AddEndpointFilter<AntiforgeryEndpointFilter>().AddEndpointFilter<IdempotencyKeyEndpointFilter>();
         batches.MapPost("/{batchId:int}/preview", (int companyId, int batchId, InvoiceGenerationRequest request, BillingService service, CancellationToken ct) =>
                 service.PreviewBatchAsync(companyId, batchId, request, ct))
             .RequireAuthorization(SecurityConstants.CompanyWritePolicy).AddEndpointFilter<AntiforgeryEndpointFilter>();
