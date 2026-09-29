@@ -8,7 +8,9 @@ import { formatMoney } from '../../shared/format/money'
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog'
 import { FormDialog } from '../../shared/components/FormDialog'
 import { ServerDataTable } from '../../shared/components/ServerDataTable'
-import { useInvoiceBatches, useInvoices, usePostInvoiceBatch } from './billingApi'
+import {
+  downloadBatchPdfZip, useInvoiceBatches, useInvoices, usePostInvoiceBatch, usePreviewBatchEmails, useSendBatchEmails,
+} from './billingApi'
 import { InvoiceBatchForm } from './InvoiceBatchForm'
 import { InvoiceDetail } from './InvoiceDetail'
 import type { InvoiceBatch, InvoiceSummary } from './types'
@@ -25,7 +27,12 @@ export function BillingWorkspace({ companyId, canPost }: { companyId: number; ca
   const batches = useInvoiceBatches(companyId, batchPagination.pageIndex + 1, batchPagination.pageSize)
   const invoices = useInvoices(companyId, invoicePagination.pageIndex + 1, invoicePagination.pageSize)
   const post = usePostInvoiceBatch(companyId)
-  const error = batches.error ?? invoices.error ?? post.error
+  const emailPreview = usePreviewBatchEmails(companyId)
+  const emailSend = useSendBatchEmails(companyId)
+  const [emailBatch, setEmailBatch] = useState<InvoiceBatch | null>(null)
+  const [pdfMessage, setPdfMessage] = useState<string | null>(null)
+  const error = batches.error ?? invoices.error ?? post.error ?? emailPreview.error ?? emailSend.error
+  const preview = emailPreview.data
 
   // The list endpoints take page/pageSize only — no sortBy — so no column advertises sorting.
   const batchColumns = useMemo<ColumnDef<InvoiceBatch>[]>(
@@ -38,15 +45,34 @@ export function BillingWorkspace({ companyId, canPost }: { companyId: number; ca
         header: t('billing_.columns.action'),
         enableSorting: false,
         meta: { align: 'right' },
-        cell: ({ row }) =>
-          canPost && row.original.status === 'Generated' ? (
-            <Button size="small" variant="outlined" disabled={post.isPending} onClick={() => setPendingBatch(row.original)}>
-              {t('billing_.post')}
-            </Button>
-          ) : null,
+        cell: ({ row }) => (
+          <Stack direction="row" spacing={1} justifyContent="flex-end">
+            {row.original.status !== 'Draft' ? (
+              <>
+                <Button size="small" onClick={() => {
+                  setPdfMessage(null)
+                  downloadBatchPdfZip(companyId, row.original.id, row.original.periodYYMM).catch(() => setPdfMessage(t('invoicePdf.failed')))
+                }}>
+                  {t('invoicePdf.downloadAll')}
+                </Button>
+                <Button size="small" disabled={emailPreview.isPending} onClick={() => {
+                  setPdfMessage(null)
+                  emailPreview.mutate(row.original.id, { onSuccess: () => setEmailBatch(row.original) })
+                }}>
+                  {t('invoicePdf.sendEmail')}
+                </Button>
+              </>
+            ) : null}
+            {canPost && row.original.status === 'Generated' ? (
+              <Button size="small" variant="outlined" disabled={post.isPending} onClick={() => setPendingBatch(row.original)}>
+                {t('billing_.post')}
+              </Button>
+            ) : null}
+          </Stack>
+        ),
       },
     ],
-    [canPost, post, t],
+    [canPost, companyId, emailPreview, post, t],
   )
 
   const invoiceColumns = useMemo<ColumnDef<InvoiceSummary>[]>(
@@ -83,6 +109,7 @@ export function BillingWorkspace({ companyId, canPost }: { companyId: number; ca
     <Stack spacing={3}>
       <Typography component="h1" variant="h1">{t('billing_.title')}</Typography>
       {error ? <Alert severity="error">{getErrorMessage(error, t('billing_.dataUnavailable'))}</Alert> : null}
+      {pdfMessage ? <Alert severity="info" role="status">{pdfMessage}</Alert> : null}
       <Paper variant="outlined" sx={{ p: 3 }}><InvoiceBatchForm companyId={companyId} /></Paper>
       <Box>
         <Typography component="h2" variant="h6" sx={{ mb: 1 }}>{t('billing_.batchesTitle')}</Typography>
@@ -137,6 +164,28 @@ export function BillingWorkspace({ companyId, canPost }: { companyId: number; ca
         onConfirm={() => {
           if (pendingBatch) post.mutate(pendingBatch.id)
           setPendingBatch(null)
+        }}
+      />
+
+      <ConfirmDialog
+        open={emailBatch !== null && preview !== undefined}
+        title={t('invoicePdf.confirmTitle')}
+        description={
+          <>
+            {t('invoicePdf.confirmBody', { withEmail: preview?.withEmail, total: preview?.totalInvoices, missing: preview?.missingEmail })}
+            {preview && preview.missingCustomerNames.length > 0
+              ? <Box component="p">{t('invoicePdf.missingList', { names: preview.missingCustomerNames.join(', ') })}</Box>
+              : null}
+          </>
+        }
+        confirmLabel={t('invoicePdf.confirm')}
+        pending={emailSend.isPending}
+        onClose={() => setEmailBatch(null)}
+        onConfirm={() => {
+          if (emailBatch && preview && preview.withEmail > 0) {
+            emailSend.mutate(emailBatch.id, { onSuccess: (result) => setPdfMessage(t('invoicePdf.sent', { enqueued: result.enqueued, skipped: result.skipped })) })
+          }
+          setEmailBatch(null)
         }}
       />
     </Stack>

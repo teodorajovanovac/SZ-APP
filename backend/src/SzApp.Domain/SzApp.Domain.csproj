@@ -6,4 +6,9 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- QRCoder: MIT licensed, pure managed code, no native/exe dependency (replaces legacy shell-out). -->
+    <PackageReference Include="QRCoder" Version="1.8.0" />
+  </ItemGroup>
+
 </Project>

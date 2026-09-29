@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Alert, Button, Chip, Paper, Stack, TextField, Typography } from '@mui/material'
+import { Alert, Box, Button, Chip, Paper, Stack, TextField, Typography } from '@mui/material'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { apiRequest } from '../../api/generated/client'
@@ -7,7 +7,7 @@ import { getErrorMessage } from '../../api/problemDetails'
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog'
 import { formatDate } from '../../shared/format/date'
 import { formatMoney } from '../../shared/format/money'
-import { billingKeys, useCancelInvoice } from './billingApi'
+import { billingKeys, downloadInvoicePdf, useCancelInvoice } from './billingApi'
 import type { InvoiceSummary } from './types'
 
 export function InvoiceDetail({ companyId, invoiceId, canPost = false }: { companyId: number; invoiceId: number; canPost?: boolean }) {
@@ -15,6 +15,7 @@ export function InvoiceDetail({ companyId, invoiceId, canPost = false }: { compa
   const [confirming, setConfirming] = useState(false)
   const [reason, setReason] = useState('')
   const cancel = useCancelInvoice(companyId, invoiceId)
+  const [downloadError, setDownloadError] = useState(false)
   const query = useQuery({
     queryKey: [...billingKeys.invoices(companyId), invoiceId],
     queryFn: () => apiRequest<InvoiceSummary>(`/api/v1/companies/${companyId}/invoices/${invoiceId}`),
@@ -41,6 +42,12 @@ export function InvoiceDetail({ companyId, invoiceId, canPost = false }: { compa
             </Button>
           </Stack>
         ) : null}
+        <Box>
+          <Button variant="outlined" onClick={() => { setDownloadError(false); downloadInvoicePdf(companyId, invoice.id, invoice.sequenceNumber).catch(() => setDownloadError(true)) }}>
+            {t('invoicePdf.download')}
+          </Button>
+        </Box>
+        {downloadError ? <Alert severity="error">{t('invoicePdf.failed')}</Alert> : null}
       </Stack>
       <ConfirmDialog
         open={confirming}

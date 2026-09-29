@@ -16,6 +16,17 @@
     <PackageReference Include="Microsoft.Extensions.ApiDescription.Server" Version="10.0.10">
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <!-- PdfSharpCore: MIT licensed fork of PDFsharp, pure managed deps (SixLabors.ImageSharp/Fonts),
+         no revenue-gated license (chosen over QuestPDF's Community-license revenue threshold). -->
+    <PackageReference Include="PdfSharpCore" Version="1.3.67" />
+    <!-- Pin transitive SixLabors.ImageSharp to the last Apache-2.0 2.x release with CVE fixes
+         (PdfSharpCore's own dependency, 1.0.4, has known high-severity CVEs; v3+ is dual-licensed
+         commercial, so staying on 2.x keeps this permissive). -->
+    <PackageReference Include="SixLabors.ImageSharp" Version="2.1.13" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Assets\Fonts\DejaVuSans.ttf" />
   </ItemGroup>
 
   <PropertyGroup>

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiRequest } from '../../api/generated/client'
+import '../../app/i18n.invoicePdf'
 import type { BillingPage, CreateInvoiceBatch, InvoiceBatch, InvoiceBatchPreview, InvoiceGenerationRequest, InvoiceSummary } from './types'
 
 // apiRequest attaches the antiforgery header automatically for unsafe methods; only
@@ -126,5 +127,48 @@ export function useCancelInvoice(companyId: number, invoiceId: number) {
     mutationFn: ({ reason, rowVersion }: { reason: string; rowVersion: string }) =>
       mutate<InvoiceSummary>(`/api/v1/companies/${companyId}/invoices/${invoiceId}/cancel`, { reason, rowVersion }, true),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: billingKeys.invoices(companyId) }),
+  })
+}
+
+// --- Invoice PDF / bulk email (GAP-02/03/26) ---
+
+export interface InvoiceEmailPreview { totalInvoices: number; withEmail: number; missingEmail: number; missingCustomerNames: string[] }
+export interface InvoiceEmailSendResult { enqueued: number; skipped: number }
+
+// File downloads need the raw Response (Blob), so they fetch their own CSRF token
+// like reportsApi's download() does.
+async function downloadFile(path: string, method: 'GET' | 'POST', fileName: string) {
+  const headers: Record<string, string> = {}
+  if (method === 'POST') {
+    const token = await apiRequest<{ token: string; headerName: string }>('/api/v1/auth/antiforgery')
+    headers[token.headerName] = token.token
+  }
+  const response = await fetch(path, { method, credentials: 'include', headers })
+  if (!response.ok) throw new Error(response.statusText)
+  const url = URL.createObjectURL(await response.blob())
+  const link = document.createElement('a')
+  link.href = url
+  link.download = fileName
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
+export const downloadInvoicePdf = (companyId: number, invoiceId: number, sequenceNumber: string) =>
+  downloadFile(`/api/v1/companies/${companyId}/invoices/${invoiceId}/pdf`, 'GET', `${sequenceNumber}.pdf`)
+
+export const downloadBatchPdfZip = (companyId: number, batchId: number, periodYYMM: number) =>
+  downloadFile(`/api/v1/companies/${companyId}/invoice-batches/${batchId}/pdf`, 'POST', `racuni-${periodYYMM}.zip`)
+
+export function usePreviewBatchEmails(companyId: number) {
+  return useMutation({
+    mutationFn: (batchId: number) =>
+      mutate<InvoiceEmailPreview>(`/api/v1/companies/${companyId}/invoice-batches/${batchId}/emails/preview`),
+  })
+}
+
+export function useSendBatchEmails(companyId: number) {
+  return useMutation({
+    mutationFn: (batchId: number) =>
+      mutate<InvoiceEmailSendResult>(`/api/v1/companies/${companyId}/invoice-batches/${batchId}/emails/send`, undefined, true),
   })
 }

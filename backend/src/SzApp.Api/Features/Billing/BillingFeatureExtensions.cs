@@ -14,6 +14,8 @@ public static class BillingFeatureExtensions
     public static IServiceCollection AddBillingFeature(this IServiceCollection services)
     {
         services.AddScoped<BillingService>();
+        services.AddScoped<InvoiceDocumentMapper>();
+        services.AddScoped<InvoicePdfService>();
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddScoped<ILedgerPostingGateway, UnavailableLedgerPostingGateway>();
         services.TryAddScoped<INoticeWorkflowGateway, UnavailableNoticeWorkflowGateway>();
@@ -64,6 +66,21 @@ public static class BillingFeatureExtensions
             .RequireAuthorization(SecurityConstants.CompanyPostPolicy)
             .AddEndpointFilter<AntiforgeryEndpointFilter>().AddEndpointFilter<IdempotencyKeyEndpointFilter>();
 
+        // GAP-02/03/26: PDF + IPS QR rendering and bulk email sending. Read access is enough to
+        // view/download (mirrors other read endpoints in this file); only /emails/send mutates.
+        batches.MapPost("/{batchId:int}/pdf", async (int companyId, int batchId, InvoicePdfService pdfService, CancellationToken ct) =>
+        {
+            var result = await pdfService.RenderBatchZipAsync(companyId, batchId, ct);
+            return result is null ? Results.NotFound() : Results.File(result.Bytes, "application/zip", result.FileName);
+        }).AddEndpointFilter<AntiforgeryEndpointFilter>();
+        batches.MapPost("/{batchId:int}/emails/preview", (int companyId, int batchId, InvoicePdfService pdfService, CancellationToken ct) =>
+                pdfService.PreviewBatchEmailsAsync(companyId, batchId, ct))
+            .AddEndpointFilter<AntiforgeryEndpointFilter>();
+        batches.MapPost("/{batchId:int}/emails/send", (int companyId, int batchId, ClaimsPrincipal principal, InvoicePdfService pdfService, CancellationToken ct) =>
+                pdfService.SendBatchEmailsAsync(companyId, batchId, StaffId(principal), ct))
+            .RequireAuthorization(SecurityConstants.CompanyWritePolicy)
+            .AddEndpointFilter<AntiforgeryEndpointFilter>().AddEndpointFilter<IdempotencyKeyEndpointFilter>();
+
         var invoices = root.MapGroup("/invoices").WithTags("Billing - Invoices");
         invoices.MapGet("/", (int companyId, int page, int pageSize, BillingService service, CancellationToken ct) =>
             service.ListInvoicesAsync(companyId, page, pageSize, ct));
@@ -71,6 +88,11 @@ public static class BillingFeatureExtensions
         {
             var invoice = await service.GetInvoiceAsync(companyId, invoiceId, ct);
             return invoice is null ? Results.NotFound() : Results.Ok(invoice);
+        });
+        invoices.MapGet("/{invoiceId:int}/pdf", async (int companyId, int invoiceId, InvoicePdfService pdfService, CancellationToken ct) =>
+        {
+            var result = await pdfService.RenderSingleAsync(companyId, invoiceId, ct);
+            return result is null ? Results.NotFound() : Results.File(result.Bytes, "application/pdf", result.FileName);
         });
         invoices.MapPost("/{invoiceId:int}/cancel", (int companyId, int invoiceId, CancelInvoiceRequest request, HttpContext context, BillingService service, CancellationToken ct) =>
                 service.CancelInvoiceAsync(companyId, invoiceId, request, IdempotencyKey(context), ct))
