@@ -245,7 +245,7 @@ public sealed class BillingService(
             {
                 throw new DomainRuleException("billing.contract-tenant-mismatch", "Ugovor ili primalac računa ne pripada aktivnoj kompaniji.");
             }
-            var amounts = BillingCalculator.CalculateInvoice(seed.Lines.Select(ToDomainLine), seed.BenefitAmount, seed.InterestAmount);
+            var amounts = BillingCalculator.CalculateInvoice(seed.Lines.Select(ToDomainLine), seed.InterestAmount);
             var calculatedLines = seed.Lines.Select(line => (Seed: line, Amounts: BillingCalculator.CalculateLine(ToDomainLine(line)))).ToArray();
             var invoice = new Invoice
             {
@@ -306,17 +306,6 @@ public sealed class BillingService(
                 db.Add(new InvoiceUnit { CompanyId = companyId, InvoiceId = invoice.Id, ContractId = contractId });
             }
 
-            if (seed.BenefitAmount > 0m)
-            {
-                var benefits = await db.Set<Benefit>()
-                    .Where(x => x.CompanyId == companyId && x.PeriodYYMM == batch.PeriodYYMM && x.InvoiceId == null && seed.ContractIds.Contains(x.ContractId))
-                    .ToArrayAsync(ct);
-                if (FinanceRounding.Money(benefits.Sum(x => x.Amount)) != FinanceRounding.Money(seed.BenefitAmount))
-                {
-                    throw new DomainRuleException("billing.benefit-mismatch", "Iznos raspoloživih benefita ne odgovara ulazu za račun.");
-                }
-                foreach (var benefit in benefits) benefit.InvoiceId = invoice.Id;
-            }
         }
 
         batch.GenerationFingerprint = preview.Fingerprint;
@@ -1030,6 +1019,9 @@ public sealed class BillingService(
     private InvoiceBatchPreviewResponse CreatePreview(int batchId, InvoiceGenerationRequest request)
     {
         if (request.Invoices.Count == 0) throw new DomainRuleException("billing.batch-empty", "Serija mora sadržati najmanje jedan račun.");
+        // FIN-18: benefits are applied only by the server-side engine (InvoiceGenerationService).
+        if (request.Invoices.Any(x => x.BenefitAmount != 0m))
+            throw new DomainRuleException("billing.benefit-server-side", "Benefit se obračunava isključivo pri serverskom generisanju računa.");
         if (request.Invoices.GroupBy(x => x.SequenceNumber, StringComparer.OrdinalIgnoreCase).Any(x => x.Count() > 1))
             throw new DomainRuleException("billing.duplicate-sequence", "Redni brojevi računa moraju biti jedinstveni u seriji.");
         var normalized = request.Invoices.OrderBy(x => x.SortIndex).ThenBy(x => x.SequenceNumber, StringComparer.Ordinal)
@@ -1042,8 +1034,8 @@ public sealed class BillingService(
                 var amounts = BillingCalculator.CalculateLine(ToDomainLine(line));
                 return new InvoicePreviewLineResponse(line.Name, amounts.Quantity, amounts.UnitPrice, amounts.NetAmount, amounts.VatAmount, amounts.TotalAmount);
             }).ToArray();
-            var invoice = BillingCalculator.CalculateInvoice(seed.Lines.Select(ToDomainLine), seed.BenefitAmount, seed.InterestAmount);
-            return new InvoicePreviewResponse(seed.PartnerId, seed.SequenceNumber, invoice.NetAmount, invoice.BenefitAmount, invoice.VatAmount, invoice.InterestAmount, invoice.TotalAmount, lineAmounts);
+            var invoice = BillingCalculator.CalculateInvoice(seed.Lines.Select(ToDomainLine), seed.InterestAmount);
+            return new InvoicePreviewResponse(seed.PartnerId, seed.SequenceNumber, invoice.NetAmount, 0m, invoice.VatAmount, invoice.InterestAmount, invoice.TotalAmount, lineAmounts);
         }).ToArray();
         return new(batchId, fingerprint, previews.Length, FinanceRounding.Money(previews.Sum(x => x.NetAmount - x.BenefitAmount)),
             FinanceRounding.Money(previews.Sum(x => x.VatAmount)), FinanceRounding.Money(previews.Sum(x => x.InterestAmount)),
