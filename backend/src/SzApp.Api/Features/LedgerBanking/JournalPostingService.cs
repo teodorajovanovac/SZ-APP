@@ -13,6 +13,8 @@ namespace SzApp.Api.Features.LedgerBanking;
 public interface IJournalPostingService
 {
     Task<JournalEntryResponse> CreateDraftAsync(int companyId, CreateJournalEntryRequest request, CancellationToken cancellationToken);
+    Task<JournalEntryResponse> UpdateDraftAsync(int companyId, int journalEntryId, CreateJournalEntryRequest request, byte[] expectedRowVersion, CancellationToken cancellationToken);
+    Task DeleteDraftAsync(int companyId, int journalEntryId, byte[] expectedRowVersion, CancellationToken cancellationToken);
     Task<PostingResultResponse> PostAsync(int companyId, int journalEntryId, int staffId, byte[] expectedRowVersion, CancellationToken cancellationToken);
     Task<PostingResultResponse> ReverseAsync(int companyId, int journalEntryId, int staffId, byte[] expectedRowVersion, CancellationToken cancellationToken);
     Task<LedgerPostingResult> PostSourceAsync(LedgerPostingRequest request, int staffId, CancellationToken cancellationToken);
@@ -32,38 +34,87 @@ public sealed class JournalPostingService(
         CreateJournalEntryRequest request,
         CancellationToken cancellationToken)
     {
+        await ValidateDraftAsync(companyId, request, cancellationToken);
+        var journal = new JournalEntry { CompanyId = companyId, IsPosted = false };
+        dbContext.JournalEntries.Add(journal);
+        FillDraft(journal, companyId, request);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return MapJournal(journal);
+    }
+
+    /// <summary>GAP-13: replaces header and lines of an unposted (draft) journal.</summary>
+    public async Task<JournalEntryResponse> UpdateDraftAsync(
+        int companyId,
+        int journalEntryId,
+        CreateJournalEntryRequest request,
+        byte[] expectedRowVersion,
+        CancellationToken cancellationToken)
+    {
+        var journal = await LoadDraftAsync(companyId, journalEntryId, expectedRowVersion, cancellationToken);
+        await ValidateDraftAsync(companyId, request, cancellationToken);
+        dbContext.LedgerEntries.RemoveRange(journal.Lines);
+        journal.Lines.Clear();
+        FillDraft(journal, companyId, request);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return MapJournal(journal);
+    }
+
+    public async Task DeleteDraftAsync(int companyId, int journalEntryId, byte[] expectedRowVersion, CancellationToken cancellationToken)
+    {
+        var journal = await LoadDraftAsync(companyId, journalEntryId, expectedRowVersion, cancellationToken);
+        dbContext.LedgerEntries.RemoveRange(journal.Lines);
+        dbContext.JournalEntries.Remove(journal);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task<JournalEntry> LoadDraftAsync(int companyId, int journalEntryId, byte[] expectedRowVersion, CancellationToken cancellationToken)
+    {
+        var journal = await dbContext.JournalEntries.Include(x => x.Lines)
+            .SingleOrDefaultAsync(x => x.Id == journalEntryId && x.CompanyId == companyId, cancellationToken)
+            ?? throw new KeyNotFoundException("Nalog nije pronađen.");
+        EnsureExpectedVersion(expectedRowVersion, journal.RowVersion);
+        if (journal.IsPosted)
+        {
+            throw new DomainRuleException("journal.posted-immutable", "Knjiženi nalog se ne može menjati.");
+        }
+
+        return journal;
+    }
+
+    private async Task ValidateDraftAsync(int companyId, CreateJournalEntryRequest request, CancellationToken cancellationToken)
+    {
         ValidateDraftRequest(request);
         await EnsurePostingAccountsAsync(request.Lines.Select(x => x.Account), cancellationToken);
         await shortLists.EnsureTypeAsync(request.JournalEntryTypeId, "LedgerLineType", cancellationToken);
         await EnsurePartnerAccountsAsync(companyId, request.Lines.Select(x => x.PartnerAccountId), cancellationToken);
         await EnsureSubAccountsAsync(request.Lines.Select(x => x.SubAccountId), cancellationToken);
 
-        var journal = new JournalEntry
-        {
-            CompanyId = companyId,
-            PostingDate = request.PostingDate,
-            DueDate = request.DueDate,
-            Description = request.Description.Trim(),
-            Currency = request.Currency.Trim().ToUpperInvariant(),
-            JournalEntryTypeId = request.JournalEntryTypeId,
-            IsPosted = false
-        };
+        // GAP-13: 2040/4350 lines need a partner opened on that same account.
+        var partnerIds = request.Lines.Where(x => x.PartnerAccountId is not null).Select(x => x.PartnerAccountId!.Value).Distinct().ToArray();
+        var partnerAccounts = await dbContext.Set<PartnerAccount>().AsNoTracking()
+            .Where(x => partnerIds.Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, x => x.Account, cancellationToken);
+        ManualJournalRules.Validate(request.Lines.Select(x => new ManualJournalLine(
+            x.Account, x.DebitAmount, x.CreditAmount, x.PartnerAccountId,
+            x.PartnerAccountId is { } id ? partnerAccounts.GetValueOrDefault(id) : null)).ToArray());
+    }
 
-        var lineSources = new List<(LedgerEntry Line, LedgerLineRequest Source)>();
+    private void FillDraft(JournalEntry journal, int companyId, CreateJournalEntryRequest request)
+    {
+        journal.PostingDate = request.PostingDate;
+        journal.DueDate = request.DueDate;
+        journal.Description = Clip(request.Description.Trim(), 255);
+        journal.Currency = request.Currency.Trim().ToUpperInvariant();
+        journal.JournalEntryTypeId = request.JournalEntryTypeId;
         foreach (var sourceLine in request.Lines)
         {
             var line = CreateLedgerLine(journal, companyId, request.PostingDate, sourceLine);
+            // The journal type (ShortList LedgerLineType, e.g. 99 početno stanje) is the lines' TIP_STAVKE.
+            line.LineTypeId = request.JournalEntryTypeId;
             journal.Lines.Add(line);
-            lineSources.Add((line, sourceLine));
+            dbContext.LedgerEntries.Add(line);
+            SetOptionalLedgerProperties(line, sourceLine.SubAccountId, sourceLine.PartnerAccountId, null);
         }
-
-        dbContext.JournalEntries.Add(journal);
-        foreach (var (line, source) in lineSources)
-        {
-            SetOptionalLedgerProperties(line, source.SubAccountId, source.PartnerAccountId, null);
-        }
-        await dbContext.SaveChangesAsync(cancellationToken);
-        return MapJournal(journal);
     }
 
     public Task<PostingResultResponse> PostAsync(
@@ -363,6 +414,8 @@ public sealed class JournalPostingService(
             CreditAmount = FinanceRounding.Calculation(request.CreditAmount),
             DocumentRef = request.DocumentRef?.Trim(),
             Note = request.Note?.Trim(),
+            Parameters = DocumentPostingRules.CleanPaymentReference(request.PaymentReference),
+            Description = string.IsNullOrWhiteSpace(request.Description) ? null : Clip(request.Description.Trim(), 255),
             Priority = journal.Lines.Count + 1
         };
 
@@ -461,7 +514,7 @@ public sealed class JournalPostingService(
         }
     }
 
-    private static JournalEntryResponse MapJournal(JournalEntry journal) => new(
+    private JournalEntryResponse MapJournal(JournalEntry journal) => new(
         new JournalEntrySummaryResponse(
             journal.Id,
             journal.PostingDate,
@@ -471,7 +524,8 @@ public sealed class JournalPostingService(
             journal.IsPosted,
             journal.PostedAt,
             journal.ReversalOfId,
-            Convert.ToBase64String(journal.RowVersion)),
+            Convert.ToBase64String(journal.RowVersion),
+            journal.JournalEntryTypeId),
         journal.Lines.OrderBy(x => x.Priority).Select(x => new LedgerEntryResponse(
             x.Id,
             x.Account,
@@ -480,7 +534,9 @@ public sealed class JournalPostingService(
             x.DebitAmount,
             x.CreditAmount,
             x.DocumentRef,
-            null,
-            null,
-            x.Note)).ToArray());
+            dbContext.Entry(x).Property<string?>("SubAccountId").CurrentValue,
+            dbContext.Entry(x).Property<int?>("PartnerAccountId").CurrentValue,
+            x.Note,
+            x.Parameters,
+            x.Description)).ToArray());
 }
