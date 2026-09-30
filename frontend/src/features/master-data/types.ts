@@ -67,6 +67,9 @@ export interface Partner {
   partnerTypeId: number | null
   language: string
   note: string | null
+  isSefUser: boolean
+  isCrfUser: boolean
+  skipAutoCheckSef: boolean
 }
 
 export interface SavePartner {
@@ -80,6 +83,29 @@ export interface SavePartner {
   partnerTypeId?: number | null
   language: string
   note?: string | null
+  isSefUser: boolean
+  isCrfUser: boolean
+  skipAutoCheckSef: boolean
+}
+
+export interface PartnerAddress {
+  id: number
+  addressId: number
+  addressTypeId: number
+  isDefault: boolean
+  streetAddress: string
+  postalCode: string | null
+  city: string
+  countryCode: string
+}
+
+export interface SavePartnerAddress {
+  addressTypeId: number
+  isDefault: boolean
+  streetAddress: string
+  postalCode?: string | null
+  city: string
+  countryCode: string
 }
 
 export interface Address {

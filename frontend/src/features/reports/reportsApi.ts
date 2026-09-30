@@ -49,8 +49,12 @@ export function useExportReport(companyId: number) {
 export function saveBlob(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
-  anchor.href = url; anchor.download = fileName; anchor.click()
-  setTimeout(() => URL.revokeObjectURL(url), 0)
+  anchor.href = url; anchor.download = fileName; anchor.style.display = 'none'
+  // The anchor must be attached for the click to start a download in every browser, and the
+  // object URL must outlive the click — revoking it immediately cancels large downloads.
+  document.body.appendChild(anchor)
+  anchor.click()
+  setTimeout(() => { anchor.remove(); URL.revokeObjectURL(url) }, 60_000)
 }
 
 export function openPrintableHtml(blob: Blob) {

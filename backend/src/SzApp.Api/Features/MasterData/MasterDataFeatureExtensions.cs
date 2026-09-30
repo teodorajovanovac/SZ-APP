@@ -36,6 +36,12 @@ public static class MasterDataFeatureExtensions
         companies.MapPut("/partners/{partnerId:int}", UpdatePartnerAsync);
         companies.MapDelete("/partners/{partnerId:int}", DeletePartnerAsync);
 
+        // Tenant-scoped address list: Address rows are reachable only through PartnerAddress.
+        companies.MapGet("/partners/{partnerId:int}/addresses", ListPartnerAddressesAsync);
+        companies.MapPost("/partners/{partnerId:int}/addresses", CreatePartnerAddressAsync);
+        companies.MapPut("/partners/{partnerId:int}/addresses/{partnerAddressId:int}", UpdatePartnerAddressAsync);
+        companies.MapDelete("/partners/{partnerId:int}/addresses/{partnerAddressId:int}", DeletePartnerAddressAsync);
+
         // Address currently has no tenant owner in the canonical model. These
         // endpoints are Root-only until PartnerAddress/BuildingEntrance provide
         // a tenant-scoped ownership path.
@@ -401,6 +407,169 @@ public static class MasterDataFeatureExtensions
         return Results.NoContent();
     }
 
+    private static IQueryable<PartnerAddress> PartnerAddressesOf(SzAppDbContext dbContext, int companyId, int partnerId) =>
+        dbContext.Set<PartnerAddress>().Where(item => item.PartnerId == partnerId && item.Partner.CompanyId == companyId);
+
+    private static PartnerAddressResponse ToResponse(PartnerAddress link) => new(
+        link.Id,
+        link.AddressId,
+        link.AddressTypeId,
+        link.IsDefault,
+        link.Address.StreetAddress,
+        link.Address.PostalCode,
+        link.Address.City,
+        link.Address.CountryCode);
+
+    private static async Task<IResult> ListPartnerAddressesAsync(
+        int companyId,
+        int partnerId,
+        SzAppDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        var items = await PartnerAddressesOf(dbContext, companyId, partnerId).AsNoTracking()
+            .Include(item => item.Address)
+            .OrderByDescending(item => item.IsDefault).ThenBy(item => item.Id)
+            .ToArrayAsync(cancellationToken);
+        return Results.Ok(items.Select(ToResponse));
+    }
+
+    private static async Task<IResult> CreatePartnerAddressAsync(
+        int companyId,
+        int partnerId,
+        SavePartnerAddressRequest request,
+        ClaimsPrincipal principal,
+        IMasterDataPermissionService permission,
+        SzAppDbContext dbContext,
+        IShortListValidator shortLists,
+        CancellationToken cancellationToken)
+    {
+        if (!await permission.CanWriteAsync(principal, companyId, cancellationToken))
+        {
+            return Results.Forbid();
+        }
+        var address = new SaveAddressRequest(request.StreetAddress, request.PostalCode, request.City, request.CountryCode);
+        var errors = MasterDataValidation.Validate(address);
+        if (errors.Count > 0)
+        {
+            return Results.ValidationProblem(errors);
+        }
+        await shortLists.EnsureTypeAsync(request.AddressTypeId, "AddressType", cancellationToken);
+        if (!await dbContext.Partners.AnyAsync(item => item.Id == partnerId && item.CompanyId == companyId, cancellationToken))
+        {
+            return Results.NotFound();
+        }
+
+        var link = new PartnerAddress
+        {
+            PartnerId = partnerId,
+            AddressTypeId = request.AddressTypeId,
+            IsDefault = request.IsDefault,
+            UpdatedAt = DateTimeOffset.UtcNow,
+            Address = new Address()
+        };
+        Apply(link.Address, address);
+        if (request.IsDefault)
+        {
+            await ClearDefaultAsync(dbContext, companyId, partnerId, request.AddressTypeId, null, cancellationToken);
+        }
+        dbContext.Set<PartnerAddress>().Add(link);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return Results.Created($"/api/v1/companies/{companyId}/partners/{partnerId}/addresses/{link.Id}", ToResponse(link));
+    }
+
+    private static async Task<IResult> UpdatePartnerAddressAsync(
+        int companyId,
+        int partnerId,
+        int partnerAddressId,
+        SavePartnerAddressRequest request,
+        ClaimsPrincipal principal,
+        IMasterDataPermissionService permission,
+        SzAppDbContext dbContext,
+        IShortListValidator shortLists,
+        CancellationToken cancellationToken)
+    {
+        if (!await permission.CanWriteAsync(principal, companyId, cancellationToken))
+        {
+            return Results.Forbid();
+        }
+        var address = new SaveAddressRequest(request.StreetAddress, request.PostalCode, request.City, request.CountryCode);
+        var errors = MasterDataValidation.Validate(address);
+        if (errors.Count > 0)
+        {
+            return Results.ValidationProblem(errors);
+        }
+        await shortLists.EnsureTypeAsync(request.AddressTypeId, "AddressType", cancellationToken);
+        var link = await PartnerAddressesOf(dbContext, companyId, partnerId).Include(item => item.Address)
+            .SingleOrDefaultAsync(item => item.Id == partnerAddressId, cancellationToken);
+        if (link is null)
+        {
+            return Results.NotFound();
+        }
+
+        if (request.IsDefault)
+        {
+            await ClearDefaultAsync(dbContext, companyId, partnerId, request.AddressTypeId, link.Id, cancellationToken);
+        }
+        link.AddressTypeId = request.AddressTypeId;
+        link.IsDefault = request.IsDefault;
+        link.UpdatedAt = DateTimeOffset.UtcNow;
+        Apply(link.Address, address);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return Results.Ok(ToResponse(link));
+    }
+
+    private static async Task<IResult> DeletePartnerAddressAsync(
+        int companyId,
+        int partnerId,
+        int partnerAddressId,
+        ClaimsPrincipal principal,
+        IMasterDataPermissionService permission,
+        SzAppDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        if (!await permission.CanWriteAsync(principal, companyId, cancellationToken))
+        {
+            return Results.Forbid();
+        }
+        var link = await PartnerAddressesOf(dbContext, companyId, partnerId).Include(item => item.Address)
+            .SingleOrDefaultAsync(item => item.Id == partnerAddressId, cancellationToken);
+        if (link is null)
+        {
+            return Results.NotFound();
+        }
+
+        dbContext.Set<PartnerAddress>().Remove(link);
+        // Address is shared with building entrances; drop it only when nothing else references it.
+        var stillUsed = await dbContext.Set<PartnerAddress>().AnyAsync(
+                item => item.AddressId == link.AddressId && item.Id != link.Id, cancellationToken) ||
+            await dbContext.Set<BuildingEntrance>().AnyAsync(item => item.AddressId == link.AddressId, cancellationToken);
+        if (!stillUsed)
+        {
+            dbContext.Addresses.Remove(link.Address);
+        }
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            return Results.Conflict(new { message = "Adresa se ne može obrisati dok je u upotrebi." });
+        }
+        return Results.NoContent();
+    }
+
+    private static async Task ClearDefaultAsync(
+        SzAppDbContext dbContext, int companyId, int partnerId, int addressTypeId, int? exceptId, CancellationToken cancellationToken)
+    {
+        var others = await PartnerAddressesOf(dbContext, companyId, partnerId)
+            .Where(item => item.AddressTypeId == addressTypeId && item.IsDefault && item.Id != exceptId)
+            .ToArrayAsync(cancellationToken);
+        foreach (var other in others)
+        {
+            other.IsDefault = false;
+        }
+    }
+
     private static async Task<IResult> ListAddressesAsync(
         int companyId,
         [AsParameters] MasterDataPageQuery query,
@@ -764,7 +933,10 @@ public static class MasterDataFeatureExtensions
         Mask(partner.Jmbg),
         partner.PartnerTypeId,
         partner.Language,
-        partner.Note);
+        partner.Note,
+        partner.IsSefUser,
+        partner.IsCrfUser,
+        partner.SkipAutoCheckSef);
 
     private static AddressResponse ToResponse(Address address) => new(
         address.Id,
@@ -812,6 +984,9 @@ public static class MasterDataFeatureExtensions
         partner.RegistrationNumber = TrimToNull(request.RegistrationNumber);
         partner.TaxNumber = TrimToNull(request.TaxNumber);
         partner.Jbkjs = TrimToNull(request.Jbkjs);
+        partner.IsSefUser = request.IsSefUser;
+        partner.IsCrfUser = request.IsCrfUser;
+        partner.SkipAutoCheckSef = request.SkipAutoCheckSef;
         // IdCardNumber/Jmbg are masked in PartnerResponse, so the client can never round-trip
         // the real value back unchanged — unlike every other field here, null on these two
         // means "leave as-is", not "clear it". Only overwrite when the client actually sent

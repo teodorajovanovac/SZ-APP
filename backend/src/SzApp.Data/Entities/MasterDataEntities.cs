@@ -38,6 +38,9 @@ public sealed class Partner
     public string? RegistrationNumber { get; set; }
     public string? TaxNumber { get; set; }
     public string? Jbkjs { get; set; }
+    public bool IsSefUser { get; set; }
+    public bool IsCrfUser { get; set; }
+    public bool SkipAutoCheckSef { get; set; }
     public string? IdCardNumber { get; set; }
     public string? Jmbg { get; set; }
     public int? PartnerTypeId { get; set; }
