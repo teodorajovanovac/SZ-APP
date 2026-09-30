@@ -290,6 +290,8 @@ public sealed class SzAppDbContext(DbContextOptions<SzAppDbContext> options)
             entity.Property(x => x.EventSource).HasMaxLength(50).IsUnicode(false);
             entity.HasIndex(x => new { x.CompanyId, x.Timestamp });
             entity.HasIndex(x => x.CorrelationId);
+            entity.HasIndex(x => new { x.EntityType, x.ItemId, x.Timestamp });
+            entity.HasIndex(x => new { x.StaffId, x.Timestamp });
             entity.HasOne(x => x.Company).WithMany().HasForeignKey(x => x.CompanyId);
             entity.HasOne(x => x.Staff).WithMany().HasForeignKey(x => x.StaffId);
         });
