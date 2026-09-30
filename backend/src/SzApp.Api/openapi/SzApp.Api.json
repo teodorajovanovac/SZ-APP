@@ -3395,6 +3395,134 @@
         }
       }
     },
+    "/api/v1/companies/{companyId}/notices/{noticeId}/pdf": {
+      "get": {
+        "tags": [
+          "Billing - Notices"
+        ],
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "noticeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "doubleSlip",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/v1/companies/{companyId}/notices/{noticeId}/lawsuit": {
+      "put": {
+        "tags": [
+          "Billing - Notices"
+        ],
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "noticeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetNoticeLawsuitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoticeResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/companies/{companyId}/notices/lawsuit/export": {
+      "get": {
+        "tags": [
+          "Billing - Notices"
+        ],
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "batchId",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/v1/companies/{companyId}/notice-templates": {
       "get": {
         "tags": [
@@ -3625,6 +3753,38 @@
       }
     },
     "/api/v1/companies/{companyId}/notice-batches": {
+      "get": {
+        "tags": [
+          "Billing - Notice batches"
+        ],
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NoticeBatchListItem"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "tags": [
           "Billing - Notice batches"
@@ -3658,6 +3818,211 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NoticeBatchResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/companies/{companyId}/notice-batches/{batchId}/pdf": {
+      "post": {
+        "tags": [
+          "Billing - Notice batches"
+        ],
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "batchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "doubleSlip",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/v1/companies/{companyId}/notice-batches/{batchId}/emails/preview": {
+      "post": {
+        "tags": [
+          "Billing - Notice batches"
+        ],
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "batchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoticeEmailPreviewResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/companies/{companyId}/notice-batches/{batchId}/emails/send": {
+      "post": {
+        "tags": [
+          "Billing - Notice batches"
+        ],
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "batchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoticeEmailSendResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/companies/{companyId}/notice-batches/{batchId}/costs/post": {
+      "post": {
+        "tags": [
+          "Billing - Notice batches"
+        ],
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "batchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoticeCostPostingResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/companies/{companyId}/notice-batches/{batchId}/costs/cancel": {
+      "post": {
+        "tags": [
+          "Billing - Notice batches"
+        ],
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "batchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoticeCostPostingResult"
                 }
               }
             }
@@ -8577,6 +8942,31 @@
           },
           "body": {
             "type": "string"
+          },
+          "subject": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "closing": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "signature": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "decisionDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
           }
         }
       },
@@ -10818,6 +11208,59 @@
           }
         }
       },
+      "NoticeBatchListItem": {
+        "required": [
+          "id",
+          "title",
+          "date",
+          "noticeCount",
+          "totalCosts",
+          "costsJournalEntryId"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "title": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "noticeCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "totalCosts": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "costsJournalEntryId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
       "NoticeBatchResponse": {
         "required": [
           "id",
@@ -10892,6 +11335,116 @@
           },
           "rowVersion": {
             "type": "string"
+          }
+        }
+      },
+      "NoticeCostPostingResult": {
+        "required": [
+          "batchId",
+          "costsJournalEntryId",
+          "journalEntryId",
+          "totalCosts"
+        ],
+        "type": "object",
+        "properties": {
+          "batchId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "costsJournalEntryId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "journalEntryId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "totalCosts": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "NoticeEmailPreviewResult": {
+        "required": [
+          "totalNotices",
+          "withEmail",
+          "missingEmail",
+          "missingCustomerNames"
+        ],
+        "type": "object",
+        "properties": {
+          "totalNotices": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "withEmail": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "missingEmail": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "missingCustomerNames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "NoticeEmailSendResult": {
+        "required": [
+          "enqueued",
+          "skipped"
+        ],
+        "type": "object",
+        "properties": {
+          "enqueued": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "skipped": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
         }
       },
@@ -11013,6 +11566,19 @@
           },
           "rowVersion": {
             "type": "string"
+          },
+          "isForLawsuit": {
+            "type": "boolean",
+            "default": false
+          },
+          "lawyerCost": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
           }
         }
       },
@@ -11045,6 +11611,31 @@
           },
           "rowVersion": {
             "type": "string"
+          },
+          "subject": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "closing": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "signature": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "decisionDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
           }
         }
       },
@@ -12541,6 +13132,27 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "SetNoticeLawsuitRequest": {
+        "required": [
+          "isForLawsuit",
+          "lawyerCost"
+        ],
+        "type": "object",
+        "properties": {
+          "isForLawsuit": {
+            "type": "boolean"
+          },
+          "lawyerCost": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
           }
         }
       },

@@ -94,54 +94,68 @@ public sealed class InvoicePdfService(
             if (data is null) { skipped++; continue; }
             var pdfBytes = InvoicePdfRenderer.Render(data);
             var fileName = $"{SanitizeFileNamePart(data.InvoiceNumber)}.pdf";
-
-            await using var pdfStream = new MemoryStream(pdfBytes);
-            var saved = await storage.SaveAsync(companyId, fileName, "application/pdf", pdfBytes.Length, pdfStream, ct);
-            var document = new DocumentRecord
-            {
-                CompanyId = companyId,
-                OwnerStaffId = staffId,
-                FileName = fileName,
-                RelativePath = saved.RelativePath,
-                ContentType = "application/pdf",
-                Size = pdfBytes.Length,
-                Sha256 = saved.Sha256,
-                SourceTable = "Invoice",
-                ReferenceId = invoiceId,
-                CreatedAt = timeProvider.GetUtcNow()
-            };
-            db.Add(document);
-
-            var sentEmail = new SentEmail
-            {
-                CompanyId = companyId,
-                CreatedByStaffId = staffId,
-                Subject = ApplyTokens(subject, data),
-                ToAddress = email,
-                BodyHtml = ApplyTokens(bodyTemplate, data),
-                CreatedAt = timeProvider.GetUtcNow(),
-                Status = EmailSendStatus.Queued,
-                NextAttemptAt = timeProvider.GetUtcNow()
-            };
-            sentEmail.Attachments.Add(new SentEmailAttachment { Document = document });
-            db.Add(sentEmail);
-            await db.SaveChangesAsync(ct); // need sentEmail.Id for the outbox payload/dedupe key
-
-            db.OutboxMessages.Add(new OutboxMessage
-            {
-                Id = Guid.NewGuid(),
-                CompanyId = companyId,
-                OccurredAt = timeProvider.GetUtcNow(),
-                Type = EmailOutboxMessageType,
-                DedupeKey = $"email:{sentEmail.Id}",
-                PayloadJson = JsonSerializer.Serialize(new SendEmailOutboxPayload(sentEmail.Id)),
-                CorrelationId = Guid.NewGuid().ToString("N")
-            });
-            await db.SaveChangesAsync(ct);
+            var document = await StoreDocumentAsync(db, storage, timeProvider, companyId, staffId, fileName, pdfBytes, "Invoice", invoiceId, ct);
+            await EnqueueEmailAsync(db, timeProvider, companyId, staffId, email,
+                ApplyTokens(subject, data), ApplyTokens(bodyTemplate, data), document, ct);
             enqueued++;
         }
 
         return new EmailSendResult(enqueued, skipped);
+    }
+
+    /// <summary>Saves a PDF through platform storage and tracks a DocumentRecord for it (saved with the next SaveChanges).</summary>
+    internal static async Task<DocumentRecord> StoreDocumentAsync(SzAppDbContext db, IPlatformDocumentStorage storage, TimeProvider clock,
+        int companyId, int staffId, string fileName, byte[] pdfBytes, string sourceTable, int referenceId, CancellationToken ct)
+    {
+        await using var pdfStream = new MemoryStream(pdfBytes);
+        var saved = await storage.SaveAsync(companyId, fileName, "application/pdf", pdfBytes.Length, pdfStream, ct);
+        var document = new DocumentRecord
+        {
+            CompanyId = companyId,
+            OwnerStaffId = staffId,
+            FileName = fileName,
+            RelativePath = saved.RelativePath,
+            ContentType = "application/pdf",
+            Size = pdfBytes.Length,
+            Sha256 = saved.Sha256,
+            SourceTable = sourceTable,
+            ReferenceId = referenceId,
+            CreatedAt = clock.GetUtcNow()
+        };
+        db.Add(document);
+        return document;
+    }
+
+    /// <summary>Queues one email with the document attached via the existing SentEmail + outbox pipeline (the Worker sends it).</summary>
+    internal static async Task EnqueueEmailAsync(SzAppDbContext db, TimeProvider clock, int companyId, int staffId,
+        string toAddress, string subject, string bodyHtml, DocumentRecord attachment, CancellationToken ct)
+    {
+        var sentEmail = new SentEmail
+        {
+            CompanyId = companyId,
+            CreatedByStaffId = staffId,
+            Subject = subject,
+            ToAddress = toAddress,
+            BodyHtml = bodyHtml,
+            CreatedAt = clock.GetUtcNow(),
+            Status = EmailSendStatus.Queued,
+            NextAttemptAt = clock.GetUtcNow()
+        };
+        sentEmail.Attachments.Add(new SentEmailAttachment { Document = attachment });
+        db.Add(sentEmail);
+        await db.SaveChangesAsync(ct); // need sentEmail.Id for the outbox payload/dedupe key
+
+        db.OutboxMessages.Add(new OutboxMessage
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = companyId,
+            OccurredAt = clock.GetUtcNow(),
+            Type = EmailOutboxMessageType,
+            DedupeKey = $"email:{sentEmail.Id}",
+            PayloadJson = JsonSerializer.Serialize(new SendEmailOutboxPayload(sentEmail.Id)),
+            CorrelationId = Guid.NewGuid().ToString("N")
+        });
+        await db.SaveChangesAsync(ct);
     }
 
     private async Task<List<int>> InvoiceIdsForBatchAsync(int companyId, int batchId, CancellationToken ct) =>
@@ -154,7 +168,9 @@ public sealed class InvoicePdfService(
     // ponytail: no seeded "Email" channel id in ShortList yet, so the email channel is identified
     // heuristically (contains '@') rather than by ChannelId. Upgrade: filter by Channel.Caption
     // once a stable seed value exists for the communication-channel ShortList.
-    private async Task<string?> FindRecipientEmailAsync(int partnerId, CancellationToken ct) =>
+    private Task<string?> FindRecipientEmailAsync(int partnerId, CancellationToken ct) => FindRecipientEmailAsync(db, partnerId, ct);
+
+    internal static async Task<string?> FindRecipientEmailAsync(SzAppDbContext db, int partnerId, CancellationToken ct) =>
         await db.Set<PartnerCommunication>().AsNoTracking()
             .Where(x => x.PartnerId == partnerId && x.IsActive && x.IsRegisteredForInvoiceReceipt && x.ValueNormalized.Contains('@'))
             .OrderBy(x => x.SortIndex)
@@ -180,6 +196,6 @@ public sealed class InvoicePdfService(
         .Replace("{DueDate}", data.DueDate.ToString("d.M.yyyy."))
         .Replace("{AmountDue}", data.AmountDue.ToString("N2"));
 
-    private static string SanitizeFileNamePart(string value) =>
+    internal static string SanitizeFileNamePart(string value) =>
         string.Concat(value.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
 }
