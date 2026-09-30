@@ -14,15 +14,16 @@ export function InvoiceBatchPreview({ companyId, request }: { companyId: number;
   const data = preview.data
   const results = generate.data?.companies ?? []
   const single = data?.buildings.length === 1 ? data.buildings[0] : null
+  const only = results.length === 1 ? results[0] : undefined
 
   return (
     <Stack spacing={2}>
       <Typography component="h2" variant="h6">{t('billing2_.title')}</Typography>
       {error ? <Alert severity="error">{getErrorMessage(error, t('billing2_.previewFailed'))}</Alert> : null}
       {generate.data ? (
-        results.length === 1 && !results[0].error ? (
-          <Alert severity={results[0].alreadyGenerated ? 'info' : 'success'}>
-            {t(results[0].alreadyGenerated ? 'billing2_.alreadyGenerated' : 'billing2_.generated', { count: results[0].invoiceCount })}
+        only && !only.error ? (
+          <Alert severity={only.alreadyGenerated ? 'info' : 'success'}>
+            {t(only.alreadyGenerated ? 'billing2_.alreadyGenerated' : 'billing2_.generated', { count: only.invoiceCount })}
           </Alert>
         ) : (
           <Alert severity={results.some((r) => r.error) ? 'warning' : 'success'}>
