@@ -79,6 +79,9 @@ public sealed class LegacyKeyMap
     public string SourceKey { get; set; } = string.Empty;
     public string TargetTable { get; set; } = string.Empty;
     public string TargetKey { get; set; } = string.Empty;
+    // ETL-05: hash of the source row as last imported. Same hash on re-import = unchanged (skip),
+    // different hash = changed in Access since (update the target row in place).
+    public string? RowHash { get; set; }
     public EtlRun EtlRun { get; set; } = null!;
 }
 

@@ -341,6 +341,7 @@ public sealed class SzAppDbContext(DbContextOptions<SzAppDbContext> options)
             entity.Property(x => x.SourceKey).HasMaxLength(255);
             entity.Property(x => x.TargetTable).HasMaxLength(128).IsUnicode(false);
             entity.Property(x => x.TargetKey).HasMaxLength(255);
+            entity.Property(x => x.RowHash).HasMaxLength(64).IsUnicode(false);
             entity.HasIndex(x => new { x.SourceTable, x.SourceKey, x.TargetTable }).IsUnique();
             entity.HasOne(x => x.EtlRun).WithMany().HasForeignKey(x => x.EtlRunId);
         });

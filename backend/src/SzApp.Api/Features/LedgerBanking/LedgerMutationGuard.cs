@@ -57,7 +57,8 @@ public sealed class LedgerMutationGuardInterceptor(LedgerMutationScope mutationS
 
     private async Task GuardAsync(DbContext? context, CancellationToken cancellationToken)
     {
-        if (context is not SzAppDbContext dbContext)
+        // ETL-06: historical legacy GL import (LegacyImportScope) writes posted journals directly.
+        if (context is not SzAppDbContext dbContext || LegacyImportScope.IsActive)
         {
             return;
         }
