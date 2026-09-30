@@ -1,12 +1,14 @@
 import { useMemo, useState } from 'react'
-import AddIcon from '@mui/icons-material/Add'
 import EditIcon from '@mui/icons-material/Edit'
-import { Alert, Button, IconButton, Link, Stack, TextField, Tooltip, Typography } from '@mui/material'
-import type { ColumnDef, PaginationState, SortingState } from '@tanstack/react-table'
+import { Alert, IconButton, Link, Stack, Tooltip } from '@mui/material'
+import type { ColumnDef } from '@tanstack/react-table'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { FormDialog } from '../../../shared/components/FormDialog'
+import { PageHeader } from '../../../shared/components/PageHeader'
+import { SearchField } from '../../../shared/components/SearchField'
 import { ServerDataTable } from '../../../shared/components/ServerDataTable'
+import { urlTableProps, useUrlState } from '../../../shared/hooks/useUrlState'
 import { usePartners } from '../useMasterData'
 import { PartnerDetail } from './PartnerDetail'
 import type { Partner } from '../types'
@@ -18,25 +20,23 @@ interface PartnerListProps {
 
 export function PartnerList({ companyId, onSelect }: PartnerListProps) {
   const { t } = useTranslation()
-  const [search, setSearch] = useState('')
-  const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 25 })
-  const [sorting, setSorting] = useState<SortingState>([{ id: 'shortName', desc: false }])
+  const [url, setUrl] = useUrlState({ q: '', page: 0, size: 25, sort: 'shortName', desc: false })
+  const table = urlTableProps(url, setUrl)
   const navigate = useNavigate()
   const [viewing, setViewing] = useState<Partner>()
-  const sort = sorting[0]
   const partners = usePartners(companyId, {
-    page: pagination.pageIndex + 1,
-    pageSize: pagination.pageSize,
-    search,
-    sortBy: sort?.id,
-    descending: sort?.desc,
+    page: url.page + 1,
+    pageSize: url.size,
+    search: url.q,
+    sortBy: url.sort,
+    descending: url.desc,
   })
 
   const columns = useMemo<ColumnDef<Partner>[]>(
     () => [
       {
         accessorKey: 'shortName',
-        header: 'Kratak naziv',
+        header: t('fields.shortName'),
         cell: ({ row, getValue }) => (
           <Link
             component="button"
@@ -52,10 +52,10 @@ export function PartnerList({ companyId, onSelect }: PartnerListProps) {
           </Link>
         ),
       },
-      { accessorKey: 'name', header: 'Pun naziv', meta: { ellipsis: true } },
-      { accessorKey: 'taxNumber', header: 'PIB', meta: { align: 'left', numeric: true } },
-      { accessorKey: 'registrationNumber', header: 'Matični broj', enableSorting: false, meta: { align: 'left', numeric: true } },
-      { accessorKey: 'language', header: 'Jezik', enableSorting: false },
+      { accessorKey: 'name', header: t('fields.fullName'), meta: { ellipsis: true } },
+      { accessorKey: 'taxNumber', header: t('fields.taxNumber'), meta: { align: 'left', numeric: true } },
+      { accessorKey: 'registrationNumber', header: t('fields.registrationNumber'), enableSorting: false, meta: { align: 'left', numeric: true } },
+      { accessorKey: 'language', header: t('fields.language'), enableSorting: false },
       {
         id: 'actions',
         header: t('ui.actions'),
@@ -75,33 +75,23 @@ export function PartnerList({ companyId, onSelect }: PartnerListProps) {
 
   return (
     <Stack spacing={2}>
-      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'center' }} justifyContent="space-between">
-        <Typography component="h1" variant="h1">Partneri</Typography>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate('/partners/new')}>
-          {t('partners_.new')}
-        </Button>
-      </Stack>
-      <TextField
-        label="Pretraga po nazivu ili PIB-u"
-        value={search}
-        onChange={(event) => {
-          setSearch(event.target.value)
-          setPagination((value) => ({ ...value, pageIndex: 0 }))
-        }}
-        size="small"
+      <PageHeader
+        title={t('partners_.title')}
+        subtitle={t('partners_.subtitle')}
+        onNew={() => navigate('/partners/new')}
+        newLabel={t('partners_.new')}
+        filters={<SearchField label={t('partners_.search')} value={url.q} onChange={(q) => setUrl({ q })} />}
       />
-      {partners.isError && <Alert severity="error">Partneri nisu mogli da se učitaju.</Alert>}
+      {partners.isError && <Alert severity="error">{t('partners_.loadError')}</Alert>}
       <ServerDataTable
-        ariaLabel="Partneri"
+        ariaLabel={t('partners_.title')}
         rows={partners.data?.items ?? []}
         columns={columns}
         rowCount={partners.data?.totalCount ?? 0}
-        pagination={pagination}
-        sorting={sorting}
-        onPaginationChange={setPagination}
-        onSortingChange={setSorting}
+        {...table}
         isLoading={partners.isLoading}
-        emptyMessage={search ? undefined : t('partners_.empty')}
+        emptyMessage={url.q ? undefined : t('partners_.empty')}
+        emptyHint={url.q ? t('partners_.emptyHint') : undefined}
         getRowId={(row) => String(row.id)}
       />
 

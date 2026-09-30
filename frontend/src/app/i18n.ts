@@ -9,6 +9,7 @@ import { loginResources } from './i18n.login'
 import { bankResources } from './i18n.bank'
 import { billing2Resources } from './i18n.billing2'
 import { noticeDocsResources } from './i18n.noticeDocs'
+import { partnerFormResources } from './i18n.partnerForm'
 
 export const resources = {
   'sr-Latn': {
@@ -1426,5 +1427,6 @@ for (const [lng, bundle] of Object.entries(loginResources)) i18n.addResourceBund
 for (const [lng, bundle] of Object.entries(bankResources)) i18n.addResourceBundle(lng, 'translation', bundle, true, false)
 for (const [lng, bundle] of Object.entries(billing2Resources)) i18n.addResourceBundle(lng, 'translation', bundle, true, false)
 for (const [lng, bundle] of Object.entries(noticeDocsResources)) i18n.addResourceBundle(lng, 'translation', bundle, true, false)
+for (const [lng, bundle] of Object.entries(partnerFormResources)) i18n.addResourceBundle(lng, 'translation', bundle, true, false)
 
 export default i18n

@@ -13,14 +13,14 @@ import { PartnerAddressesSection } from './PartnerAddressesSection'
 import type { Partner, SavePartner } from '../types'
 
 const partnerSchema = z.object({
-  shortName: z.string().trim().min(1, 'Kratak naziv je obavezan.').max(100),
-  name: z.string().trim().min(1, 'Pun naziv je obavezan.').max(255),
-  registrationNumber: z.string().trim().max(10).refine((v) => !v || isValidMb(v), 'Matični broj nije ispravan (8 cifara sa kontrolnom cifrom).').optional(),
-  taxNumber: z.string().trim().max(10).refine((v) => !v || isValidPib(v), 'PIB nije ispravan (9 cifara sa kontrolnom cifrom).').optional(),
+  shortName: z.string().trim().min(1, 'validation.shortNameRequired').max(100),
+  name: z.string().trim().min(1, 'validation.fullNameRequired').max(255),
+  registrationNumber: z.string().trim().max(10).refine((v) => !v || isValidMb(v), 'partnerForm_.mbInvalid').optional(),
+  taxNumber: z.string().trim().max(10).refine((v) => !v || isValidPib(v), 'partnerForm_.pibInvalid').optional(),
   jbkjs: z.string().trim().max(10).optional(),
   idCardNumber: z.string().trim().max(20).optional(),
-  jmbg: z.string().trim().max(15).refine((v) => !v || isValidJmbg(v), 'JMBG nije ispravan (13 cifara sa kontrolnom cifrom).').optional(),
-  language: z.string().trim().min(1).max(10),
+  jmbg: z.string().trim().max(15).refine((v) => !v || isValidJmbg(v), 'partnerForm_.jmbgInvalid').optional(),
+  language: z.string().trim().min(1, 'validation.required').max(10),
   note: z.string().optional(),
   partnerTypeId: z.number().nullable(),
   isSefUser: z.boolean(),
@@ -39,6 +39,7 @@ interface PartnerFormProps {
 
 export function PartnerForm({ companyId, partner, onSaved, onCancel }: PartnerFormProps) {
   const { t } = useTranslation()
+  const message = (error?: { message?: string }) => (error?.message ? t(error.message) : undefined)
   // The company list is already limited to what the signed-in staff member may access.
   const { companies } = useActiveCompany()
   const [selectedCompanyId, setSelectedCompanyId] = useState(partner?.companyId ?? companyId)
@@ -87,14 +88,14 @@ export function PartnerForm({ companyId, partner, onSaved, onCancel }: PartnerFo
 
   return (
     <Stack component="form" spacing={2} onSubmit={handleSubmit(submit)} noValidate>
-      {save.isError && <Alert severity="error">{getErrorMessage(save.error, 'Partner nije sačuvan. Proverite podatke i pokušajte ponovo.')}</Alert>}
+      {save.isError && <Alert severity="error">{getErrorMessage(save.error, t('partners_.saveError'))}</Alert>}
       <Grid container spacing={2} columnSpacing={3}>
-        <Section>Identifikacija</Section>
+        <Section>{t('sections.identification')}</Section>
         <Grid size={{ xs: 12, sm: 6 }}>
-          <TextField fullWidth size="small" label="Kratak naziv" required {...register('shortName')} error={!!errors.shortName} helperText={errors.shortName?.message} />
+          <TextField fullWidth size="small" label={t('fields.shortName')} required {...register('shortName')} error={!!errors.shortName} helperText={message(errors.shortName)} />
         </Grid>
         <Grid size={{ xs: 12, sm: 6 }}>
-          <TextField fullWidth size="small" label="Pun naziv" required {...register('name')} error={!!errors.name} helperText={errors.name?.message} />
+          <TextField fullWidth size="small" label={t('fields.fullName')} required {...register('name')} error={!!errors.name} helperText={message(errors.name)} />
         </Grid>
         <Grid size={{ xs: 12, sm: 6 }}>
           <Controller
@@ -105,11 +106,11 @@ export function PartnerForm({ companyId, partner, onSaved, onCancel }: PartnerFo
                 select
                 fullWidth
                 size="small"
-                label="Tip partnera"
+                label={t('partnerForm_.partnerType')}
                 value={field.value ?? ''}
                 onChange={(event) => field.onChange(event.target.value === '' ? null : Number(event.target.value))}
               >
-                <MenuItem value=""><em>Nije izabran</em></MenuItem>
+                <MenuItem value=""><em>{t('partnerForm_.notSelected')}</em></MenuItem>
                 {partnerTypes.data?.map((type) => <MenuItem key={type.id} value={type.id}>{type.caption}</MenuItem>)}
               </TextField>
             )}
@@ -120,7 +121,7 @@ export function PartnerForm({ companyId, partner, onSaved, onCancel }: PartnerFo
             select
             fullWidth
             size="small"
-            label="Kompanija"
+            label={t('partnerForm_.company')}
             value={selectedCompanyId}
             onChange={(event) => setSelectedCompanyId(Number(event.target.value))}
           >
@@ -128,13 +129,13 @@ export function PartnerForm({ companyId, partner, onSaved, onCancel }: PartnerFo
           </TextField>
         </Grid>
         <Grid size={{ xs: 12, sm: 3 }}>
-          <TextField fullWidth size="small" label="Matični broj" {...register('registrationNumber')} error={!!errors.registrationNumber} helperText={errors.registrationNumber?.message} />
+          <TextField fullWidth size="small" label={t('fields.registrationNumber')} {...register('registrationNumber')} error={!!errors.registrationNumber} helperText={message(errors.registrationNumber)} />
         </Grid>
         <Grid size={{ xs: 12, sm: 3 }}>
-          <TextField fullWidth size="small" label="PIB" {...register('taxNumber')} error={!!errors.taxNumber} helperText={errors.taxNumber?.message} />
+          <TextField fullWidth size="small" label={t('fields.taxNumber')} {...register('taxNumber')} error={!!errors.taxNumber} helperText={message(errors.taxNumber)} />
         </Grid>
         <Grid size={{ xs: 12, sm: 3 }}>
-          <TextField fullWidth size="small" label="JBKJS" {...register('jbkjs')} error={!!errors.jbkjs} helperText={errors.jbkjs?.message} />
+          <TextField fullWidth size="small" label={t('fields.jbkjs')} {...register('jbkjs')} error={!!errors.jbkjs} helperText={message(errors.jbkjs)} />
         </Grid>
         <Grid size={{ xs: 12, sm: 3 }}>
           <FormGroup row sx={{ flexWrap: 'nowrap' }}>
@@ -145,53 +146,53 @@ export function PartnerForm({ companyId, partner, onSaved, onCancel }: PartnerFo
               <FormControlLabel control={<Checkbox size="small" checked={field.value} onChange={(e) => field.onChange(e.target.checked)} />} label="CRF" />
             )} />
             <Controller control={control} name="skipAutoCheckSef" render={({ field }) => (
-              <FormControlLabel control={<Checkbox size="small" checked={field.value} onChange={(e) => field.onChange(e.target.checked)} />} label="Bez provere" />
+              <FormControlLabel control={<Checkbox size="small" checked={field.value} onChange={(e) => field.onChange(e.target.checked)} />} label={t('partnerForm_.skipValidation')} />
             )} />
           </FormGroup>
         </Grid>
 
-        <Section>Lični podaci</Section>
+        <Section>{t('sections.personal')}</Section>
         <Grid size={{ xs: 12, sm: 4 }}>
           <TextField
             fullWidth
             size="small"
-            label="Broj lične karte"
+            label={t('fields.idCardNumber')}
             placeholder={partner?.maskedIdCardNumber ?? undefined}
             {...register('idCardNumber')}
             error={!!errors.idCardNumber}
-            helperText={errors.idCardNumber?.message ?? (partner?.maskedIdCardNumber ? t('partners_.maskedFieldHint', { value: partner.maskedIdCardNumber }) : undefined)}
+            helperText={message(errors.idCardNumber) ?? (partner?.maskedIdCardNumber ? t('partners_.maskedFieldHint', { value: partner.maskedIdCardNumber }) : undefined)}
           />
         </Grid>
         <Grid size={{ xs: 12, sm: 4 }}>
           <TextField
             fullWidth
             size="small"
-            label="JMBG"
+            label={t('fields.jmbg')}
             placeholder={partner?.maskedJmbg ?? undefined}
             {...register('jmbg')}
             error={!!errors.jmbg}
-            helperText={errors.jmbg?.message ?? (partner?.maskedJmbg ? t('partners_.maskedFieldHint', { value: partner.maskedJmbg }) : undefined)}
+            helperText={message(errors.jmbg) ?? (partner?.maskedJmbg ? t('partners_.maskedFieldHint', { value: partner.maskedJmbg }) : undefined)}
           />
         </Grid>
         <Grid size={{ xs: 12, sm: 4 }}>
-          <TextField fullWidth size="small" label="Jezik" required {...register('language')} error={!!errors.language} helperText={errors.language?.message} />
+          <TextField fullWidth size="small" label={t('fields.language')} required {...register('language')} error={!!errors.language} helperText={message(errors.language)} />
         </Grid>
 
-        <Section>Adrese</Section>
+        <Section>{t('partnerForm_.addresses')}</Section>
         <Grid size={12}>
           {partner
             ? <PartnerAddressesSection companyId={partner.companyId} partnerId={partner.id} />
-            : <Typography color="text.secondary" variant="body2">Adrese se unose nakon što se partner prvi put sačuva.</Typography>}
+            : <Typography color="text.secondary" variant="body2">{t('partnerForm_.addressesAfterSave')}</Typography>}
         </Grid>
 
-        <Section>Napomena</Section>
+        <Section>{t('sections.note')}</Section>
         <Grid size={12}>
-          <TextField fullWidth size="small" label="Napomena" multiline minRows={3} {...register('note')} />
+          <TextField fullWidth size="small" label={t('fields.note')} multiline minRows={3} {...register('note')} />
         </Grid>
       </Grid>
       <Stack direction="row" spacing={1} justifyContent="flex-end">
-        {onCancel && <Button onClick={onCancel}>Odustani</Button>}
-        <Button type="submit" variant="contained" disabled={save.isPending}>Sačuvaj</Button>
+        {onCancel && <Button onClick={onCancel}>{t('common.cancel')}</Button>}
+        <Button type="submit" variant="contained" disabled={save.isPending}>{t('common.save')}</Button>
       </Stack>
     </Stack>
   )
