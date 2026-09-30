@@ -36,6 +36,7 @@ const StaffListPage = page(() => import('../features/staff/StaffListPage'), 'Sta
 const StaffDetailPage = page(() => import('../features/staff/StaffDetailPage'), 'StaffDetailPage')
 const SettingsPage = page(() => import('../features/administration/SettingsPage'), 'SettingsPage')
 const ShortListsPage = page(() => import('../features/administration/ShortListsPage'), 'ShortListsPage')
+const AuditLogPage = page(() => import('../features/administration/AuditLogPage'), 'AuditLogPage')
 const BuildingEntranceDetailPage = page(() => import('../features/master-data/pages/BuildingEntranceDetailPage'), 'BuildingEntranceDetailPage')
 const PartnerDetailPage = page(() => import('../features/master-data/pages/PartnerDetailPage'), 'PartnerDetailPage')
 const UnitDetailPage = page(() => import('../features/master-data/pages/UnitDetailPage'), 'UnitDetailPage')
@@ -77,6 +78,7 @@ function AuthenticatedRoutes() {
               <Route path="staff" element={<StaffListPage />} />
               <Route path="staff/:staffId" element={<StaffDetailPage />} />
               <Route path="settings" element={<SettingsPage />} />
+              <Route path="audit" element={<AuditLogPage />} />
             </Route>
             <Route element={<RoleGuard allowedRoles={['Root']} />}>
               <Route path="short-lists" element={<ShortListsPage />} />

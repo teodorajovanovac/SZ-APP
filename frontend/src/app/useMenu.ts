@@ -11,6 +11,7 @@ import GroupsIcon from '@mui/icons-material/Groups'
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline'
 import ImportExportIcon from '@mui/icons-material/ImportExport'
 import ListAltIcon from '@mui/icons-material/ListAlt'
+import HistoryIcon from '@mui/icons-material/History'
 import LocalShippingIcon from '@mui/icons-material/LocalShipping'
 import NotificationsIcon from '@mui/icons-material/Notifications'
 import PaymentsIcon from '@mui/icons-material/Payments'
@@ -39,6 +40,7 @@ const iconsByName: Record<string, SvgIconComponent> = {
   Groups: GroupsIcon,
   ImportExport: ImportExportIcon,
   ListAlt: ListAltIcon,
+  History: HistoryIcon,
   LocalShipping: LocalShippingIcon,
   Notifications: NotificationsIcon,
   Payments: PaymentsIcon,

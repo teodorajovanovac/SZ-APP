@@ -1,5 +1,6 @@
 using SzApp.Api.Features.Audit;
 using System.Security.Claims;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -121,6 +122,15 @@ builder.Services.AddHealthChecks()
     .AddCheck("self", () => HealthCheckResult.Healthy(), tags: ["live"])
     .AddCheck<DatabaseHealthCheck>("sqlserver", tags: ["ready"]);
 
+// ponytail: per-IP window; behind a reverse proxy add UseForwardedHeaders or all clients share one bucket.
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("login", context => RateLimitPartition.GetFixedWindowLimiter(
+        context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1) }));
+});
+
 var app = builder.Build();
 
 app.Use(async (context, next) =>
@@ -146,8 +156,10 @@ app.Use(async (context, next) =>
 app.UseExceptionHandler();
 if (requireHttps)
 {
+    app.UseHsts();
     app.UseHttpsRedirection();
 }
+app.UseRateLimiter();
 app.UseAuthentication();
 app.Use(async (context, next) =>
 {
@@ -235,7 +247,8 @@ auth.MapPost("/login", async (
     user.LastIp = httpContext.Connection.RemoteIpAddress?.ToString();
     await userManager.UpdateAsync(user);
     return Results.Ok(await BuildCurrentUserAsync(user, userManager, dbContext, cancellationToken));
-}).AddEndpointFilter<AntiforgeryEndpointFilter>().AllowAnonymous();
+}).AddEndpointFilter<AntiforgeryEndpointFilter>().AllowAnonymous()
+    .RequireRateLimiting("login");
 
 auth.MapPost("/change-password", async (
     ChangePasswordRequest request,
