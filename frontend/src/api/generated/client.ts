@@ -80,13 +80,29 @@ async function parseProblem(response: Response): Promise<ProblemDetails> {
   }
 }
 
-export async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
+// PERF-07: one antiforgery token per session instead of a round-trip before every write.
+// The token is bound to the signed-in identity, so login/logout drop it, and a 400/403 on a
+// write made with a cached token refreshes it and retries once.
+let csrfToken: Promise<AntiforgeryToken> | null = null
+export function resetAntiforgeryToken() {
+  csrfToken = null
+}
+function getAntiforgeryToken() {
+  csrfToken ??= apiRequest<AntiforgeryToken>('/api/v1/auth/antiforgery').catch((error: unknown) => {
+    csrfToken = null
+    throw error
+  })
+  return csrfToken
+}
+
+export async function apiRequest<T>(path: string, init: RequestInit = {}, retried = false): Promise<T> {
   const headers = new Headers(init.headers)
   headers.set('Accept', 'application/json')
   const method = (init.method ?? 'GET').toUpperCase()
   const unsafe = !['GET', 'HEAD', 'OPTIONS', 'TRACE'].includes(method)
-  if (unsafe && path !== '/api/v1/auth/antiforgery' && !headers.has('X-CSRF-TOKEN')) {
-    const csrf = await apiRequest<AntiforgeryToken>('/api/v1/auth/antiforgery')
+  const usesCachedCsrf = unsafe && path !== '/api/v1/auth/antiforgery' && !headers.has('X-CSRF-TOKEN')
+  if (usesCachedCsrf) {
+    const csrf = await getAntiforgeryToken()
     headers.set(csrf.headerName, csrf.token)
   }
   if (init.body && !(init.body instanceof FormData) && !headers.has('Content-Type')) {
@@ -100,6 +116,10 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
   })
 
   if (!response.ok) {
+    if (usesCachedCsrf && !retried && (response.status === 400 || response.status === 403)) {
+      resetAntiforgeryToken()
+      return apiRequest<T>(path, init, true)
+    }
     throw new ApiProblemError(await parseProblem(response))
   }
 
@@ -113,12 +133,13 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
 export const api = {
   auth: {
     login: async (request: LoginRequest) => {
+      resetAntiforgeryToken()
       const csrf = await apiRequest<AntiforgeryToken>('/api/v1/auth/antiforgery')
       return apiRequest<CurrentUser>('/api/v1/auth/login', {
         method: 'POST',
         headers: { [csrf.headerName]: csrf.token },
         body: JSON.stringify(request),
-      })
+      }).finally(resetAntiforgeryToken)
     },
     me: () => apiRequest<CurrentUser>('/api/v1/auth/me'),
     changePassword: (currentPassword: string, newPassword: string) =>
@@ -127,11 +148,12 @@ export const api = {
         body: JSON.stringify({ currentPassword, newPassword }),
       }),
     logout: async () => {
+      resetAntiforgeryToken()
       const csrf = await apiRequest<AntiforgeryToken>('/api/v1/auth/antiforgery')
       return apiRequest<void>('/api/v1/auth/logout', {
         method: 'POST',
         headers: { [csrf.headerName]: csrf.token },
-      })
+      }).finally(resetAntiforgeryToken)
     },
   },
   companies: {

@@ -1,6 +1,7 @@
 import { CssBaseline } from '@mui/material'
 import { ThemeProvider } from '@mui/material/styles'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
+import { lazy, Suspense, type ComponentType } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { AuthGate } from '../features/auth/AuthGate'
 import { AuthProvider } from '../features/auth/AuthProvider'
@@ -8,41 +9,48 @@ import { LoginPage } from '../features/auth/LoginPage'
 import { useAuth } from '../features/auth/useAuth'
 import { ActiveCompanyProvider } from '../features/companies/ActiveCompanyProvider'
 import { CompanyScopeProvider } from '../features/companies/CompanyScopeProvider'
-import { DashboardPage } from '../shared/pages/DashboardPage'
+import { useCompanyRole } from '../features/companies/useCompanyRole'
+import { NotifyProvider } from '../shared/feedback/NotifyProvider'
+import { PageSkeleton } from '../shared/components/PageSkeleton'
 import { NotFoundPage } from '../shared/pages/NotFoundPage'
 import { RoleGuard } from '../shared/routing/RoleGuard'
 import { AppShell } from './AppShell'
+import { queryClient } from './queryClient'
 import { theme } from './theme'
-import { useCompanyRole } from '../features/companies/useCompanyRole'
-import { AddressesPage, BuildingEntrancesPage, CompanyPage, LocationCategoriesPage, PartnersPage, UnitsPage } from '../features/master-data/MasterDataPages'
-import { StaffListPage } from '../features/staff/StaffListPage'
-import { StaffDetailPage } from '../features/staff/StaffDetailPage'
-import { SettingsPage } from '../features/administration/SettingsPage'
-import { ShortListsPage } from '../features/administration/ShortListsPage'
-import { BuildingEntranceDetailPage } from '../features/master-data/pages/BuildingEntranceDetailPage'
-import { PartnerDetailPage } from '../features/master-data/pages/PartnerDetailPage'
-import { UnitDetailPage } from '../features/master-data/pages/UnitDetailPage'
-import { ContractsPage } from '../features/contracts/ContractsPage'
-import { BillingWorkspace } from '../features/billing/BillingWorkspace'
-import { SupplierInvoiceList } from '../features/suppliers/SupplierInvoiceList'
-import { LedgerBankingPage } from '../features/ledger-banking/LedgerBankingPage'
-import { NoticeList } from '../features/notices/NoticeList'
-import { DocumentsPage } from '../features/documents'
-import { EmailPage } from '../features/email'
-import { PlatformAdministrationPage } from '../features/administration/PlatformAdministrationPage'
-import { ReportsPage } from '../features/reports/ReportsPage'
-import { EtlRunsPage } from '../features/imports/EtlRunsPage'
-import { ExportPage } from '../features/imports/ExportPage'
-import { LedgerCardsPage } from '../features/ledger-cards/LedgerCardsPage'
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 30_000,
-      refetchOnWindowFocus: false,
-    },
-  },
-})
+// PERF-01: one chunk per screen/module. `page` picks a named export so feature
+// modules keep their named exports (no default-export churn).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function page<M extends Record<K, ComponentType<any>>, K extends keyof M>(load: () => Promise<M>, name: K) {
+  return lazy(() => load().then((module) => ({ default: module[name] })))
+}
+const masterData = () => import('../features/master-data/MasterDataPages')
+const DashboardPage = page(() => import('../shared/pages/DashboardPage'), 'DashboardPage')
+const CompanyPage = page(masterData, 'CompanyPage')
+const LocationCategoriesPage = page(masterData, 'LocationCategoriesPage')
+const PartnersPage = page(masterData, 'PartnersPage')
+const AddressesPage = page(masterData, 'AddressesPage')
+const UnitsPage = page(masterData, 'UnitsPage')
+const BuildingEntrancesPage = page(masterData, 'BuildingEntrancesPage')
+const StaffListPage = page(() => import('../features/staff/StaffListPage'), 'StaffListPage')
+const StaffDetailPage = page(() => import('../features/staff/StaffDetailPage'), 'StaffDetailPage')
+const SettingsPage = page(() => import('../features/administration/SettingsPage'), 'SettingsPage')
+const ShortListsPage = page(() => import('../features/administration/ShortListsPage'), 'ShortListsPage')
+const BuildingEntranceDetailPage = page(() => import('../features/master-data/pages/BuildingEntranceDetailPage'), 'BuildingEntranceDetailPage')
+const PartnerDetailPage = page(() => import('../features/master-data/pages/PartnerDetailPage'), 'PartnerDetailPage')
+const UnitDetailPage = page(() => import('../features/master-data/pages/UnitDetailPage'), 'UnitDetailPage')
+const ContractsPage = page(() => import('../features/contracts/ContractsPage'), 'ContractsPage')
+const BillingWorkspace = page(() => import('../features/billing/BillingWorkspace'), 'BillingWorkspace')
+const SupplierInvoiceList = page(() => import('../features/suppliers/SupplierInvoiceList'), 'SupplierInvoiceList')
+const LedgerBankingPage = page(() => import('../features/ledger-banking/LedgerBankingPage'), 'LedgerBankingPage')
+const NoticeList = page(() => import('../features/notices/NoticeList'), 'NoticeList')
+const DocumentsPage = page(() => import('../features/documents'), 'DocumentsPage')
+const EmailPage = page(() => import('../features/email'), 'EmailPage')
+const PlatformAdministrationPage = page(() => import('../features/administration/PlatformAdministrationPage'), 'PlatformAdministrationPage')
+const ReportsPage = page(() => import('../features/reports/ReportsPage'), 'ReportsPage')
+const EtlRunsPage = page(() => import('../features/imports/EtlRunsPage'), 'EtlRunsPage')
+const ExportPage = page(() => import('../features/imports/ExportPage'), 'ExportPage')
+const LedgerCardsPage = page(() => import('../features/ledger-cards/LedgerCardsPage'), 'LedgerCardsPage')
 
 function AuthenticatedRoutes() {
   const { user } = useAuth()
@@ -111,14 +119,18 @@ export function App() {
       <CssBaseline />
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
-          <AuthProvider>
-            <Routes>
-              <Route path="/login" element={<LoginPage />} />
-              <Route element={<AuthGate />}>
-                <Route path="/*" element={<AuthenticatedRoutes />} />
-              </Route>
-            </Routes>
-          </AuthProvider>
+          <NotifyProvider>
+            <AuthProvider>
+              <Suspense fallback={<PageSkeleton />}>
+                <Routes>
+                  <Route path="/login" element={<LoginPage />} />
+                  <Route element={<AuthGate />}>
+                    <Route path="/*" element={<AuthenticatedRoutes />} />
+                  </Route>
+                </Routes>
+              </Suspense>
+            </AuthProvider>
+          </NotifyProvider>
         </BrowserRouter>
       </QueryClientProvider>
     </ThemeProvider>
