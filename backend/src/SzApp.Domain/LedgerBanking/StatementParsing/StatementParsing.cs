@@ -39,6 +39,8 @@ public interface IBankStatementParser
     bool IsSupported { get; }
     /// <summary>Legacy <c>IzvodIzBanke</c> detection by file name.</summary>
     bool MatchesFileName(string fileName);
+    /// <summary>Legacy content sniffing (IsAssecoOfficeBankig / IsPostanskaImport); only tried when no file-name rule matched.</summary>
+    bool MatchesContent(byte[] content) => false;
     ParsedStatement Parse(string fileName, byte[] content);
 }
 

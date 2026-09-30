@@ -55,7 +55,7 @@ public sealed partial class BankStatementService(
         int? bankAccountId,
         CancellationToken cancellationToken)
     {
-        var parser = BankStatementParsers.Resolve(fileName, bankCode);
+        var parser = BankStatementParsers.Resolve(fileName, bankCode, content);
         var parsed = BankStatementParsers.Parse(fileName, content, parser.BankCode);
         var warnings = new List<string>();
         var bankAccount = await ResolveCompanyBankAccountAsync(companyId, parsed.AccountNumber, bankAccountId, cancellationToken);
