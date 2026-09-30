@@ -34,7 +34,7 @@ export function NoticeDocumentsToolbar({ companyId, canWrite, canPost }: { compa
     if (!current) return
     if (current.kind === 'email') {
       const result = (await action.mutateAsync({ batchId, action: 'emails/send' })) as NoticeEmailSendResult
-      setMessage(t('noticeDocs_.sent', result))
+      setMessage(t('noticeDocs_.sent', { enqueued: result.enqueued, skipped: result.skipped }))
     } else {
       await action.mutateAsync({ batchId, action: current.kind === 'post' ? 'costs/post' : 'costs/cancel' })
     }

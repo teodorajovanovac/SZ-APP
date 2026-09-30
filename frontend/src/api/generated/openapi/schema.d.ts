@@ -2028,7 +2028,10 @@ export interface paths {
         put?: never;
         post: {
             parameters: {
-                query?: never;
+                query?: {
+                    template?: components["schemas"]["InvoicePdfTemplate"];
+                    doubleSlip?: boolean;
+                };
                 header?: never;
                 path: {
                     companyId: number;
@@ -2214,7 +2217,10 @@ export interface paths {
         };
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    template?: components["schemas"]["InvoicePdfTemplate"];
+                    doubleSlip?: boolean;
+                };
                 header?: never;
                 path: {
                     companyId: number;
@@ -2682,6 +2688,123 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/notices/{noticeId}/pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    doubleSlip?: boolean;
+                };
+                header?: never;
+                path: {
+                    companyId: number;
+                    noticeId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/notices/{noticeId}/lawsuit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    companyId: number;
+                    noticeId: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SetNoticeLawsuitRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["NoticeResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/notices/lawsuit/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    batchId?: number | string;
+                };
+                header?: never;
+                path: {
+                    companyId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/notice-templates": {
         parameters: {
             query?: never;
@@ -2875,7 +2998,28 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    companyId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["NoticeBatchListItem"][];
+                    };
+                };
+            };
+        };
         put?: never;
         post: {
             parameters: {
@@ -2899,6 +3043,196 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["NoticeBatchResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/notice-batches/{batchId}/pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: {
+                    doubleSlip?: boolean;
+                };
+                header?: never;
+                path: {
+                    companyId: number;
+                    batchId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/notice-batches/{batchId}/emails/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    companyId: number;
+                    batchId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["NoticeEmailPreviewResult"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/notice-batches/{batchId}/emails/send": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    companyId: number;
+                    batchId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["NoticeEmailSendResult"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/notice-batches/{batchId}/costs/post": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    companyId: number;
+                    batchId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["NoticeCostPostingResult"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/notice-batches/{batchId}/costs/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    companyId: number;
+                    batchId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["NoticeCostPostingResult"];
                     };
                 };
             };
@@ -6689,6 +7023,11 @@ export interface components {
         CreateNoticeTemplateRequest: {
             name: string;
             body: string;
+            subject?: null | string;
+            closing?: null | string;
+            signature?: null | string;
+            /** Format: date */
+            decisionDate?: null | string;
         };
         CreatePaymentOrderRequest: {
             templateTitle: string;
@@ -7089,6 +7428,7 @@ export interface components {
              */
             sortIndex: number | string;
         };
+        InvoicePdfTemplate: number;
         InvoicePreviewLineResponse: {
             name: string;
             /** Format: double */
@@ -7218,6 +7558,19 @@ export interface components {
             aditionalCostsUpperAmount: number | string;
             rowVersion: string;
         };
+        NoticeBatchListItem: {
+            /** Format: int32 */
+            id: number | string;
+            title: string;
+            /** Format: date */
+            date: string;
+            /** Format: int32 */
+            noticeCount: number | string;
+            /** Format: double */
+            totalCosts: number | string;
+            /** Format: int32 */
+            costsJournalEntryId: null | number | string;
+        };
         NoticeBatchResponse: {
             /** Format: int32 */
             id: number | string;
@@ -7235,6 +7588,31 @@ export interface components {
             /** Format: double */
             aditionalCostsUpperAmount: null | number | string;
             rowVersion: string;
+        };
+        NoticeCostPostingResult: {
+            /** Format: int32 */
+            batchId: number | string;
+            /** Format: int32 */
+            costsJournalEntryId: null | number | string;
+            /** Format: int32 */
+            journalEntryId: number | string;
+            /** Format: double */
+            totalCosts: number | string;
+        };
+        NoticeEmailPreviewResult: {
+            /** Format: int32 */
+            totalNotices: number | string;
+            /** Format: int32 */
+            withEmail: number | string;
+            /** Format: int32 */
+            missingEmail: number | string;
+            missingCustomerNames: string[];
+        };
+        NoticeEmailSendResult: {
+            /** Format: int32 */
+            enqueued: number | string;
+            /** Format: int32 */
+            skipped: number | string;
         };
         NoticeGenerationResponse: {
             /** Format: int32 */
@@ -7261,6 +7639,10 @@ export interface components {
             deliveryStatus: string;
             renderedDocumentPath: null | string;
             rowVersion: string;
+            /** @default false */
+            isForLawsuit: boolean;
+            /** Format: double */
+            lawyerCost?: null | number | string;
         };
         NoticeTemplateResponse: {
             /** Format: int32 */
@@ -7269,6 +7651,11 @@ export interface components {
             body: string;
             isActive: boolean;
             rowVersion: string;
+            subject?: null | string;
+            closing?: null | string;
+            signature?: null | string;
+            /** Format: date */
+            decisionDate?: null | string;
         };
         PartnerAddressRequest: {
             /** Format: int32 */
@@ -7594,6 +7981,11 @@ export interface components {
             /** Format: int32 */
             floorNumber: null | number | string;
             rowVersion: null | string;
+        };
+        SetNoticeLawsuitRequest: {
+            isForLawsuit: boolean;
+            /** Format: double */
+            lawyerCost: null | number | string;
         };
         SupplierInvoiceResponse: {
             /** Format: int32 */
