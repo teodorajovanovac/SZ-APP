@@ -60,6 +60,19 @@ public static class SerbianLegacyValueParser
         throw new FormatException($"'{value}' nije datum u formatu d.M.yyyy.");
     }
 
+    /// <summary>Date with optional time ("d.M.yyyy H:mm:ss"); Access-style ISO "yyyy-MM-dd HH:mm:ss" too.</summary>
+    public static DateTime ParseDateTime(string value)
+    {
+        var trimmed = value.Trim();
+        if (DateTime.TryParseExact(trimmed, DateTimeFormats, CultureInfo.InvariantCulture, DateTimeStyles.AllowWhiteSpaces, out var withTime) ||
+            DateTime.TryParseExact(trimmed, ["yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd"], CultureInfo.InvariantCulture, DateTimeStyles.AllowWhiteSpaces, out withTime))
+        {
+            return withTime;
+        }
+
+        return ParseDate(trimmed).ToDateTime(TimeOnly.MinValue);
+    }
+
     public static bool ParseAccessBoolean(string value) => value.Trim().ToLowerInvariant() switch
     {
         "-1" or "true" or "da" or "yes" => true,
