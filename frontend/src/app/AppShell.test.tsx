@@ -77,7 +77,8 @@ describe('AppShell', () => {
     expect(screen.queryByRole('link', { name: 'Administracija' })).not.toBeInTheDocument()
     expect(screen.getByLabelText('Aktivna kompanija')).toBeInTheDocument()
     // Sign-out lives in the account menu opened from the sidebar footer.
-    fireEvent.click(screen.getByText('Revizor').closest('[role="button"]') ?? screen.getByText('Revizor'))
+    const account = screen.getAllByText('Revizor').map((el) => el.closest('[role="button"]')).find(Boolean)
+    fireEvent.click(account!)
     expect(await screen.findByRole('menuitem', { name: 'Odjavi se' })).toBeInTheDocument()
   })
 })
