@@ -49,12 +49,7 @@ public static class RowBinder
 
             if (keyNames.Contains(name))
             {
-                if (isInsert && spec.Key != KeyMode.Identity)
-                {
-                    TrySet(entry, property, sourceKey, result);
-                }
-
-                continue;
+                continue; // keys are set by TableMaterializer before the entity is tracked
             }
 
             var column = spec.Aliases?.GetValueOrDefault(name) ?? name;
