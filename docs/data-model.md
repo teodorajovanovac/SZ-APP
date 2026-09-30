@@ -33,6 +33,12 @@ Prilikom izdavanja računa izdavaće se 3 računa po PartnerAccounts
 Svaki dobavljač je unet u Partner, dobavljači nemaju Units tj nemaju Contract.
 Svakako im je potreban ParnerAccount i sam CompanyId može biti Null jer su dobavljači uglavnom globalni.
 
+Partner tabela dopuna
+	[PassportNumber]	Text(15), -- Broj pasosa
+	[PassportCountry]	Text(50),  -- ZEMLJA IZDAVACA
+	
+
+
 ## data.mdb — 73 tables (real data)
 ```sql
 -- ----------------------------------------------------------
@@ -426,6 +432,9 @@ CREATE TABLE [Partner]
 	--za fitička lica
 	[IdCardNumber]	Text(10), -- Broj licne karte / 9 KARATERA
 	[Jmbg] 			Text(15), -- 13 karaktera
+	
+	[PassportNumber]	Text(15), -- Broj pasosa
+	[PassportCountry]	Text(50),  -- ZEMLJA IZDAVACA
 	
 	[PartnerTypeId]			Long Integer,  -- FK ShortList: TableName: PartnerType 
 	[Language]			Text (10),  -- def srLat / settings
