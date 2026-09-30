@@ -348,6 +348,7 @@ public static class BillingModelBuilderExtensions
             entity.HasIndex(x => new { x.CompanyId, x.IsArchived, x.Date });
             entity.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.NoAction);
             entity.HasOne<ShortList>().WithMany().HasForeignKey(x => x.PaymentOrderTypeId).OnDelete(DeleteBehavior.NoAction);
+            entity.HasOne<SupplierInvoice>().WithMany().HasForeignKey(x => x.SupplierInvoiceId).OnDelete(DeleteBehavior.NoAction);
         });
     }
 }

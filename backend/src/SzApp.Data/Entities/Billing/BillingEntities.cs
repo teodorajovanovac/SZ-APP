@@ -279,5 +279,7 @@ public sealed class PaymentOrder : ICompanyOwned
     public DateTimeOffset CreatedTimestamp { get; set; }
     public bool IsFavorite { get; set; }
     public bool IsArchived { get; set; }
+    // GAP-34 / legacy VIRMAN.refSourceID: the supplier invoice this virman pays (null = typed by hand).
+    public int? SupplierInvoiceId { get; set; }
     public byte[] RowVersion { get; set; } = [];
 }
