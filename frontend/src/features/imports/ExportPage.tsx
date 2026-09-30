@@ -47,6 +47,52 @@ async function downloadExport(path: string): Promise<{ blob: Blob; fileName: str
   return { blob: await response.blob(), fileName }
 }
 
+interface LegacyExport { name: string; title: string; needsPeriod: boolean }
+
+function LegacyExportSection({ companyId, encoding, all }: { companyId: number; encoding: string; all: boolean }) {
+  const { t } = useTranslation()
+  const [yymm, setYymm] = useState('')
+  const list = useQuery({
+    queryKey: ['export-legacy', companyId],
+    queryFn: () => apiRequest<LegacyExport[]>(`/api/v1/companies/${companyId}/export/legacy`),
+  })
+  const run = useMutation({
+    mutationFn: async (name: string) => {
+      const query = new URLSearchParams({ encoding, ...(yymm ? { yymm } : {}) })
+      const path = all ? `/api/v1/export/legacy/${name}?${query}` : `/api/v1/companies/${companyId}/export/legacy/${name}?${query}`
+      const { blob, fileName } = await downloadExport(path)
+      saveBlob(blob, fileName)
+    },
+  })
+  return (
+    <Paper variant="outlined" component="section" sx={{ p: { xs: 2, md: 3 } }}>
+      <Stack spacing={2}>
+        <Box>
+          <Typography component="h2" variant="h6">{t('legacyExport_.title')}</Typography>
+          <Typography color="text.secondary" variant="body2">{t('legacyExport_.subtitle')}</Typography>
+        </Box>
+        {run.isError ? <Alert severity="error">{t('legacyExport_.failed')}</Alert> : null}
+        <TextField label={t('legacyExport_.period')} value={yymm} onChange={(e) => setYymm(e.target.value.replace(/\D/g, '').slice(0, 4))} sx={{ maxWidth: 200 }} inputProps={{ inputMode: 'numeric' }} />
+        <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+          {(list.data ?? []).map((x) => (
+            <Button
+              key={x.name}
+              variant="outlined"
+              size="small"
+              startIcon={<FileDownloadOutlinedIcon />}
+              disabled={run.isPending || (x.needsPeriod && yymm.length !== 4)}
+              title={x.needsPeriod && yymm.length !== 4 ? t('legacyExport_.needsPeriod') : x.title}
+              onClick={() => run.mutate(x.name)}
+            >
+              {x.name}
+            </Button>
+          ))}
+        </Stack>
+      </Stack>
+    </Paper>
+  )
+}
+
 export function ExportPage() {
   const { t } = useTranslation()
   const { user } = useAuth()
@@ -176,6 +222,8 @@ export function ExportPage() {
           </Box>
         </Stack>
       </Paper>
+
+      <LegacyExportSection companyId={activeCompany.id} encoding={encoding} all={isRoot && scope === 'all'} />
     </Stack>
   )
 }

@@ -2,6 +2,7 @@ import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
 import { interestNoticeResources } from './i18n.interestNotices'
 import { cardsResources } from './i18n.cards'
+import { legacyResources } from './i18n.legacy'
 import { loginResources } from './i18n.login'
 import { bankResources } from './i18n.bank'
 import { billing2Resources } from './i18n.billing2'
@@ -1415,6 +1416,7 @@ void i18n.use(initReactI18next).init({
 })
 for (const [lng, bundle] of Object.entries(interestNoticeResources)) i18n.addResourceBundle(lng, 'translation', bundle, true, false)
 for (const [lng, bundle] of Object.entries(cardsResources)) i18n.addResourceBundle(lng, 'translation', bundle, true, false)
+for (const [lng, bundle] of Object.entries(legacyResources)) i18n.addResourceBundle(lng, 'translation', bundle, true, false)
 for (const [lng, bundle] of Object.entries(loginResources)) i18n.addResourceBundle(lng, 'translation', bundle, true, false)
 for (const [lng, bundle] of Object.entries(bankResources)) i18n.addResourceBundle(lng, 'translation', bundle, true, false)
 for (const [lng, bundle] of Object.entries(billing2Resources)) i18n.addResourceBundle(lng, 'translation', bundle, true, false)
