@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiRequest } from '../../api/generated/client'
 import '../../app/i18n.invoicePdf'
 import type { BillingPage, CreateInvoiceBatch, GenerateInvoicesRequest, GenerateInvoicesScopeResult, InvoiceBatch, InvoiceScopePreview, InvoiceSummary } from './types'
+import { saveBlob } from '../reports/reportsApi'
 
 // apiRequest attaches the antiforgery header automatically for unsafe methods; only
 // the idempotency key needs adding here.
@@ -146,12 +147,7 @@ export async function downloadFile(path: string, method: 'GET' | 'POST', fileNam
   }
   const response = await fetch(path, { method, credentials: 'include', headers })
   if (!response.ok) throw new Error(response.statusText)
-  const url = URL.createObjectURL(await response.blob())
-  const link = document.createElement('a')
-  link.href = url
-  link.download = fileName
-  link.click()
-  URL.revokeObjectURL(url)
+  saveBlob(await response.blob(), fileName)
 }
 
 export const downloadInvoicePdf = (companyId: number, invoiceId: number, sequenceNumber: string) =>

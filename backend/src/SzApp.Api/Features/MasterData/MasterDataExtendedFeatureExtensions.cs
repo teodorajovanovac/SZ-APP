@@ -642,7 +642,7 @@ public static class MasterDataExtendedFeatureExtensions
 
     private static void Apply(BankAccount item, SaveBankAccountRequest request)
     {
-        item.AccountNumber = Trim(request.AccountNumber);
+        item.AccountNumber = BankAccountNumber.TryFormat(request.AccountNumber, out var formatted) ? formatted : Trim(request.AccountNumber);
         item.IsActive = request.IsActive;
         item.PartnerId = request.PartnerId;
         item.SortIndex = request.SortIndex;
@@ -697,6 +697,8 @@ public static class MasterDataExtendedFeatureExtensions
         CancellationToken cancellationToken)
     {
         if (request.AccountNumber?.Length > 50) return "Broj računa može imati najviše 50 znakova.";
+        if (!string.IsNullOrWhiteSpace(request.AccountNumber) && !BankAccountNumber.TryFormat(request.AccountNumber, out _))
+            return "Broj računa nije u ispravnom formatu (npr. 160-0000000000123-45).";
         if (string.IsNullOrWhiteSpace(request.Currency) || request.Currency.Trim().Length != 3) return "Valuta mora imati tačno tri znaka.";
         if (request.PartnerId.HasValue && !await db.Partners.AnyAsync(
                 item => item.Id == request.PartnerId && (item.CompanyId == companyId || item.CompanyId == null),

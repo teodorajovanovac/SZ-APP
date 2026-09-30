@@ -66,7 +66,10 @@ public sealed record PartnerResponse(
     string? MaskedJmbg,
     int? PartnerTypeId,
     string Language,
-    string? Note);
+    string? Note,
+    bool IsSefUser = false,
+    bool IsCrfUser = false,
+    bool SkipAutoCheckSef = false);
 
 public sealed record SavePartnerRequest(
     string ShortName,
@@ -78,7 +81,29 @@ public sealed record SavePartnerRequest(
     string? Jmbg,
     int? PartnerTypeId,
     string Language,
-    string? Note);
+    string? Note,
+    bool IsSefUser = false,
+    bool IsCrfUser = false,
+    bool SkipAutoCheckSef = false,
+    int? CompanyId = null);
+
+public sealed record PartnerAddressResponse(
+    int Id,
+    int AddressId,
+    int AddressTypeId,
+    bool IsDefault,
+    string StreetAddress,
+    string? PostalCode,
+    string City,
+    string CountryCode);
+
+public sealed record SavePartnerAddressRequest(
+    int AddressTypeId,
+    bool IsDefault,
+    string StreetAddress,
+    string? PostalCode,
+    string City,
+    string CountryCode);
 
 public sealed record AddressResponse(
     int Id,

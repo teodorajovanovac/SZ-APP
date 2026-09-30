@@ -39,6 +39,7 @@ const ShortListsPage = page(() => import('../features/administration/ShortListsP
 const AuditLogPage = page(() => import('../features/administration/AuditLogPage'), 'AuditLogPage')
 const BuildingEntranceDetailPage = page(() => import('../features/master-data/pages/BuildingEntranceDetailPage'), 'BuildingEntranceDetailPage')
 const PartnerDetailPage = page(() => import('../features/master-data/pages/PartnerDetailPage'), 'PartnerDetailPage')
+const PartnerEditPage = page(() => import('../features/master-data/pages/PartnerEditPage'), 'PartnerEditPage')
 const UnitDetailPage = page(() => import('../features/master-data/pages/UnitDetailPage'), 'UnitDetailPage')
 const ContractsPage = page(() => import('../features/contracts/ContractsPage'), 'ContractsPage')
 const BillingWorkspace = page(() => import('../features/billing/BillingWorkspace'), 'BillingWorkspace')
@@ -73,6 +74,8 @@ function AuthenticatedRoutes() {
               <Route path="administration" element={<AdministrationRoute />} />
             </Route>
             <Route path="partners" element={<PartnersPage />} />
+            <Route path="partners/new" element={<PartnerEditPage />} />
+            <Route path="partners/:companyId/:partnerId/edit" element={<PartnerEditPage />} />
             <Route path="addresses" element={<AddressesPage />} />
             <Route element={<RoleGuard allowedRoles={['Root', 'Upravnik']} />}>
               <Route path="staff" element={<StaffListPage />} />

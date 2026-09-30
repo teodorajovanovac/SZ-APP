@@ -11,6 +11,7 @@ import type {
   PagedResponse,
   Partner,
   PartnerAccount,
+  PartnerAddress,
   ReplaceContract,
   SaveAddress,
   SaveBankAccount,
@@ -19,6 +20,7 @@ import type {
   SaveLocationCategory,
   SavePartner,
   SavePartnerAccount,
+  SavePartnerAddress,
   SaveStaffAccess,
   SaveUnit,
   ShortListItem,
@@ -86,6 +88,16 @@ export const masterDataApi = {
       }),
     remove: (companyId: number, partnerId: number) =>
       apiRequest<void>(`${companyBase(companyId)}/partners/${partnerId}`, { method: 'DELETE' }),
+    addresses: {
+      list: (companyId: number, partnerId: number) =>
+        apiRequest<PartnerAddress[]>(`${companyBase(companyId)}/partners/${partnerId}/addresses`),
+      create: (companyId: number, partnerId: number, value: SavePartnerAddress) =>
+        apiRequest<PartnerAddress>(`${companyBase(companyId)}/partners/${partnerId}/addresses`, { method: 'POST', body: JSON.stringify(value) }),
+      update: (companyId: number, partnerId: number, id: number, value: SavePartnerAddress) =>
+        apiRequest<PartnerAddress>(`${companyBase(companyId)}/partners/${partnerId}/addresses/${id}`, { method: 'PUT', body: JSON.stringify(value) }),
+      remove: (companyId: number, partnerId: number, id: number) =>
+        apiRequest<void>(`${companyBase(companyId)}/partners/${partnerId}/addresses/${id}`, { method: 'DELETE' }),
+    },
   },
   addresses: {
     list: (companyId: number, request: PageRequest) =>

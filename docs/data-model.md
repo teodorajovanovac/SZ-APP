@@ -11,6 +11,34 @@ No Access Relationships or indexes are defined in any of the three files — ver
 binary level (mdb-schema --relations --indexes), not just in the export. This is the actual state of
 the database, not a gap in the export.
 
+
+-- 2026-09-30 GREŠKA U MODELU BAZE PODATAKA -
+
+Imam gresku u struktri baze:
+
+PartnerAccount
+	ne treba da ima ContractId
+
+Contract
+	umesto AccountNumber treba da ima vezu PartnerAccountId
+
+Objašnjenje
+Svaka jedinica ima svoj Contract koji je samo jedan aktivan
+U Contract je definisan partner preko PartnerId i jedan Partner moze imati više Contract 
+ali obzirom da neki Partneri npr firme za izdavanje imaju potrebu da razdvoje jedinice Npr 3 stana i 6 GM razdavaju na 3 celine po 1 stan i 2 GM potrebno je u PartnerAccount za jednog partnera definisati 3 ParnerAccount gde je Account 2040 za sva 3 ParnerAccount a AccountNumber jedinstven u CompanyId npr 1001, 1002, 1003
+
+Time imamo 1 Partner, 3 ParnerAccount, 9 Units, 9 Contract.
+Prilikom izdavanja računa izdavaće se 3 računa po PartnerAccounts
+
+Svaki dobavljač je unet u Partner, dobavljači nemaju Units tj nemaju Contract.
+Svakako im je potreban ParnerAccount i sam CompanyId može biti Null jer su dobavljači uglavnom globalni.
+
+Partner tabela dopuna
+	[PassportNumber]	Text(15), -- Broj pasosa
+	[PassportCountry]	Text(50),  -- ZEMLJA IZDAVACA
+	
+
+
 ## data.mdb — 73 tables (real data)
 ```sql
 -- ----------------------------------------------------------
@@ -384,7 +412,6 @@ CREATE TABLE [PartnerAccount]
 	[CompanyId]			Long Integer,  -- FK to Companies.Id, MOŽE BITI NULL ZA DOBAVLJAČE JER SE KORISTI U SVI KOMPANIJAMA
 	[Account]			Text (10) NOT NULL, --FK to ChartOfAccounts.Account
 	[PartnerId]			Long Integer NOT NULL,  -- FK to Partners.Id	 
-	[ContractId]		Long Integer,  -- FK to Contracts.Id  -- ako je dobavljač nema ugovora, ugovor je null
 	[AccountNumber]		Long Integer NOT NULL,  -- Generated UNIQU IN CompanyId / 2040 - 1001-5999 / 4350 - 9001 -...  -- OVO SE KORISTI ZA PRETRAGU
 );
 
@@ -405,6 +432,9 @@ CREATE TABLE [Partner]
 	--za fitička lica
 	[IdCardNumber]	Text(10), -- Broj licne karte / 9 KARATERA
 	[Jmbg] 			Text(15), -- 13 karaktera
+	
+	[PassportNumber]	Text(15), -- Broj pasosa
+	[PassportCountry]	Text(50),  -- ZEMLJA IZDAVACA
 	
 	[PartnerTypeId]			Long Integer,  -- FK ShortList: TableName: PartnerType 
 	[Language]			Text (10),  -- def srLat / settings
@@ -506,7 +536,6 @@ CREATE TABLE [Unit]
 	[Id]				Long Integer NOT NULL, 
 	[CompanyId]			Long Integer NOT NULL,  
 	[Name]				Text (255), 
-	[ContractId]		Long Integer,  -- not assigned unit are Null
 	[UnitTypeId]		Long Integer,  -- FK to  ShortList: UnitType / Stan, Lokal, Poslovni prostor...
 	[BuildingEntranceId]	Long Integer, -- FK to BuildingEntrance .... ovde je i veza sa adresom
 	[Note]				Text (255),  -- interna napomena
@@ -517,6 +546,9 @@ CREATE TABLE [Unit]
 	[K4]			Double,  --  -- || -- - tagovi za garažu, popust za penzionere samo za upravljanje....
 	[K5]			Double, 
 	[FloorNumber]			Long Integer,  
+
+	-- IZBAČENO POGREŠAN UNOS
+	-- [ContractId]		Long Integer,  -- not assigned unit are Null
 );
 
 
@@ -524,7 +556,8 @@ CREATE TABLE [Unit]
 CREATE TABLE [Contract]
  (
 	[Id]				Long Integer, 
-	[AccountNumber]		Long Integer,  -- ZAMENA ZA PARTNER ACCOUNTING ID
+	--[AccountNumber]		Long Integer,  -- ZAMENA ZA PARTNER ACCOUNTING ID
+	[PartnerAccountId]	Long Integer,  -- FK to PartnerAccount.Id
 	[UnitId]			Long Integer,  -- FK to Units
 	[OwnerPartnerId]	Long Integer,  -- FK to Partners / 
 	[InvoicePartnerId]	Long Integer,  -- FK to Partners / def owner / ako je unet tenet onda korsinik bira izmedju dva

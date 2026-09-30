@@ -1,25 +1,31 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Alert, Divider, Grid, Stack, TextField, Typography } from '@mui/material'
-import type { BaseSyntheticEvent } from 'react'
-import { useForm } from 'react-hook-form'
+import { useState } from 'react'
+import { Alert, Button, Checkbox, Divider, FormControlLabel, FormGroup, Grid, MenuItem, Stack, TextField, Typography } from '@mui/material'
+import { Controller, useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
 import { getErrorMessage } from '../../../api/problemDetails'
-import { FormActions, isSaveNewSubmit } from '../../../shared/components/FormActions'
+import { useActiveCompany } from '../../companies/useActiveCompany'
 import { useSavePartner } from '../useMasterData'
+import { useShortList } from '../useShortList'
+import { isValidJmbg, isValidMb, isValidPib } from '../../../shared/validation/serbianIds'
+import { PartnerAddressesSection } from './PartnerAddressesSection'
 import type { Partner, SavePartner } from '../types'
 
-// zod messages are i18n keys (translated at render) so the schema can stay at module scope.
 const partnerSchema = z.object({
-  shortName: z.string().trim().min(1, 'validation.shortNameRequired').max(100),
-  name: z.string().trim().min(1, 'validation.fullNameRequired').max(255),
-  registrationNumber: z.string().trim().max(10).optional(),
-  taxNumber: z.string().trim().max(10).optional(),
+  shortName: z.string().trim().min(1, 'Kratak naziv je obavezan.').max(100),
+  name: z.string().trim().min(1, 'Pun naziv je obavezan.').max(255),
+  registrationNumber: z.string().trim().max(10).refine((v) => !v || isValidMb(v), 'Matični broj nije ispravan (8 cifara sa kontrolnom cifrom).').optional(),
+  taxNumber: z.string().trim().max(10).refine((v) => !v || isValidPib(v), 'PIB nije ispravan (9 cifara sa kontrolnom cifrom).').optional(),
   jbkjs: z.string().trim().max(10).optional(),
   idCardNumber: z.string().trim().max(20).optional(),
-  jmbg: z.string().trim().max(15).optional(),
-  language: z.string().trim().min(1, 'validation.required').max(10),
+  jmbg: z.string().trim().max(15).refine((v) => !v || isValidJmbg(v), 'JMBG nije ispravan (13 cifara sa kontrolnom cifrom).').optional(),
+  language: z.string().trim().min(1).max(10),
   note: z.string().optional(),
+  partnerTypeId: z.number().nullable(),
+  isSefUser: z.boolean(),
+  isCrfUser: z.boolean(),
+  skipAutoCheckSef: z.boolean(),
 })
 
 type PartnerFormValue = z.infer<typeof partnerSchema>
@@ -28,16 +34,21 @@ interface PartnerFormProps {
   companyId: number
   partner?: Partner
   onSaved?: (partner: Partner) => void
-  /** Offers "Sačuvaj i novi"; called instead of onSaved when that button (Ctrl+Enter) was used. */
-  onSavedNew?: (partner: Partner) => void
   onCancel?: () => void
 }
 
-export function PartnerForm({ companyId, partner, onSaved, onSavedNew, onCancel }: PartnerFormProps) {
+export function PartnerForm({ companyId, partner, onSaved, onCancel }: PartnerFormProps) {
   const { t } = useTranslation()
-  const save = useSavePartner(companyId, partner?.id)
+  // The company list is already limited to what the signed-in staff member may access.
+  const { companies } = useActiveCompany()
+  const [selectedCompanyId, setSelectedCompanyId] = useState(partner?.companyId ?? companyId)
+  // An existing partner is saved through its current company's route; a move is expressed by
+  // sending the newly selected companyId in the body. A new partner is created under the selection.
+  const save = useSavePartner(partner?.companyId ?? selectedCompanyId, partner?.id)
+  const partnerTypes = useShortList(selectedCompanyId, 'PartnerType')
   const {
     register,
+    control,
     handleSubmit,
     formState: { errors, dirtyFields },
   } = useForm<PartnerFormValue>({
@@ -52,12 +63,14 @@ export function PartnerForm({ companyId, partner, onSaved, onSavedNew, onCancel 
       jmbg: '',
       language: partner?.language ?? 'sr-Latn',
       note: partner?.note ?? '',
+      partnerTypeId: partner?.partnerTypeId ?? null,
+      isSefUser: partner?.isSefUser ?? false,
+      isCrfUser: partner?.isCrfUser ?? false,
+      skipAutoCheckSef: partner?.skipAutoCheckSef ?? false,
     },
   })
-  const message = (error?: { message?: string }) => (error?.message ? t(error.message) : undefined)
 
-  const submit = (value: PartnerFormValue, event?: BaseSyntheticEvent) => {
-    const andNew = Boolean(onSavedNew) && isSaveNewSubmit(event)
+  const submit = (value: PartnerFormValue) => {
     // idCardNumber/jmbg come back from the API masked (e.g. "***1234"), so this form can
     // never preload the real value — it always starts blank. Sending that blank back as ''
     // would make the backend erase the stored value on every unrelated edit. Only send
@@ -65,67 +78,121 @@ export function PartnerForm({ companyId, partner, onSaved, onSavedNew, onCancel 
     // untouched field is omitted from the request and the backend leaves it alone.
     const request: SavePartner = {
       ...value,
+      companyId: selectedCompanyId,
       idCardNumber: dirtyFields.idCardNumber ? value.idCardNumber : undefined,
       jmbg: dirtyFields.jmbg ? value.jmbg : undefined,
-      partnerTypeId: partner?.partnerTypeId ?? null,
     }
-    save.mutate(request, { onSuccess: andNew ? onSavedNew : onSaved })
+    save.mutate(request, { onSuccess: onSaved })
   }
 
   return (
     <Stack component="form" spacing={2} onSubmit={handleSubmit(submit)} noValidate>
-      {save.isError && <Alert severity="error">{getErrorMessage(save.error, t('partners_.saveError'))}</Alert>}
+      {save.isError && <Alert severity="error">{getErrorMessage(save.error, 'Partner nije sačuvan. Proverite podatke i pokušajte ponovo.')}</Alert>}
       <Grid container spacing={2} columnSpacing={3}>
-        <Section>{t('sections.identification')}</Section>
+        <Section>Identifikacija</Section>
         <Grid size={{ xs: 12, sm: 6 }}>
-          <TextField fullWidth size="small" label={t('fields.shortName')} required {...register('shortName')} error={!!errors.shortName} helperText={message(errors.shortName)} />
+          <TextField fullWidth size="small" label="Kratak naziv" required {...register('shortName')} error={!!errors.shortName} helperText={errors.shortName?.message} />
         </Grid>
         <Grid size={{ xs: 12, sm: 6 }}>
-          <TextField fullWidth size="small" label={t('fields.fullName')} required {...register('name')} error={!!errors.name} helperText={message(errors.name)} />
+          <TextField fullWidth size="small" label="Pun naziv" required {...register('name')} error={!!errors.name} helperText={errors.name?.message} />
         </Grid>
-        <Grid size={{ xs: 12, sm: 4 }}>
-          <TextField fullWidth size="small" label={t('fields.registrationNumber')} {...register('registrationNumber')} error={!!errors.registrationNumber} helperText={message(errors.registrationNumber)} />
+        <Grid size={{ xs: 12, sm: 6 }}>
+          <Controller
+            control={control}
+            name="partnerTypeId"
+            render={({ field }) => (
+              <TextField
+                select
+                fullWidth
+                size="small"
+                label="Tip partnera"
+                value={field.value ?? ''}
+                onChange={(event) => field.onChange(event.target.value === '' ? null : Number(event.target.value))}
+              >
+                <MenuItem value=""><em>Nije izabran</em></MenuItem>
+                {partnerTypes.data?.map((type) => <MenuItem key={type.id} value={type.id}>{type.caption}</MenuItem>)}
+              </TextField>
+            )}
+          />
         </Grid>
-        <Grid size={{ xs: 12, sm: 4 }}>
-          <TextField fullWidth size="small" label={t('fields.taxNumber')} {...register('taxNumber')} error={!!errors.taxNumber} helperText={message(errors.taxNumber)} />
+        <Grid size={{ xs: 12, sm: 6 }}>
+          <TextField
+            select
+            fullWidth
+            size="small"
+            label="Kompanija"
+            value={selectedCompanyId}
+            onChange={(event) => setSelectedCompanyId(Number(event.target.value))}
+          >
+            {companies.map((company) => <MenuItem key={company.id} value={company.id}>{company.name}</MenuItem>)}
+          </TextField>
         </Grid>
-        <Grid size={{ xs: 12, sm: 4 }}>
-          <TextField fullWidth size="small" label={t('fields.jbkjs')} {...register('jbkjs')} error={!!errors.jbkjs} helperText={message(errors.jbkjs)} />
+        <Grid size={{ xs: 12, sm: 3 }}>
+          <TextField fullWidth size="small" label="Matični broj" {...register('registrationNumber')} error={!!errors.registrationNumber} helperText={errors.registrationNumber?.message} />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 3 }}>
+          <TextField fullWidth size="small" label="PIB" {...register('taxNumber')} error={!!errors.taxNumber} helperText={errors.taxNumber?.message} />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 3 }}>
+          <TextField fullWidth size="small" label="JBKJS" {...register('jbkjs')} error={!!errors.jbkjs} helperText={errors.jbkjs?.message} />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 3 }}>
+          <FormGroup row sx={{ flexWrap: 'nowrap' }}>
+            <Controller control={control} name="isSefUser" render={({ field }) => (
+              <FormControlLabel control={<Checkbox size="small" checked={field.value} onChange={(e) => field.onChange(e.target.checked)} />} label="SEF" />
+            )} />
+            <Controller control={control} name="isCrfUser" render={({ field }) => (
+              <FormControlLabel control={<Checkbox size="small" checked={field.value} onChange={(e) => field.onChange(e.target.checked)} />} label="CRF" />
+            )} />
+            <Controller control={control} name="skipAutoCheckSef" render={({ field }) => (
+              <FormControlLabel control={<Checkbox size="small" checked={field.value} onChange={(e) => field.onChange(e.target.checked)} />} label="Bez provere" />
+            )} />
+          </FormGroup>
         </Grid>
 
-        <Section>{t('sections.personal')}</Section>
+        <Section>Lični podaci</Section>
         <Grid size={{ xs: 12, sm: 4 }}>
           <TextField
             fullWidth
             size="small"
-            label={t('fields.idCardNumber')}
+            label="Broj lične karte"
             placeholder={partner?.maskedIdCardNumber ?? undefined}
             {...register('idCardNumber')}
             error={!!errors.idCardNumber}
-            helperText={message(errors.idCardNumber) ?? (partner?.maskedIdCardNumber ? t('partners_.maskedFieldHint', { value: partner.maskedIdCardNumber }) : undefined)}
+            helperText={errors.idCardNumber?.message ?? (partner?.maskedIdCardNumber ? t('partners_.maskedFieldHint', { value: partner.maskedIdCardNumber }) : undefined)}
           />
         </Grid>
         <Grid size={{ xs: 12, sm: 4 }}>
           <TextField
             fullWidth
             size="small"
-            label={t('fields.jmbg')}
+            label="JMBG"
             placeholder={partner?.maskedJmbg ?? undefined}
             {...register('jmbg')}
             error={!!errors.jmbg}
-            helperText={message(errors.jmbg) ?? (partner?.maskedJmbg ? t('partners_.maskedFieldHint', { value: partner.maskedJmbg }) : undefined)}
+            helperText={errors.jmbg?.message ?? (partner?.maskedJmbg ? t('partners_.maskedFieldHint', { value: partner.maskedJmbg }) : undefined)}
           />
         </Grid>
         <Grid size={{ xs: 12, sm: 4 }}>
-          <TextField fullWidth size="small" label={t('fields.language')} required {...register('language')} error={!!errors.language} helperText={message(errors.language)} />
+          <TextField fullWidth size="small" label="Jezik" required {...register('language')} error={!!errors.language} helperText={errors.language?.message} />
         </Grid>
 
-        <Section>{t('sections.note')}</Section>
+        <Section>Adrese</Section>
         <Grid size={12}>
-          <TextField fullWidth size="small" label={t('fields.note')} multiline minRows={3} {...register('note')} />
+          {partner
+            ? <PartnerAddressesSection companyId={partner.companyId} partnerId={partner.id} />
+            : <Typography color="text.secondary" variant="body2">Adrese se unose nakon što se partner prvi put sačuva.</Typography>}
+        </Grid>
+
+        <Section>Napomena</Section>
+        <Grid size={12}>
+          <TextField fullWidth size="small" label="Napomena" multiline minRows={3} {...register('note')} />
         </Grid>
       </Grid>
-      <FormActions onCancel={onCancel} pending={save.isPending} saveNew={Boolean(onSavedNew)} />
+      <Stack direction="row" spacing={1} justifyContent="flex-end">
+        {onCancel && <Button onClick={onCancel}>Odustani</Button>}
+        <Button type="submit" variant="contained" disabled={save.isPending}>Sačuvaj</Button>
+      </Stack>
     </Stack>
   )
 }
@@ -138,3 +205,4 @@ function Section({ children }: { children: string }) {
     </Grid>
   )
 }
+

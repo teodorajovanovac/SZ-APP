@@ -1,114 +1,117 @@
 import { useMemo, useState } from 'react'
+import AddIcon from '@mui/icons-material/Add'
 import EditIcon from '@mui/icons-material/Edit'
-import { Alert, IconButton, Link, Stack, Tooltip } from '@mui/material'
-import type { ColumnDef } from '@tanstack/react-table'
+import { Alert, Button, IconButton, Link, Stack, TextField, Tooltip, Typography } from '@mui/material'
+import type { ColumnDef, PaginationState, SortingState } from '@tanstack/react-table'
 import { useTranslation } from 'react-i18next'
-import { Link as RouterLink } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { FormDialog } from '../../../shared/components/FormDialog'
-import { PageHeader } from '../../../shared/components/PageHeader'
-import { SearchField } from '../../../shared/components/SearchField'
 import { ServerDataTable } from '../../../shared/components/ServerDataTable'
-import { useNotify } from '../../../shared/feedback/NotifyProvider'
-import { urlTableProps, useUrlState } from '../../../shared/hooks/useUrlState'
 import { usePartners } from '../useMasterData'
-import { PartnerForm } from './PartnerForm'
+import { PartnerDetail } from './PartnerDetail'
 import type { Partner } from '../types'
 
 interface PartnerListProps {
   companyId: number
+  onSelect?: (partner: Partner) => void
 }
 
-export function PartnerList({ companyId }: PartnerListProps) {
+export function PartnerList({ companyId, onSelect }: PartnerListProps) {
   const { t } = useTranslation()
-  const notify = useNotify()
-  const [url, setUrl] = useUrlState({ q: '', page: 0, size: 25, sort: 'shortName', desc: false })
-  const table = urlTableProps(url, setUrl)
-  const [editing, setEditing] = useState<Partner | 'new'>()
-  const [formKey, setFormKey] = useState(0)
-  const [savedId, setSavedId] = useState<string>()
+  const [search, setSearch] = useState('')
+  const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 25 })
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'shortName', desc: false }])
+  const navigate = useNavigate()
+  const [viewing, setViewing] = useState<Partner>()
+  const sort = sorting[0]
   const partners = usePartners(companyId, {
-    page: url.page + 1,
-    pageSize: url.size,
-    search: url.q,
-    sortBy: url.sort,
-    descending: url.desc,
+    page: pagination.pageIndex + 1,
+    pageSize: pagination.pageSize,
+    search,
+    sortBy: sort?.id,
+    descending: sort?.desc,
   })
-
-  const onSaved = (partner: Partner) => {
-    setSavedId(String(partner.id))
-    notify({ message: t('partners_.saved', { name: partner.shortName }), link: { to: `/partners/${companyId}/${partner.id}`, label: t('partners_.open') } })
-  }
 
   const columns = useMemo<ColumnDef<Partner>[]>(
     () => [
       {
         accessorKey: 'shortName',
-        header: t('fields.shortName'),
-        enableSorting: true,
-        // UX-22: a real link, so Ctrl+click opens the partner in a new tab.
+        header: 'Kratak naziv',
         cell: ({ row, getValue }) => (
-          <Link component={RouterLink} to={`/partners/${companyId}/${row.original.id}`}>
+          <Link
+            component="button"
+            type="button"
+            underline="hover"
+            textAlign="left"
+            onClick={() => {
+              setViewing(row.original)
+              onSelect?.(row.original)
+            }}
+          >
             {String(getValue())}
           </Link>
         ),
       },
-      { accessorKey: 'name', header: t('fields.fullName'), enableSorting: true, meta: { ellipsis: true } },
-      { accessorKey: 'taxNumber', header: t('fields.taxNumber'), enableSorting: true, meta: { align: 'left', numeric: true } },
-      { accessorKey: 'registrationNumber', header: t('fields.registrationNumber'), meta: { align: 'left', numeric: true } },
-      { accessorKey: 'language', header: t('fields.language') },
+      { accessorKey: 'name', header: 'Pun naziv', meta: { ellipsis: true } },
+      { accessorKey: 'taxNumber', header: 'PIB', meta: { align: 'left', numeric: true } },
+      { accessorKey: 'registrationNumber', header: 'Matični broj', enableSorting: false, meta: { align: 'left', numeric: true } },
+      { accessorKey: 'language', header: 'Jezik', enableSorting: false },
       {
         id: 'actions',
         header: t('ui.actions'),
+        enableSorting: false,
         meta: { align: 'right' },
         cell: ({ row }) => (
           <Tooltip title={t('ui.edit')}>
-            <IconButton size="small" aria-label={t('ui.edit')} onClick={() => setEditing(row.original)}>
+            <IconButton size="small" aria-label={t('ui.edit')} onClick={() => navigate(`/partners/${row.original.companyId}/${row.original.id}/edit`)}>
               <EditIcon fontSize="small" />
             </IconButton>
           </Tooltip>
         ),
       },
     ],
-    [companyId, t],
+    [navigate, onSelect, t],
   )
 
   return (
     <Stack spacing={2}>
-      <PageHeader
-        title={t('partners_.title')}
-        subtitle={t('partners_.subtitle')}
-        onNew={() => setEditing('new')}
-        newLabel={t('partners_.new')}
-        filters={<SearchField label={t('partners_.search')} value={url.q} onChange={(q) => setUrl({ q })} />}
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'center' }} justifyContent="space-between">
+        <Typography component="h1" variant="h1">Partneri</Typography>
+        <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate('/partners/new')}>
+          {t('partners_.new')}
+        </Button>
+      </Stack>
+      <TextField
+        label="Pretraga po nazivu ili PIB-u"
+        value={search}
+        onChange={(event) => {
+          setSearch(event.target.value)
+          setPagination((value) => ({ ...value, pageIndex: 0 }))
+        }}
+        size="small"
       />
-      {partners.isError && <Alert severity="error">{t('partners_.loadError')}</Alert>}
+      {partners.isError && <Alert severity="error">Partneri nisu mogli da se učitaju.</Alert>}
       <ServerDataTable
-        ariaLabel={t('partners_.title')}
+        ariaLabel="Partneri"
         rows={partners.data?.items ?? []}
         columns={columns}
         rowCount={partners.data?.totalCount ?? 0}
-        {...table}
+        pagination={pagination}
+        sorting={sorting}
+        onPaginationChange={setPagination}
+        onSortingChange={setSorting}
         isLoading={partners.isLoading}
-        emptyMessage={url.q ? undefined : t('partners_.empty')}
-        emptyHint={url.q ? t('partners_.emptyHint') : undefined}
+        emptyMessage={search ? undefined : t('partners_.empty')}
         getRowId={(row) => String(row.id)}
-        highlightRowId={savedId}
       />
 
-      <FormDialog
-        open={Boolean(editing)}
-        title={editing === 'new' ? t('partners_.newTitle') : t('partners_.editTitle')}
-        onClose={() => setEditing(undefined)}
-        maxWidth="md"
-      >
-        {editing ? (
-          <PartnerForm
-            key={formKey}
-            companyId={companyId}
-            partner={editing === 'new' ? undefined : editing}
-            onSaved={(partner) => { onSaved(partner); setEditing(undefined) }}
-            onSavedNew={editing === 'new' ? (partner) => { onSaved(partner); setFormKey((k) => k + 1) } : undefined}
-            onCancel={() => setEditing(undefined)}
+      <FormDialog open={Boolean(viewing)} title={t('partners_.detailTitle')} onClose={() => setViewing(undefined)}>
+        {viewing ? (
+          <PartnerDetail
+            partner={viewing}
+            onEdit={() => {
+              navigate(`/partners/${viewing.companyId}/${viewing.id}/edit`)
+            }}
           />
         ) : null}
       </FormDialog>

@@ -3652,6 +3652,12 @@ namespace SzApp.Data.Migrations
                         .IsUnicode(false)
                         .HasColumnType("varchar(20)");
 
+                    b.Property<bool>("IsCrfUser")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsSefUser")
+                        .HasColumnType("bit");
+
                     b.Property<string>("Jbkjs")
                         .HasMaxLength(10)
                         .IsUnicode(false)
@@ -3688,6 +3694,9 @@ namespace SzApp.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<bool>("SkipAutoCheckSef")
+                        .HasColumnType("bit");
 
                     b.Property<string>("TaxNumber")
                         .HasMaxLength(10)
