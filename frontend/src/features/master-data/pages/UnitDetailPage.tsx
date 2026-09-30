@@ -1,45 +1,92 @@
-import { Card, CardContent, Stack, Typography } from '@mui/material'
+import { Card, CardContent, Link, Tab, Table, TableBody, TableCell, TableHead, TableRow, Tabs } from '@mui/material'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useParams } from 'react-router-dom'
+import { Link as RouterLink, useParams } from 'react-router-dom'
 import { ApiProblemError } from '../../../api/generated/client'
-import { useUnitDetail } from '../useMasterData'
-import { DetailField, DetailPageLayout } from './DetailPageLayout'
+import { EmptyState } from '../../../shared/components/EmptyState'
+import { formatDate } from '../../../shared/format/date'
+import { useShortList } from '../useShortList'
+import { useBuildingEntranceDetail, useContractHistory, useUnitDetail } from '../useMasterData'
+import { DetailField, DetailGrid, DetailPageLayout } from './DetailPageLayout'
 
 export function UnitDetailPage() {
   const { t } = useTranslation()
   const { companyId, unitId } = useParams()
+  const [tab, setTab] = useState(0)
   const companyIdNum = Number(companyId)
   const unitIdNum = Number(unitId)
   const validParams = Number.isFinite(companyIdNum) && Number.isFinite(unitIdNum) && companyIdNum > 0 && unitIdNum > 0
+  const cid = validParams ? companyIdNum : 0
 
-  const detail = useUnitDetail(validParams ? companyIdNum : 0, validParams ? unitIdNum : 0)
+  const detail = useUnitDetail(cid, validParams ? unitIdNum : 0)
+  const data = detail.data
+  // UX-24: names instead of raw ids.
+  const entrance = useBuildingEntranceDetail(cid, data?.buildingEntranceId ?? 0)
+  const unitTypes = useShortList(data?.unitTypeId ? cid : 0, 'UnitType')
+  const contracts = useContractHistory(tab === 1 ? cid : 0, validParams ? unitIdNum : 0)
   const isNotFound = !validParams || (detail.error instanceof ApiProblemError && isNotFoundStatus(detail.error.problem.status))
+  const entranceName = entrance.data ? [entrance.data.buildingName, entrance.data.entranceName].filter(Boolean).join(' · ') : null
+  const unitType = unitTypes.data?.find((item) => item.id === data?.unitTypeId)?.caption
 
   return (
     <DetailPageLayout
-      title={t('masterDataDetail_.unitTitle')}
+      title={data ? data.name ?? `#${data.id}` : t('masterDataDetail_.unitTitle')}
+      subtitle={unitType}
       isLoading={validParams && detail.isLoading}
       isError={detail.isError}
       isNotFound={isNotFound}
     >
-      {detail.data && (
+      {data && (
         <Card variant="outlined">
+          <Tabs value={tab} onChange={(_, value: number) => setTab(value)} sx={{ px: 2, borderBottom: 1, borderColor: 'divider' }}>
+            <Tab label={t('ui.tabs.details')} />
+            <Tab label={t('ui.tabs.contracts')} />
+          </Tabs>
           <CardContent>
-            <Typography variant="h5" component="h2">
-              {detail.data.name ?? `#${detail.data.id}`}
-            </Typography>
-            <Stack component="dl" spacing={1} sx={{ mt: 2 }}>
-              <DetailField label="Ulaz (ID)" value={detail.data.buildingEntranceId} />
-              <DetailField label="Tip jedinice (ID)" value={detail.data.unitTypeId} />
-              <DetailField label="Broj sprata" value={detail.data.floorNumber} />
-              <DetailField label="Redni broj" value={detail.data.sortingNumber} />
-              <DetailField label="K1" value={detail.data.k1} />
-              <DetailField label="K2" value={detail.data.k2} />
-              <DetailField label="K3" value={detail.data.k3} />
-              <DetailField label="K4" value={detail.data.k4} />
-              <DetailField label="K5" value={detail.data.k5} />
-              <DetailField label="Napomena" value={detail.data.note} />
-            </Stack>
+            {tab === 0 ? (
+              <DetailGrid>
+                <DetailField
+                  label={t('fields.entrance')}
+                  value={data.buildingEntranceId ? (
+                    <Link component={RouterLink} to={`/building-entrances/${cid}/${data.buildingEntranceId}`}>
+                      {entranceName || `#${data.buildingEntranceId}`}
+                    </Link>
+                  ) : null}
+                />
+                <DetailField label={t('fields.unitType')} value={unitType ?? (data.unitTypeId ? `#${data.unitTypeId}` : null)} />
+                <DetailField label={t('fields.floor')} value={data.floorNumber} />
+                <DetailField label={t('fields.ordinal')} value={data.sortingNumber} />
+                <DetailField label="K1" value={data.k1} />
+                <DetailField label="K2" value={data.k2} />
+                <DetailField label="K3" value={data.k3} />
+                <DetailField label="K4" value={data.k4} />
+                <DetailField label="K5" value={data.k5} />
+                <DetailField label={t('fields.note')} value={data.note} />
+              </DetailGrid>
+            ) : (contracts.data?.length ?? 0) === 0 && !contracts.isLoading ? (
+              <EmptyState message={t('units_.contractsEmpty')} />
+            ) : (
+              <Table aria-label={t('ui.tabs.contracts')}>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>{t('fields.accountNumber')}</TableCell>
+                    <TableCell>{t('fields.contractDate')}</TableCell>
+                    <TableCell>{t('fields.contractEnd')}</TableCell>
+                    <TableCell>{t('fields.status')}</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {contracts.data?.map((contract) => (
+                    <TableRow key={contract.id} hover>
+                      <TableCell sx={{ fontVariantNumeric: 'tabular-nums' }}>{contract.accountNumber ?? '—'}</TableCell>
+                      <TableCell>{formatDate(contract.contractDate)}</TableCell>
+                      <TableCell>{contract.contractEndDate ? formatDate(contract.contractEndDate) : '—'}</TableCell>
+                      <TableCell>{contract.isActive ? t('contracts_.statusActive') : t('contracts_.statusInactive')}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
       )}

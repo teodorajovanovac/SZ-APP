@@ -1,9 +1,9 @@
-import { Button, Card, CardContent, Stack, Typography } from '@mui/material'
+import { Button, Card, CardContent } from '@mui/material'
 import { useTranslation } from 'react-i18next'
 import { Link as RouterLink, useParams } from 'react-router-dom'
 import { ApiProblemError } from '../../../api/generated/client'
 import { usePartnerDetail } from '../useMasterData'
-import { DetailField, DetailPageLayout } from './DetailPageLayout'
+import { DetailField, DetailGrid, DetailPageLayout } from './DetailPageLayout'
 
 export function PartnerDetailPage() {
   const { t } = useTranslation()
@@ -14,33 +14,35 @@ export function PartnerDetailPage() {
 
   const detail = usePartnerDetail(validParams ? companyIdNum : 0, validParams ? partnerIdNum : 0)
   const isNotFound = !validParams || (detail.error instanceof ApiProblemError && isNotFoundStatus(detail.error.problem.status))
+  const data = detail.data
 
   return (
     <DetailPageLayout
-      title={t('masterDataDetail_.partnerTitle')}
+      title={data?.shortName ?? t('masterDataDetail_.partnerTitle')}
+      subtitle={data?.name}
+      actions={
+        data ? (
+          <Button component={RouterLink} to={`/kartice?companyId=${companyIdNum}&partnerId=${partnerIdNum}&account=2040`} variant="outlined">
+            {t('cards_.tabCard')}
+          </Button>
+        ) : null
+      }
       isLoading={validParams && detail.isLoading}
       isError={detail.isError}
       isNotFound={isNotFound}
     >
-      {detail.data && (
+      {data && (
         <Card variant="outlined">
           <CardContent>
-            <Typography variant="h5" component="h2">
-              {detail.data.shortName}
-            </Typography>
-            <Typography color="text.secondary">{detail.data.name}</Typography>
-            <Button component={RouterLink} to={`/kartice?companyId=${companyIdNum}&partnerId=${partnerIdNum}&account=2040`} variant="outlined" size="small" sx={{ mt: 1.5 }}>
-              {t('cards_.tabCard')}
-            </Button>
-            <Stack component="dl" spacing={1} sx={{ mt: 2 }}>
-              <DetailField label="PIB" value={detail.data.taxNumber} />
-              <DetailField label="Matični broj" value={detail.data.registrationNumber} />
-              <DetailField label="JBKJS" value={detail.data.jbkjs} />
-              <DetailField label="JMBG" value={detail.data.maskedJmbg} />
-              <DetailField label="Broj lične karte" value={detail.data.maskedIdCardNumber} />
-              <DetailField label="Jezik" value={detail.data.language} />
-              <DetailField label="Napomena" value={detail.data.note} />
-            </Stack>
+            <DetailGrid>
+              <DetailField label={t('fields.taxNumber')} value={data.taxNumber} />
+              <DetailField label={t('fields.registrationNumber')} value={data.registrationNumber} />
+              <DetailField label={t('fields.jbkjs')} value={data.jbkjs} />
+              <DetailField label={t('fields.jmbg')} value={data.maskedJmbg} />
+              <DetailField label={t('fields.idCardNumber')} value={data.maskedIdCardNumber} />
+              <DetailField label={t('fields.language')} value={data.language} />
+              <DetailField label={t('fields.note')} value={data.note} />
+            </DetailGrid>
           </CardContent>
         </Card>
       )}
