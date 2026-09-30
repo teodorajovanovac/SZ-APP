@@ -73,7 +73,15 @@ public enum ReconciliationMetric
     InvoiceTotal = 3,
     TrialBalance = 4,
     BankDebit = 5,
-    BankCredit = 6
+    BankCredit = 6,
+    // ETL-08: post-import company reconciliation.
+    AccountBalance = 7,
+    PartnerBalance = 8,
+    BankLedgerBalance = 9,
+    JournalImbalance = 10,
+    // ETL-05: delta import outcome.
+    DeletedInSource = 11,
+    UpdatedRows = 12
 }
 
 public sealed class ReconciliationRecord
