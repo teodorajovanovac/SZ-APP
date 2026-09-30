@@ -124,4 +124,61 @@ public sealed class DocumentPostingRulesTests
         PostingPeriod.EnsureOpen([new DateOnly(2026, 9, 1), new DateOnly(2025, 8, 31)], locked);
         Assert.Throws<DomainRuleException>(() => PostingPeriod.EnsureValid(2613));
     }
+
+    [Fact]
+    public void InvoiceBatch_Interest_2040OnInterestSubAccount_WithAndWithoutType9Supplier()
+    {
+        var suppliers = new Dictionary<int, SupplierPostingInfo>(Suppliers)
+        {
+            [90] = new SupplierPostingInfo(90, SupplierDocumentTypes.Interest, 950, "4350", "11309", 1, null, "Kamata upravnik")
+        };
+        var lines = DocumentPostingRules.BuildInvoiceBatch(Turnover, "R-2608", [Line(1, 10, 100m)], suppliers,
+        [
+            new InterestPostingSource(1, 501, "2040", Due, "97-1-26", "11309", 90, 8.22m),
+            new InterestPostingSource(1, 501, "2040", Due, "97-1-26", "10009", null, 1.50m),
+            new InterestPostingSource(1, 501, "2040", Due, "97-1-26", "10009", null, 0m) // not > 0: skipped
+        ]);
+        AssertBalanced(lines);
+
+        var interest = lines.Where(x => x.Account == "2040" && x.Note == DocumentPostingRules.InterestNote).ToArray();
+        Assert.Equal(2, interest.Length);
+        Assert.All(interest, x => { Assert.Equal(LedgerLineTypes.Invoice, x.LineType); Assert.Equal(501, x.PartnerAccountId); Assert.Equal(1, x.InvoiceId); });
+        Assert.Equal(8.22m, interest.Single(x => x.SubAccountId == "11309").Debit);
+
+        // Type-9 supplier: 4900 C + 4350 C on the supplier + 5590 D; without one: 4900 C on the interest sub-account only.
+        Assert.Equal(8.22m, lines.Single(x => x.Account == "4900" && x.SupplierInvoiceId == 90).Credit);
+        Assert.Equal(8.22m, lines.Single(x => x.Account == "4350" && x.SupplierInvoiceId == 90 && x.PartnerAccountId == 950).Credit);
+        Assert.Equal(8.22m, lines.Single(x => x.Account == "5590" && x.SupplierInvoiceId == 90).Debit);
+        Assert.Equal(1.50m, lines.Single(x => x.Account == "4900" && x.SubAccountId == "10009" && x.SupplierInvoiceId == null).Credit);
+    }
+
+    [Fact]
+    public void InvoiceBatch_GroupMember_StornoedAndPostedOnMaster()
+    {
+        var master = new GroupInvoiceTarget(9, 777, "2040", Due.AddDays(1), "97-9-26");
+        var lines = DocumentPostingRules.BuildInvoiceBatch(Turnover, "R-2608",
+            [Line(1, 10, 100m), Line(1, 20, 50m), Line(2, 10, 30m)], Suppliers,
+            groupTargets: new Dictionary<int, GroupInvoiceTarget> { [1] = master });
+        AssertBalanced(lines);
+
+        var member = lines.Where(x => x.Account == "2040" && x.InvoiceId == 1).ToArray();
+        Assert.Equal(4, member.Length); // original + red storno per line
+        Assert.Equal(0m, member.Sum(x => x.Debit));
+        Assert.All(member.Where(x => x.Debit < 0m), x => Assert.Equal(LedgerLineTypes.Invoice, x.LineType));
+
+        var onMaster = lines.Where(x => x.InvoiceId == 9).ToArray();
+        Assert.Equal(150m, onMaster.Sum(x => x.Debit));
+        Assert.All(onMaster, x =>
+        {
+            Assert.Equal(777, x.PartnerAccountId);
+            Assert.Equal(master.DueDate, x.DueDate);
+            Assert.Equal("97926", x.Parameters);
+        });
+        Assert.Equal("10001", onMaster.Single(x => x.SupplierInvoiceId == 10).SubAccountId); // sub-account kept
+
+        // Supplier side unchanged by the move: revenue = everything invoiced once.
+        Assert.Equal(180m, lines.Where(x => x.Account == "4900").Sum(x => x.Credit));
+        // Non-member untouched.
+        Assert.Single(lines, x => x.Account == "2040" && x.InvoiceId == 2);
+    }
 }

@@ -97,7 +97,11 @@ public static class InterestCalculator
     }
 
     public static IReadOnlyList<InterestTotal> Totals(IEnumerable<InterestRow> rows) =>
-        rows.GroupBy(x => (x.PartnerAccountId, x.SubAccountId))
+        Transfer(rows.Select(x => new InterestTotal(x.PartnerAccountId, x.SubAccountId, x.Interest)));
+
+    /// <summary>Legacy PrenesiZK over unrounded interest amounts: Round(Σ, 2) per (partner, sub-account), only &gt; 0.</summary>
+    public static IReadOnlyList<InterestTotal> Transfer(IEnumerable<InterestTotal> unrounded) =>
+        unrounded.GroupBy(x => (x.PartnerAccountId, x.SubAccountId))
             .Select(g => new InterestTotal(g.Key.PartnerAccountId, g.Key.SubAccountId, FinanceRounding.Money(g.Sum(x => x.Interest))))
             .Where(x => x.Interest > 0m)
             .OrderBy(x => x.PartnerAccountId).ThenBy(x => x.SubAccountId, StringComparer.Ordinal)
