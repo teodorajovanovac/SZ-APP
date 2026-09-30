@@ -89,6 +89,91 @@ public sealed class InvoiceGenerationSqlTests
         Assert.Equal(200m + 375m, gl.Where(x => x.Account == "2040").Sum(x => x.DebitAmount)); // zeroed benefit line not posted
     }
 
+    [Fact]
+    public async Task Generate_GroupInvoiceAndInterest_PostOnMaster()
+    {
+        if (!string.Equals(Environment.GetEnvironmentVariable("SZAPP_RUN_SQL_INTEGRATION"), "1", StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        await using var sqlServer = new MsSqlBuilder().WithImage("mcr.microsoft.com/mssql/server:2025-latest").Build();
+        await sqlServer.StartAsync();
+        var options = new DbContextOptionsBuilder<SzAppDbContext>().UseSqlServer(sqlServer.GetConnectionString()).Options;
+        await using (var migrate = new SzAppDbContext(options))
+        {
+            await migrate.Database.MigrateAsync();
+        }
+
+        await using var db = new SzAppDbContext(options);
+        var s = await SeedAsync(db);
+
+        // Customer 2 is billed through group master 4001; customer 1 has interest on 11301 (-> 11309, type-9 template '0000').
+        var masterPartner = new Partner { ShortName = "Grupa", Name = "Grupa d.o.o." };
+        db.Add(masterPartner);
+        await db.SaveChangesAsync();
+        var masterAccount = new PartnerAccount { CompanyId = s.CompanyId, PartnerId = masterPartner.Id, Account = "2040", AccountNumber = 4001 };
+        db.Add(masterAccount);
+        db.AddRange(new SubAccount { Id = "11309", Name = "Kamata upravnik" },
+            new SubAccount { Id = "11301", Name = "Upravnik", InterestSubAccountId = "11309" });
+        var interestType = new ShortList { TableName = "SupplierDocumentType", Caption = "Kamata", IndexValue = 9 };
+        db.Add(interestType);
+        await db.SaveChangesAsync();
+        var managerAccountId = await db.Set<PartnerAccount>().Where(x => x.AccountNumber == InvoiceGenerationService.ManagerSupplierAccountNumber).Select(x => x.Id).SingleAsync();
+        db.Add(new SupplierInvoice
+        {
+            CompanyId = s.CompanyId, InvoiceNo = 99, CodeName = "KAM", Caption = "Kamata", SupplierPartnerAccountId = managerAccountId,
+            CalculationTypeId = 99, PeriodYYMM = 0, DocumentTypeId = interestType.Id, SubAccountId = "11309",
+            InvoiceDate = new DateOnly(2026, 1, 1), TransactionDate = new DateOnly(2026, 1, 1)
+        });
+        var contract2 = await db.Set<Contract>().SingleAsync(x => x.OwnerPartnerId == s.Customer2);
+        contract2.InvoiceLegacyMasterId = masterAccount.Id;
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+
+        var service = new InvoiceGenerationService(db, TimeProvider.System);
+        var result = await service.GenerateAsync(s.CompanyId, s.StaffId, new GenerateInvoicesV2Request(2608, null, "Beograd",
+            new DateOnly(2026, 9, 1), new DateOnly(2026, 9, 15), new DateOnly(2026, 8, 1), new DateOnly(2026, 8, 31), new DateOnly(2026, 8, 31), 117m),
+            CancellationToken.None);
+        Assert.Equal(3, result.InvoiceIds.Count); // 2 customers + 1 master
+
+        db.ChangeTracker.Clear();
+        var account1 = await db.Set<PartnerAccount>().SingleAsync(x => x.PartnerId == s.Customer1 && x.Account == "2040");
+        db.AddRange(
+            new InterestStatement { CompanyId = s.CompanyId, Account = "2040", Date = new DateOnly(2026, 8, 1), PartnerAccountId = account1.Id, SubAccountId = "11301", InvoiceBatchId = result.InvoiceBatchId, Interest = 5.004m },
+            new InterestStatement { CompanyId = s.CompanyId, Account = "2040", Date = new DateOnly(2026, 8, 10), PartnerAccountId = account1.Id, SubAccountId = "11301", InvoiceBatchId = result.InvoiceBatchId, Interest = 3.2149m });
+        await db.SaveChangesAsync();
+        await InvoiceGenerationService.ApplyInterestAsync(db, s.CompanyId, result.InvoiceBatchId, CancellationToken.None);
+
+        db.ChangeTracker.Clear();
+        var invoices = await db.Invoices.AsNoTracking().Where(x => result.InvoiceIds.Contains(x.Id)).ToArrayAsync();
+        var inv1 = invoices.Single(x => x.PartnerId == s.Customer1);
+        Assert.Equal(8.22m, inv1.InterestAmount); // Round(5.004 + 3.2149, 2), per (partner, sub-account)
+        Assert.Equal(inv1.Total + 8.22m, inv1.InvoiceTotal);
+        var member = invoices.Single(x => x.PartnerId == s.Customer2);
+        var master = invoices.Single(x => x.PartnerId == masterPartner.Id);
+        Assert.True(member.IsCancelled);
+        Assert.Equal(member.Total, master.Total);
+        Assert.Equal($"SZ-4001-2608", master.SequenceNumber);
+        Assert.Equal(master.Id, await db.Invoices.Where(x => x.Id == member.Id).Select(x => EF.Property<int?>(x, "InvoiceParentId")).SingleAsync());
+
+        var clock = new BelgradeBusinessClock(TimeProvider.System);
+        var guard = new PostingPeriodGuard(db, TimeProvider.System);
+        var journals = new JournalPostingService(db, new LedgerMutationScope(), new ShortListValidator(db), TimeProvider.System, guard, clock);
+        var gateway = new LedgerPostingGateway(journals, new HttpContextAccessor(),
+            Options.Create(new LedgerBankingOptions { SystemUserId = s.StaffId }));
+        var billing = new BillingService(db, new ShortListValidator(db), gateway, null!, TimeProvider.System, clock);
+        var posted = await billing.PostBatchAsync(s.CompanyId, result.InvoiceBatchId, "k-grp-post", CancellationToken.None);
+        var gl = await db.LedgerEntries.AsNoTracking().Where(x => x.JournalEntryId == posted.JournalEntryId)
+            .Select(x => new { x.Account, x.DebitAmount, x.CreditAmount, x.InvoiceId, Sub = EF.Property<string?>(x, "SubAccountId") }).ToArrayAsync();
+        Assert.Equal(gl.Sum(x => x.DebitAmount), gl.Sum(x => x.CreditAmount));
+        Assert.Equal(0m, gl.Where(x => x.Account == "2040" && x.InvoiceId == member.Id).Sum(x => x.DebitAmount)); // posted, then stornoed
+        Assert.Equal(master.Total, gl.Where(x => x.Account == "2040" && x.InvoiceId == master.Id).Sum(x => x.DebitAmount));
+        Assert.Equal(8.22m, gl.Where(x => x.Account == "2040" && x.Sub == "11309").Sum(x => x.DebitAmount));
+        Assert.Equal(8.22m, gl.Where(x => x.Account == "5590" && x.Sub == "11309").Sum(x => x.DebitAmount));
+        Assert.Equal(8.22m, gl.Where(x => x.Account == "4350" && x.Sub == "11309").Sum(x => x.CreditAmount));
+    }
+
     private sealed record Seed(int CompanyId, int StaffId, int Customer1, int Customer2, int Account1No);
 
     private static async Task<Seed> SeedAsync(SzAppDbContext db)

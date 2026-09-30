@@ -47,6 +47,17 @@ public sealed class InvoiceDocumentMapper(SzAppDbContext db)
         var lines = invoice.Lines.OrderBy(x => x.SortIndex)
             .Select(x => new InvoiceDocumentLine(x.Name, x.Quantity, x.PricePcs, x.VatRate, x.TotalAmount))
             .ToArray();
+        // GAP-12 group master (legacy Racun_007) has no lines of its own: it prints its members' lines, prefixed by member.
+        var members = await db.Invoices.AsNoTracking().Include(x => x.Lines)
+            .Where(x => x.CompanyId == companyId && EF.Property<int?>(x, "InvoiceParentId") == invoiceId)
+            .OrderBy(x => EF.Property<int>(x, "SortIndex"))
+            .ToArrayAsync(ct);
+        if (members.Length > 0)
+        {
+            lines = members.SelectMany(m => m.Lines.OrderBy(x => x.SortIndex)
+                    .Select(x => new InvoiceDocumentLine($"{m.PartnerName}: {x.Name}", x.Quantity, x.PricePcs, x.VatRate, x.TotalAmount)))
+                .ToArray();
+        }
 
         return new InvoiceDocumentData(
             InvoiceNumber: invoice.SequenceNumber,

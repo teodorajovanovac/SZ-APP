@@ -64,4 +64,38 @@ public sealed class InvoiceGenerationEngineTests
 
         Assert.Empty(InvoiceGenerationEngine.GenerateLines(units, invoices, 100m));
     }
+
+    [Fact]
+    public void InvoiceCarriers_MembersGoToMaster_CancelledCarryNothing()
+    {
+        var carriers = InvoiceGenerationEngine.InvoiceCarriers(
+        [
+            new InvoiceCarrierRow(1, 100, false, null),  // plain invoice
+            new InvoiceCarrierRow(2, 200, true, 9),      // group member of master 9
+            new InvoiceCarrierRow(9, 900, false, null),  // group master
+            new InvoiceCarrierRow(3, 300, true, null),   // user-cancelled
+            new InvoiceCarrierRow(4, 400, true, 5),      // member of a cancelled master
+            new InvoiceCarrierRow(5, 500, true, null),
+        ]);
+
+        Assert.Equal(1, carriers[100]);
+        Assert.Equal(9, carriers[200]);
+        Assert.Equal(9, carriers[900]);
+        Assert.False(carriers.ContainsKey(300));
+        Assert.False(carriers.ContainsKey(400));
+    }
+
+    [Theory]
+    [InlineData(110, 100, 10)]
+    [InlineData(90, 100, -10)]
+    [InlineData(100, 300, -66.67)]
+    public void ChangePercent_AgainstPreviousBatch(decimal current, decimal previous, decimal expected) =>
+        Assert.Equal(expected, InvoiceGenerationEngine.ChangePercent(current, previous));
+
+    [Fact]
+    public void ChangePercent_NoPrevious_IsNull()
+    {
+        Assert.Null(InvoiceGenerationEngine.ChangePercent(100m, null));
+        Assert.Null(InvoiceGenerationEngine.ChangePercent(100m, 0m));
+    }
 }

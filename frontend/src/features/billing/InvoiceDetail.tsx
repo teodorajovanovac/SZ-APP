@@ -33,7 +33,9 @@ export function InvoiceDetail({ companyId, invoiceId, canPost = false }: { compa
         <Typography>{invoice.partnerName}</Typography>
         <Typography color="text.secondary">{invoice.address}, {invoice.postalCode} {invoice.city}</Typography>
         <Typography>{t('billing_.detail.dueDate')}: {formatDate(invoice.dueDate)}</Typography>
-        <Typography fontWeight={700}>{t('billing_.detail.total')}: {formatMoney(invoice.invoiceTotal, invoice.currency)}</Typography>
+        <Typography>{t('billing_.detail.total')}: {formatMoney(invoice.total, invoice.currency)}</Typography>
+        <Typography>{t('invx_.interest')}: {formatMoney(invoice.interestAmount, invoice.currency)}</Typography>
+        <Typography fontWeight={700}>{t('invx_.totalWithInterest')}: {formatMoney(invoice.invoiceTotal, invoice.currency)}</Typography>
         {cancel.error ? <Alert severity="error">{getErrorMessage(cancel.error, t('posting_.cancelInvoice'))}</Alert> : null}
         {canPost && !invoice.isCancelled ? (
           <Stack direction="row">

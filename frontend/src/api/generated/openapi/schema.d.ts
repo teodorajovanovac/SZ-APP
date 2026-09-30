@@ -1843,7 +1843,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["InvoiceBatchPreviewV2Response"];
+                        "application/json": components["schemas"]["InvoiceScopePreviewResponse"];
                     };
                 };
             };
@@ -1884,7 +1884,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["GenerateInvoicesV2Response"];
+                        "application/json": components["schemas"]["GenerateInvoicesScopeResponse"];
                     };
                 };
             };
@@ -6540,6 +6540,19 @@ export interface components {
             currentPassword: string;
             newPassword: string;
         };
+        CompanyGenerateResultV2: {
+            /** Format: int32 */
+            companyId: number | string;
+            companyName: string;
+            /** Format: int32 */
+            invoiceBatchId: null | number | string;
+            alreadyGenerated: boolean;
+            /** Format: int32 */
+            invoiceCount: number | string;
+            /** Format: double */
+            interestTotal: null | number | string;
+            error: null | string;
+        };
         CompanySummaryResponse: {
             /** Format: int32 */
             id: number | string;
@@ -6848,6 +6861,9 @@ export interface components {
             fileName: null | string;
             isCurrent: boolean;
         };
+        GenerateInvoicesScopeResponse: {
+            companies: components["schemas"]["CompanyGenerateResultV2"][];
+        };
         GenerateInvoicesV2Request: {
             /** Format: int32 */
             periodYYMM: number | string;
@@ -6865,12 +6881,13 @@ export interface components {
             transactionDate: string;
             /** Format: double */
             exchangeRateNbs: number | string;
-        };
-        GenerateInvoicesV2Response: {
+            scope?: null | string;
             /** Format: int32 */
-            invoiceBatchId: number | string;
-            alreadyGenerated: boolean;
-            invoiceIds: (number | string)[];
+            locationCategoryId?: null | number | string;
+            /** Format: date */
+            interestPeriodStart?: null | string;
+            /** Format: date */
+            interestPeriodEnd?: null | string;
         };
         GenerateNoticesRequest: {
             /** @default false */
@@ -7002,6 +7019,13 @@ export interface components {
             /** Format: double */
             total: number | string;
             customers: components["schemas"]["CustomerInvoicePreviewV2"][];
+            /** @default  */
+            companyName: string;
+            /** Format: double */
+            previousTotal?: null | number | string;
+            /** Format: double */
+            changePercent?: null | number | string;
+            error?: null | string;
         };
         InvoiceBatchResponse: {
             /** Format: int32 */
@@ -7148,6 +7172,19 @@ export interface components {
             isCancelled: boolean;
             rowVersion: string;
             lines?: null | components["schemas"]["InvoiceLineResponse"][];
+        };
+        InvoiceScopePreviewResponse: {
+            buildings: components["schemas"]["InvoiceBatchPreviewV2Response"][];
+            /** Format: int32 */
+            customerCount: number | string;
+            /** Format: double */
+            netTotal: number | string;
+            /** Format: double */
+            vatTotal: number | string;
+            /** Format: double */
+            interestTotal: number | string;
+            /** Format: double */
+            total: number | string;
         };
         InvoiceSeedRequest: {
             /** Format: int32 */

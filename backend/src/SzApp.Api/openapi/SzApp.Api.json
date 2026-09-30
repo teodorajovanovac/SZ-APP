@@ -2424,7 +2424,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/InvoiceBatchPreviewV2Response"
+                  "$ref": "#/components/schemas/InvoiceScopePreviewResponse"
                 }
               }
             }
@@ -2465,7 +2465,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenerateInvoicesV2Response"
+                  "$ref": "#/components/schemas/GenerateInvoicesScopeResponse"
                 }
               }
             }
@@ -7921,6 +7921,66 @@
           }
         }
       },
+      "CompanyGenerateResultV2": {
+        "required": [
+          "companyId",
+          "companyName",
+          "invoiceBatchId",
+          "alreadyGenerated",
+          "invoiceCount",
+          "interestTotal",
+          "error"
+        ],
+        "type": "object",
+        "properties": {
+          "companyId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "companyName": {
+            "type": "string"
+          },
+          "invoiceBatchId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "alreadyGenerated": {
+            "type": "boolean"
+          },
+          "invoiceCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "interestTotal": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "error": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "CompanySummaryResponse": {
         "required": [
           "id",
@@ -9275,6 +9335,20 @@
           }
         }
       },
+      "GenerateInvoicesScopeResponse": {
+        "required": [
+          "companies"
+        ],
+        "type": "object",
+        "properties": {
+          "companies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CompanyGenerateResultV2"
+            }
+          }
+        }
+      },
       "GenerateInvoicesV2Request": {
         "required": [
           "periodYYMM",
@@ -9333,38 +9407,35 @@
               "string"
             ],
             "format": "double"
-          }
-        }
-      },
-      "GenerateInvoicesV2Response": {
-        "required": [
-          "invoiceBatchId",
-          "alreadyGenerated",
-          "invoiceIds"
-        ],
-        "type": "object",
-        "properties": {
-          "invoiceBatchId": {
+          },
+          "scope": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "locationCategoryId": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
+              "null",
               "integer",
               "string"
             ],
             "format": "int32"
           },
-          "alreadyGenerated": {
-            "type": "boolean"
+          "interestPeriodStart": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
           },
-          "invoiceIds": {
-            "type": "array",
-            "items": {
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ],
-              "format": "int32"
-            }
+          "interestPeriodEnd": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
           }
         }
       },
@@ -9909,6 +9980,34 @@
             "items": {
               "$ref": "#/components/schemas/CustomerInvoicePreviewV2"
             }
+          },
+          "companyName": {
+            "type": "string",
+            "default": ""
+          },
+          "previousTotal": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "changePercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "error": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -10464,6 +10563,65 @@
             "items": {
               "$ref": "#/components/schemas/InvoiceLineResponse"
             }
+          }
+        }
+      },
+      "InvoiceScopePreviewResponse": {
+        "required": [
+          "buildings",
+          "customerCount",
+          "netTotal",
+          "vatTotal",
+          "interestTotal",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "buildings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InvoiceBatchPreviewV2Response"
+            }
+          },
+          "customerCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "netTotal": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "vatTotal": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "interestTotal": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "total": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
           }
         }
       },

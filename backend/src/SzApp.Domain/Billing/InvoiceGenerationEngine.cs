@@ -20,6 +20,9 @@ public sealed record R0SupplierInput(
     decimal PerCoefficientAmountEur,
     decimal VatRatePercent);
 
+/// <summary>One invoice of a batch as seen by interest/group attribution. ParentId = group master invoice (GAP-12).</summary>
+public sealed record InvoiceCarrierRow(int InvoiceId, int PartnerId, bool IsCancelled, int? ParentId);
+
 public sealed record R1CustomerLine(int CustomerId, int SupplierInvoiceId, int SupplierPartnerAccountId, int UnitTypeId, R1LineResult Result);
 
 /// <summary>
@@ -29,6 +32,27 @@ public sealed record R1CustomerLine(int CustomerId, int SupplierInvoiceId, int S
 /// </summary>
 public static class InvoiceGenerationEngine
 {
+    /// <summary>
+    /// Partner -> the invoice that carries its amounts (interest, postings) in one batch: a group member's
+    /// master, otherwise its own invoice. Partners whose carrier is cancelled carry nothing.
+    /// </summary>
+    public static IReadOnlyDictionary<int, int> InvoiceCarriers(IEnumerable<InvoiceCarrierRow> invoices)
+    {
+        var rows = invoices.ToArray();
+        var active = rows.Where(x => !x.IsCancelled).Select(x => x.InvoiceId).ToHashSet();
+        var result = new Dictionary<int, int>();
+        foreach (var row in rows.OrderBy(x => x.InvoiceId))
+        {
+            var carrier = row.ParentId ?? row.InvoiceId;
+            if (active.Contains(carrier)) result.TryAdd(row.PartnerId, carrier);
+        }
+        return result;
+    }
+
+    /// <summary>Wizard ±% vs the previous batch: null when there is no (non-zero) previous total.</summary>
+    public static decimal? ChangePercent(decimal current, decimal? previous) =>
+        previous is { } p && p != 0m ? FinanceRounding.Money((current - p) / p * 100m) : null;
+
     public static IReadOnlyList<R1CustomerLine> GenerateLines(
         IReadOnlyList<R0UnitRow> units,
         IReadOnlyList<R0SupplierInput> supplierInvoices,

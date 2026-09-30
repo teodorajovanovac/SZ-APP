@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiRequest } from '../../api/generated/client'
 import '../../app/i18n.invoicePdf'
-import type { BillingPage, CreateInvoiceBatch, GenerateInvoicesRequest, GenerateInvoicesResult, InvoiceBatch, InvoiceBatchPreview, InvoiceSummary } from './types'
+import type { BillingPage, CreateInvoiceBatch, GenerateInvoicesRequest, GenerateInvoicesScopeResult, InvoiceBatch, InvoiceScopePreview, InvoiceSummary } from './types'
 
 // apiRequest attaches the antiforgery header automatically for unsafe methods; only
 // the idempotency key needs adding here.
@@ -44,7 +44,7 @@ export function useCreateInvoiceBatch(companyId: number) {
 export function usePreviewInvoiceBatch(companyId: number) {
   return useMutation({
     mutationFn: (request: GenerateInvoicesRequest) =>
-      mutate<InvoiceBatchPreview>(`/api/v1/companies/${companyId}/invoice-batches/preview`, request),
+      mutate<InvoiceScopePreview>(`/api/v1/companies/${companyId}/invoice-batches/preview`, request),
   })
 }
 
@@ -52,7 +52,7 @@ export function useGenerateInvoiceBatch(companyId: number) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (request: GenerateInvoicesRequest) =>
-      mutate<GenerateInvoicesResult>(`/api/v1/companies/${companyId}/invoice-batches/generate`, request, true),
+      mutate<GenerateInvoicesScopeResult>(`/api/v1/companies/${companyId}/invoice-batches/generate`, request, true),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: billingKeys.batches(companyId) })
       await queryClient.invalidateQueries({ queryKey: billingKeys.invoices(companyId) })

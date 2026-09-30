@@ -32,6 +32,7 @@ public static class SupplierDocumentTypes
     public const int Planned = 1;   // "Predviđeni troškovi" -- posted together with the invoice batch
     public const int Actual = 2;    // "Izvršeni troškovi" -- posted on its own
     public const int CreditNote = 3; // odobrenje -- same as 2 with sides swapped, line type 7
+    public const int Interest = 9;  // kamata -- template per interest sub-account; posted with the batch like type 1
 }
 
 public sealed record PostingLine(
@@ -62,6 +63,24 @@ public sealed record InvoicePostingSource(
     string? PaymentReference,
     int? SupplierInvoiceId,
     decimal Amount);
+
+/// <summary>
+/// 9.4 PrenesiZK row (partner x base sub-account, already rounded, &gt; 0) attributed to the invoice it is
+/// shown on. Posted as 2040 D on the interest sub-account; SupplierInvoiceId = the type-9 supplier invoice
+/// for that sub-account if one exists (then 4350/5590 too), else 2040/4900 only.
+/// </summary>
+public sealed record InterestPostingSource(
+    int InvoiceId,
+    int CustomerPartnerAccountId,
+    string CustomerAccount,
+    DateOnly DueDate,
+    string? PaymentReference,
+    string? InterestSubAccountId,
+    int? SupplierInvoiceId,
+    decimal Amount);
+
+/// <summary>GAP-12 (9.1 R5/R9/R10): the group master invoice a member invoice's 2040 lines move to.</summary>
+public sealed record GroupInvoiceTarget(int InvoiceId, int PartnerAccountId, string Account, DateOnly DueDate, string? PaymentReference);
 
 public sealed record SupplierPostingInfo(
     int Id,
@@ -95,13 +114,18 @@ public static class DocumentPostingRules
     /// <summary>
     /// 9.2 invoice batch posting (legacy <c>KnjizenjeRacuna</c>): 2040 D per invoice × supplier
     /// invoice (× its sub-account), 4900 C per supplier invoice, and for supplier document type 1
-    /// also 4350 C (partner = supplier) + 5590 D. Zero groups are skipped. Result is balanced.
+    /// also 4350 C (partner = supplier) + 5590 D (same for type 9 = interest). Zero groups are skipped.
+    /// Interest (R7/R8): 2040 D per PrenesiZK row on the interest sub-account. Group invoices
+    /// (legacy <c>GrupniRacunFixKnjizenje</c>): every 2040 line of a member is repeated negated
+    /// (same side, same type) and then posted on the master, at the end of the journal. Result is balanced.
     /// </summary>
     public static IReadOnlyList<PostingLine> BuildInvoiceBatch(
         DateOnly postingDate,
         string documentRef,
         IEnumerable<InvoicePostingSource> sources,
-        IReadOnlyDictionary<int, SupplierPostingInfo> suppliers)
+        IReadOnlyDictionary<int, SupplierPostingInfo> suppliers,
+        IEnumerable<InterestPostingSource>? interest = null,
+        IReadOnlyDictionary<int, GroupInvoiceTarget>? groupTargets = null)
     {
         var customerLines = new List<PostingLine>();
         foreach (var group in sources
@@ -124,8 +148,46 @@ public static class DocumentPostingRules
                 CollectionPriority: supplier?.CollectionPriority));
         }
 
-        return customerLines.Concat(BuildSupplierSide(customerLines, postingDate, documentRef, suppliers, LedgerLineTypes.Invoice)).ToArray();
+        foreach (var i in (interest ?? []).OrderBy(x => x.InvoiceId).ThenBy(x => x.InterestSubAccountId, StringComparer.Ordinal))
+        {
+            var amount = FinanceRounding.Money(i.Amount);
+            if (amount <= 0m) continue; // PrenesiZK: only positive interest
+            var supplier = SupplierFor(suppliers, i.SupplierInvoiceId);
+            customerLines.Add(new PostingLine(
+                i.CustomerAccount, amount, 0m, LedgerLineTypes.Invoice, postingDate,
+                PartnerAccountId: i.CustomerPartnerAccountId,
+                SubAccountId: i.InterestSubAccountId,
+                DueDate: i.DueDate,
+                DocumentRef: documentRef,
+                Parameters: CleanPaymentReference(i.PaymentReference),
+                InvoiceId: i.InvoiceId,
+                SupplierInvoiceId: i.SupplierInvoiceId,
+                CollectionPriority: supplier?.CollectionPriority,
+                Note: InterestNote));
+        }
+
+        var moved = new List<PostingLine>();
+        if (groupTargets is { Count: > 0 })
+        {
+            foreach (var line in customerLines)
+            {
+                if (line.InvoiceId is not { } id || !groupTargets.TryGetValue(id, out var master)) continue;
+                moved.Add(line with { Debit = -line.Debit });
+                moved.Add(line with
+                {
+                    Account = master.Account, PartnerAccountId = master.PartnerAccountId, InvoiceId = master.InvoiceId,
+                    DueDate = master.DueDate, Parameters = CleanPaymentReference(master.PaymentReference)
+                });
+            }
+        }
+
+        return customerLines
+            .Concat(BuildSupplierSide(customerLines, postingDate, documentRef, suppliers, LedgerLineTypes.Invoice))
+            .Concat(moved)
+            .ToArray();
     }
+
+    public const string InterestNote = "Kamata";
 
     /// <summary>
     /// P9 storno of one invoice (legacy <c>KnjizenjeRacunaStorno</c>): the invoice's posted 2040
@@ -190,15 +252,18 @@ public static class DocumentPostingRules
         int customerLineType)
     {
         var supplierLineType = customerLineType == LedgerLineTypes.Storno ? LedgerLineTypes.Storno : LedgerLineTypes.SupplierInvoice;
-        foreach (var group in customerLines.GroupBy(x => x.SupplierInvoiceId).OrderBy(x => x.Key ?? 0))
+        // Keyed by sub-account too, so interest without a type-9 supplier invoice still gets 4900 on its interest sub-account.
+        foreach (var group in customerLines.GroupBy(x => (x.SupplierInvoiceId, x.SubAccountId))
+                     .OrderBy(x => x.Key.SupplierInvoiceId ?? 0).ThenBy(x => x.Key.SubAccountId, StringComparer.Ordinal))
         {
             var amount = FinanceRounding.Money(group.Sum(x => x.Debit));
             if (amount == 0m) continue;
-            var supplier = SupplierFor(suppliers, group.Key);
+            var supplier = SupplierFor(suppliers, group.Key.SupplierInvoiceId);
             yield return new PostingLine(LedgerAccounts.Revenue, 0m, amount, customerLineType, postingDate,
-                SubAccountId: supplier?.SubAccountId, DocumentRef: documentRef, SupplierInvoiceId: group.Key, Note: supplier?.Caption);
+                SubAccountId: group.Key.SubAccountId, DocumentRef: documentRef, SupplierInvoiceId: group.Key.SupplierInvoiceId,
+                Note: supplier?.Caption ?? group.First().Note);
 
-            if (supplier?.DocumentType != SupplierDocumentTypes.Planned) continue;
+            if (supplier?.DocumentType is not (SupplierDocumentTypes.Planned or SupplierDocumentTypes.Interest)) continue;
             yield return new PostingLine(supplier.SupplierAccount, 0m, amount, supplierLineType, postingDate,
                 PartnerAccountId: supplier.SupplierPartnerAccountId, SubAccountId: supplier.SubAccountId, DocumentRef: documentRef,
                 Parameters: CleanPaymentReference(supplier.PaymentReference), SupplierInvoiceId: supplier.Id, Note: supplier.Caption);
