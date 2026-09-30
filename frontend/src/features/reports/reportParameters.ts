@@ -1,8 +1,9 @@
+import i18n from 'i18next'
 import type { ReportParameters } from './types'
 
 export function parseReportParameters(value: string): ReportParameters {
   const parsed: unknown = value.trim() ? JSON.parse(value) : {}
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Parametri moraju biti JSON objekat.')
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error(i18n.t('validation.jsonObject'))
   const result: ReportParameters = {}
   for (const [key, item] of Object.entries(parsed)) {
     if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(key)) throw new Error(`Naziv parametra '${key}' nije ispravan.`)

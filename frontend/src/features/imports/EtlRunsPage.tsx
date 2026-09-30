@@ -155,7 +155,7 @@ export function EtlRunsPage() {
                       ) : null}
                     </TableCell>
                     <TableCell>{run.sourceTable}</TableCell>
-                    <TableCell><Chip size="small" label={run.stage} /></TableCell>
+                    <TableCell><Chip size="small" label={t(`etlStage.${run.stage}`, { defaultValue: run.stage })} /></TableCell>
                     <TableCell align="right">{run.importedRows}/{run.sourceRows}</TableCell>
                     <TableCell align="right">
                       {run.quarantinedRows > 0 ? (

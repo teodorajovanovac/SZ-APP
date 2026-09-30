@@ -1,3 +1,4 @@
+import i18n from 'i18next'
 import type { PropsWithChildren } from 'react'
 import { useState } from 'react'
 import type { CompanySummary } from '../../api/generated/client'
@@ -17,7 +18,7 @@ export function ActiveCompanyProvider({ companies, children }: ActiveCompanyProv
   const activeCompany = companies.find((company) => company.id === activeCompanyId) ?? companies[0]
 
   if (!activeCompany) {
-    throw new Error('Prijavljeni korisnik nema pristup nijednoj kompaniji.')
+    throw new Error(i18n.t('errors.noCompanies'))
   }
 
   const selectCompany = (companyId: number) => {

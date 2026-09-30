@@ -1,7 +1,14 @@
-import { Alert, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from '@mui/material'
+import { Alert, Link, Stack } from '@mui/material'
+import type { ColumnDef } from '@tanstack/react-table'
+import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Link as RouterLink } from 'react-router-dom'
 import { useActiveCompany } from '../companies/useActiveCompany'
 import { formatDate } from '../../shared/format/date'
+import { PageHeader } from '../../shared/components/PageHeader'
+import { SearchField } from '../../shared/components/SearchField'
+import { ServerDataTable } from '../../shared/components/ServerDataTable'
+import { urlTableProps, useUrlState } from '../../shared/hooks/useUrlState'
 import { AddressList, PartnerList } from './index'
 import { BuildingEntranceList } from './components/BuildingEntranceList'
 import { LocationCategoryList } from './components/LocationCategoryList'
@@ -17,50 +24,65 @@ export function AddressesPage() { const { activeCompany } = useActiveCompany(); 
 export function UnitsPage() {
   const { t } = useTranslation()
   const { activeCompany } = useActiveCompany()
-  const units = useUnits(activeCompany.id, { page: 1, pageSize: 100 })
-  const rows = units.data?.items ?? []
+  const companyId = activeCompany.id
+  // The API orders by sorting number; no column sort.
+  const [url, setUrl] = useUrlState({ q: '', page: 0, size: 50 })
+  const table = urlTableProps(url, setUrl)
+  const units = useUnits(companyId, { page: url.page + 1, pageSize: url.size, search: url.q })
+  const columns = useMemo<ColumnDef<Unit>[]>(
+    () => [
+      {
+        id: 'name',
+        header: t('fields.unitLabel'),
+        cell: ({ row }) => (
+          <Link component={RouterLink} to={`/units/${companyId}/${row.original.id}`}>
+            {row.original.name ?? `#${row.original.id}`}
+          </Link>
+        ),
+      },
+      {
+        id: 'entrance',
+        header: t('fields.entrance'),
+        cell: ({ row }) =>
+          row.original.buildingEntranceId ? (
+            <Link component={RouterLink} to={`/building-entrances/${companyId}/${row.original.buildingEntranceId}`}>
+              #{row.original.buildingEntranceId}
+            </Link>
+          ) : t('ui.noValue'),
+      },
+      { id: 'k1', header: t('fields.area'), meta: { numeric: true }, cell: ({ row }) => row.original.k1?.toLocaleString('sr-Latn-RS', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? t('ui.noValue') },
+      {
+        id: 'contract',
+        header: t('fields.activeContract'),
+        cell: ({ row }) => {
+          const unit = row.original
+          if (!unit.activeContractDate) return t('ui.noValue')
+          return `${formatDate(unit.activeContractDate)} – ${unit.activeContractEndDate ? formatDate(unit.activeContractEndDate) : t('ui.active')}`
+        },
+      },
+    ],
+    [companyId, t],
+  )
   return (
     <Stack spacing={2}>
-      <Typography component="h1" variant="h1">Jedinice i ugovori</Typography>
-      {units.isError && <Alert severity="error">Jedinice nisu dostupne.</Alert>}
-      <Paper variant="outlined">
-        <Typography variant="caption" color="text.secondary" sx={{ display: { xs: 'block', md: 'none' }, px: 2, pt: 1 }}>
-          {t('ui.scrollHint')}
-        </Typography>
-        <TableContainer sx={{ overflowX: 'auto' }}>
-          <Table size="small" sx={{ minWidth: 640 }}>
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 600 }}>Oznaka</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Ulaz</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 600 }}>Površina</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Aktivni ugovor</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {rows.map((unit) => <UnitRow key={unit.id} unit={unit} />)}
-              {!units.isLoading && rows.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={4} align="center" sx={{ py: 6, border: 0, color: 'text.secondary' }}>
-                    {t('table.empty')}
-                  </TableCell>
-                </TableRow>
-              ) : null}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
+      <PageHeader
+        title={t('units_.title')}
+        subtitle={t('units_.subtitle')}
+        filters={<SearchField label={t('units_.search')} value={url.q} onChange={(q) => setUrl({ q })} />}
+      />
+      {units.isError && <Alert severity="error">{t('units_.loadError')}</Alert>}
+      <ServerDataTable
+        ariaLabel={t('units_.title')}
+        rows={units.data?.items ?? []}
+        columns={columns}
+        rowCount={units.data?.totalCount ?? 0}
+        pagination={table.pagination}
+        onPaginationChange={table.onPaginationChange}
+        isLoading={units.isLoading}
+        emptyMessage={url.q ? undefined : t('units_.empty')}
+        getRowId={(row) => String(row.id)}
+        minWidth={640}
+      />
     </Stack>
-  )
-}
-
-function UnitRow({ unit }: { unit: Unit }) {
-  return (
-    <TableRow hover>
-      <TableCell>{unit.name ?? `#${unit.id}`}</TableCell>
-      <TableCell>{unit.buildingEntranceId ?? '—'}</TableCell>
-      <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>{unit.k1?.toFixed(2) ?? '—'}</TableCell>
-      <TableCell>{unit.activeContractDate ? `${formatDate(unit.activeContractDate)} – ${unit.activeContractEndDate ? formatDate(unit.activeContractEndDate) : 'aktivno'}` : '—'}</TableCell>
-    </TableRow>
   )
 }

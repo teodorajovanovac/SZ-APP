@@ -241,9 +241,12 @@ export const theme = createTheme(
         },
       },
       MuiDivider: { styleOverrides: { root: { borderColor } } },
+      // DES-01: compact data density (≈34 px rows, 13 px text) — accounting lists are long.
+      MuiTable: { defaultProps: { size: 'small' } },
       MuiTableCell: {
         styleOverrides: {
           root: { borderColor, paddingBlock: 11 },
+          sizeSmall: { paddingBlock: 7 },
           head: {
             fontWeight: 650,
             fontSize: '0.6875rem',

@@ -1,9 +1,9 @@
-import { Card, CardContent, Stack, Typography } from '@mui/material'
+import { Card, CardContent } from '@mui/material'
 import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router-dom'
 import { ApiProblemError } from '../../../api/generated/client'
 import { useBuildingEntranceDetail } from '../useMasterData'
-import { DetailField, DetailPageLayout } from './DetailPageLayout'
+import { DetailField, DetailGrid, DetailPageLayout } from './DetailPageLayout'
 
 export function BuildingEntranceDetailPage() {
   const { t } = useTranslation()
@@ -15,28 +15,28 @@ export function BuildingEntranceDetailPage() {
 
   const detail = useBuildingEntranceDetail(validParams ? companyIdNum : 0, validParams ? entranceIdNum : 0)
   const isNotFound = !validParams || (detail.error instanceof ApiProblemError && isNotFoundStatus(detail.error.problem.status))
+  const data = detail.data
 
   return (
     <DetailPageLayout
-      title={t('masterDataDetail_.buildingEntranceTitle')}
+      title={data ? [data.buildingName, data.entranceName].filter(Boolean).join(' · ') || `#${data.id}` : t('masterDataDetail_.buildingEntranceTitle')}
+      subtitle={data?.buildingLabel}
       isLoading={validParams && detail.isLoading}
       isError={detail.isError}
       isNotFound={isNotFound}
     >
-      {detail.data && (
+      {data && (
         <Card variant="outlined">
           <CardContent>
-            <Typography variant="h5" component="h2">
-              {detail.data.entranceName ?? detail.data.buildingName ?? `#${detail.data.id}`}
-            </Typography>
-            <Stack component="dl" spacing={1} sx={{ mt: 2 }}>
-              <DetailField label="Zgrada" value={detail.data.buildingName} />
-              <DetailField label="Ulaz" value={detail.data.entranceName} />
-              <DetailField label="Oznaka zgrade" value={detail.data.buildingLabel} />
-              <DetailField label="Adresa (ID)" value={detail.data.addressId} />
-              <DetailField label="Opis" value={detail.data.description} />
-              <DetailField label="Redni broj" value={detail.data.sortIndex} />
-            </Stack>
+            <DetailGrid>
+              <DetailField label={t('fields.building')} value={data.buildingName} />
+              <DetailField label={t('fields.entrance')} value={data.entranceName} />
+              <DetailField label={t('fields.buildingLabel')} value={data.buildingLabel} />
+              {/* ponytail: the API has no address lookup by id for non-Root users; shows the id until it does. */}
+              <DetailField label={t('fields.address')} value={data.addressId ? `#${data.addressId}` : null} />
+              <DetailField label={t('fields.description')} value={data.description} />
+              <DetailField label={t('fields.ordinal')} value={data.sortIndex} />
+            </DetailGrid>
           </CardContent>
         </Card>
       )}

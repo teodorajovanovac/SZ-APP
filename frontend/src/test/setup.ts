@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest'
 import '../app/i18n'
+import '../app/i18n.ui'
 
 Object.defineProperty(window, 'matchMedia', {
   writable: true,

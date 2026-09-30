@@ -55,9 +55,9 @@ export function StaffCreateForm({ onSaved, onCancel }: StaffCreateFormProps) {
       </TextField>
       {companyId !== '' && (
         <TextField size="small" select label={t('staffAdmin_.role')} value={role} onChange={(e) => setRole(e.target.value as StaffRole)}>
-          <MenuItem value="Upravnik">Upravnik</MenuItem>
-          <MenuItem value="Moderator">Moderator</MenuItem>
-          <MenuItem value="Review">Review</MenuItem>
+          <MenuItem value="Upravnik">{t('roles.Upravnik')}</MenuItem>
+          <MenuItem value="Moderator">{t('roles.Moderator')}</MenuItem>
+          <MenuItem value="Review">{t('roles.Review')}</MenuItem>
         </TextField>
       )}
       {isRootCaller && (

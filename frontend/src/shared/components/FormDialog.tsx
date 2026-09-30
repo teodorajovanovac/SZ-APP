@@ -1,7 +1,8 @@
 import { Dialog, DialogContent, DialogTitle, IconButton } from '@mui/material'
 import CloseIcon from '@mui/icons-material/Close'
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import { comboFromEvent } from '../keyboard/shortcuts'
 import { ConfirmDialog } from './ConfirmDialog'
 
 interface FormDialogProps {
@@ -21,11 +22,15 @@ interface FormDialogProps {
  * confirmation before actually closing. No form needs to report its own dirty state —
  * DialogContent's native change events bubble up through the React tree regardless of
  * MUI's portal, so this works for any form dropped in as children.
+ *
+ * UX-50: the first field gets focus on open; Ctrl+S submits the form inside, Ctrl+Enter
+ * clicks its `data-save-new` button ("Sačuvaj i novi") when the form offers one.
  */
 export function FormDialog({ open, title, onClose, children, maxWidth = 'sm' }: FormDialogProps) {
   const { t } = useTranslation()
   const [dirty, setDirty] = useState(false)
   const [confirmingClose, setConfirmingClose] = useState(false)
+  const contentRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (open) setDirty(false)
@@ -36,9 +41,34 @@ export function FormDialog({ open, title, onClose, children, maxWidth = 'sm' }: 
     else onClose()
   }
 
+  const focusFirstField = () => {
+    contentRef.current
+      ?.querySelector<HTMLElement>('input:not([type="hidden"]):not([disabled]):not([readonly]), textarea:not([disabled]), [role="combobox"]')
+      ?.focus()
+  }
+
+  const onKeyDown = (event: KeyboardEvent) => {
+    const combo = comboFromEvent(event.nativeEvent)
+    if (combo !== 'ctrl+s' && combo !== 'ctrl+enter') return
+    const form = contentRef.current?.querySelector('form')
+    if (!form) return
+    event.preventDefault()
+    const saveNew = combo === 'ctrl+enter' ? form.querySelector<HTMLButtonElement>('[data-save-new]:not([disabled])') : null
+    if (saveNew) saveNew.click()
+    else form.requestSubmit()
+  }
+
   return (
     <>
-      <Dialog open={open} onClose={requestClose} onChange={() => setDirty(true)} fullWidth maxWidth={maxWidth}>
+      <Dialog
+        open={open}
+        onClose={requestClose}
+        onChange={() => setDirty(true)}
+        onKeyDown={onKeyDown}
+        fullWidth
+        maxWidth={maxWidth}
+        slotProps={{ transition: { onEntered: focusFirstField } }}
+      >
         <DialogTitle sx={{ pr: 6 }}>
           {title}
           <IconButton
@@ -49,7 +79,7 @@ export function FormDialog({ open, title, onClose, children, maxWidth = 'sm' }: 
             <CloseIcon />
           </IconButton>
         </DialogTitle>
-        <DialogContent dividers>{children}</DialogContent>
+        <DialogContent dividers ref={contentRef}>{children}</DialogContent>
       </Dialog>
       <ConfirmDialog
         open={confirmingClose}

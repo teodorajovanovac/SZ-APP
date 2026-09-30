@@ -1,4 +1,5 @@
 import KeyboardArrowUpDownIcon from '@mui/icons-material/UnfoldMore'
+import KeyboardIcon from '@mui/icons-material/KeyboardOutlined'
 import LockResetIcon from '@mui/icons-material/LockReset'
 import LogoutIcon from '@mui/icons-material/Logout'
 import MenuIcon from '@mui/icons-material/Menu'
@@ -13,6 +14,7 @@ import {
   Drawer,
   FormControl,
   IconButton,
+  LinearProgress,
   List,
   ListItemButton,
   ListItemIcon,
@@ -26,15 +28,21 @@ import {
   ToggleButton,
   ToggleButtonGroup,
   Toolbar,
+  Tooltip,
   Typography,
   useMediaQuery,
 } from '@mui/material'
 import { alpha, useTheme } from '@mui/material/styles'
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useLayoutEffect, useMemo, useState } from 'react'
+import { useIsFetching } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../features/auth/useAuth'
 import { ChangePasswordForm } from '../features/auth/ChangePasswordForm'
+import { ReloginDialog } from '../features/auth/ReloginDialog'
+import { PageSkeleton } from '../shared/components/PageSkeleton'
+import { ShortcutsHelpDialog } from '../shared/keyboard/ShortcutsHelpDialog'
+import { useGlobalShortcuts, useShortcut } from '../shared/keyboard/shortcuts'
 import { BrandMark } from '../shared/components/BrandMark'
 import { FormDialog } from '../shared/components/FormDialog'
 import { CommandPalette } from '../features/ledger-cards/CommandPalette'
@@ -54,13 +62,12 @@ export function AppShell() {
   const [changingPassword, setChangingPassword] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [accountAnchor, setAccountAnchor] = useState<HTMLElement | null>(null)
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setSearchOpen(true) }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  const [helpOpen, setHelpOpen] = useState(false)
+  const navigate = useNavigate()
+  const location = useLocation()
+  const fetching = useIsFetching()
+  useShortcut('ctrl+k', () => setSearchOpen(true))
+  useGlobalShortcuts({ navigate, openHelp: () => setHelpOpen(true) })
   const { t, i18n } = useTranslation()
   const { user, logout } = useAuth()
   const { companies, activeCompany } = useActiveCompany()
@@ -91,6 +98,15 @@ export function AppShell() {
   // (core.MenuItem + Translation) so they can be edited without a frontend deploy.
   const menu = useMenu(activeCompany.id)
   const groups = buildMenuGroups(menu.data)
+  // UX-37/UX-36: the tab title follows the menu caption of the current screen (pages with a
+  // PageHeader refine it afterwards — this layout effect runs before their passive effects).
+  const currentCaption = menu.data
+    ?.filter((item) => item.path && item.path !== '/' && location.pathname.startsWith(item.path))
+    .sort((a, b) => (b.path?.length ?? 0) - (a.path?.length ?? 0))[0]?.caption
+  const pageCaption = location.pathname === '/' ? t('dashboard') : currentCaption
+  useLayoutEffect(() => {
+    document.title = pageCaption ? `${pageCaption} · ${t('appName')}` : t('appName')
+  }, [pageCaption, t])
 
   const changeLanguage = async (language: string) => {
     localStorage.setItem('sz.language', language)
@@ -103,7 +119,7 @@ export function AppShell() {
       size="small"
       disableClearable
       fullWidth
-      sx={{ width: isDesktop ? 220 : '100%' }}
+      sx={{ width: isDesktop ? undefined : '100%', flex: isDesktop ? '0 1 230px' : undefined, minWidth: isDesktop ? 150 : undefined }}
       options={companies}
       value={activeCompany}
       isOptionEqualToValue={(option, value) => option.id === value.id}
@@ -120,6 +136,7 @@ export function AppShell() {
       size="small"
       exclusive
       fullWidth={!isDesktop}
+      sx={{ flexShrink: 0 }}
       value={scopeMode}
       onChange={handleScopeModeChange}
       aria-label={t('companyScope.groupLabel')}
@@ -134,7 +151,7 @@ export function AppShell() {
     <Autocomplete
       size="small"
       fullWidth
-      sx={{ width: isDesktop ? 220 : '100%' }}
+      sx={{ width: isDesktop ? undefined : '100%', flex: isDesktop ? '0 1 220px' : undefined, minWidth: isDesktop ? 140 : undefined }}
       options={locationOptions}
       value={selectedLocationOption}
       isOptionEqualToValue={(option, value) => option.id === value.id}
@@ -253,7 +270,7 @@ export function AppShell() {
           <Box sx={{ minWidth: 0, flex: 1 }}>
             <Typography variant="body2" fontWeight={600} noWrap>{user?.displayName}</Typography>
             <Typography variant="caption" color="text.secondary" noWrap display="block">
-              {user?.roles.join(', ')}
+              {user?.roles.map((role) => t(`roles.${role}`, { defaultValue: role })).join(', ')}
             </Typography>
           </Box>
           <KeyboardArrowUpDownIcon fontSize="small" sx={{ color: 'text.secondary' }} />
@@ -278,7 +295,7 @@ export function AppShell() {
         position="fixed"
         sx={{ zIndex: theme.zIndex.drawer + 1, width: { lg: `calc(100% - ${drawerWidth}px)` }, ml: { lg: `${drawerWidth}px` } }}
       >
-        <Toolbar sx={{ gap: 1.5, minHeight: { xs: 56, sm: 64 } }}>
+        <Toolbar sx={{ gap: 1.5, minHeight: { xs: 56, sm: 64 }, flexWrap: 'nowrap' }}>
           {!isDesktop && (
             <IconButton edge="start" onClick={() => setMobileOpen(true)} aria-label={t('openNavigation')}>
               <MenuIcon />
@@ -294,7 +311,10 @@ export function AppShell() {
               gap: 1,
               px: 1.5,
               height: 38,
-              width: { xs: 'auto', md: 300 },
+              flex: { xs: '0 0 auto', md: '0 1 300px' },
+              minWidth: { xs: 38, md: 160 },
+              overflow: 'hidden',
+              whiteSpace: 'nowrap',
               borderRadius: 2.5,
               border: 1,
               borderColor: 'divider',
@@ -305,21 +325,32 @@ export function AppShell() {
             }}
           >
             <SearchIcon fontSize="small" />
-            <Box component="span" sx={{ display: { xs: 'none', md: 'inline' }, flex: 1, textAlign: 'left' }}>{t('search_.open')}</Box>
+            <Box component="span" sx={{ display: { xs: 'none', md: 'inline' }, flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t('search_.open')}</Box>
           </ButtonBase>
           <CommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
           <Box sx={{ flexGrow: 1 }} />
           {/* On phones the company and language pickers live in the drawer. */}
           {isDesktop && (
-            <Stack direction="row" spacing={1.25} alignItems="center">
+            <Stack direction="row" spacing={1.25} alignItems="center" sx={{ minWidth: 0, flex: '0 1 auto', justifyContent: 'flex-end' }}>
               {companySelect}
               {scopeToggle}
               {locationCategorySelect}
               {languageSelect}
             </Stack>
           )}
+          <Tooltip title={t('ui.shortcuts.withKeys', { label: t('ui.shortcuts.title'), keys: '?' })}>
+            <IconButton onClick={() => setHelpOpen(true)} aria-label={t('ui.shortcuts.title')} sx={{ display: { xs: 'none', md: 'inline-flex' } }}>
+              <KeyboardIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
         </Toolbar>
+        {/* DES-04: one thin global progress bar instead of per-table spinners flashing. */}
+        {fetching > 0 && (
+          <LinearProgress aria-label={t('ui.loading')} sx={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 2 }} />
+        )}
       </AppBar>
+      <ShortcutsHelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} />
+      <ReloginDialog />
       <Menu
         anchorEl={accountAnchor}
         open={Boolean(accountAnchor)}
@@ -364,7 +395,9 @@ export function AppShell() {
           mt: { xs: 7, sm: 8 },
         }}
       >
-        <Outlet />
+        <Suspense fallback={<PageSkeleton />}>
+          <Outlet />
+        </Suspense>
       </Box>
     </Box>
   )
