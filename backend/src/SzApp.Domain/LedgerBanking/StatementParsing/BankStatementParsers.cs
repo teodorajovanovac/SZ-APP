@@ -14,6 +14,7 @@ public static class BankStatementParsers
             name => name.Contains("[160", StringComparison.Ordinal),
             name => Between(name, '[', ']'), null),
         new UniCreditTxtParser(),
+        // Legacy ImportIzvod_180 is only a MsgBox ("NEMA PROCESA ZA BANKU 180") -- nothing to port.
         new UnsupportedParser(180, "Alpha banka (TXT)", name => name.StartsWith('I') && name.Length == 16),
         new PostanskaXmlParser(),
         new OfxStatementParser(205, "Komercijalna banka (XML)", "refnumber",
@@ -21,16 +22,19 @@ public static class BankStatementParsers
             name => Field(Stem(name), ' ', 1), name => StatementText.ParseDate(Field(Stem(name), ' ', 0))),
         new RaiffeisenXmlParser(),
         new SocieteGeneraleXmlParser(),
-        new UnsupportedParser(325, "OTP banka (XML V1/V2)", name => name.IndexOf("325", StringComparison.Ordinal) == 5 && name.Length > 28),
+        new OtpXmlParser(),
         new OfxStatementParser(330, "Credit Agricole (XML)", "payeerefnumber",
             name => name.IndexOf("_330", StringComparison.Ordinal) == 5 && name.Length == 37,
             name => Field(name, '_', 1), null),
-        new UnsupportedParser(9001, "Asseco Office Banking (XML)", _ => false),
-        new UnsupportedParser(9002, "Poštanska štedionica KS2IZVPLKK", _ => false),
+        new AssecoOfficeBankingParser(),
+        new PostanskaKs2Parser(),
     ];
 
-    /// <summary>Chosen format wins; otherwise legacy file-name detection (IzvodIzBanke).</summary>
-    public static IBankStatementParser Resolve(string fileName, int? bankCode)
+    /// <summary>
+    /// Chosen format wins; otherwise legacy file-name detection (IzvodIzBanke), then -- like legacy --
+    /// content sniffing for Asseco Office Banking and Poštanska KS2IZVPLKK (no file-name rule).
+    /// </summary>
+    public static IBankStatementParser Resolve(string fileName, int? bankCode, byte[]? content = null)
     {
         if (bankCode is { } code)
         {
@@ -39,12 +43,13 @@ public static class BankStatementParsers
         }
 
         return All.FirstOrDefault(x => x.MatchesFileName(fileName))
+               ?? (content is null ? null : All.FirstOrDefault(x => x.MatchesContent(content)))
                ?? throw new DomainRuleException("statement.format-not-detected", "Banka nije prepoznata po imenu fajla — izaberite format ručno.");
     }
 
     public static ParsedStatement Parse(string fileName, byte[] content, int? bankCode = null)
     {
-        var parser = Resolve(fileName, bankCode);
+        var parser = Resolve(fileName, bankCode, content);
         if (!parser.IsSupported)
         {
             throw new DomainRuleException("statement.format-not-supported", $"Format nije podržan: {parser.Name}.");
@@ -73,6 +78,10 @@ public static class BankStatementParsers
         var end = start < 0 ? -1 : value.IndexOf(close, start + 1);
         return end > start ? value[(start + 1)..end] : null;
     }
+
+    /// <summary>Legacy mBank for content-detected formats = first 3 digits of the account.</summary>
+    internal static int BankOf(string? account, int fallback) =>
+        account is { Length: >= 3 } && account[..3].All(char.IsAsciiDigit) ? int.Parse(account[..3], System.Globalization.CultureInfo.InvariantCulture) : fallback;
 
     internal static ParsedStatementLine Line(int number, int bankCode, string? name, string? account, string? info, int? code, string? reference, decimal debit, decimal credit) =>
         new(number,
@@ -322,6 +331,175 @@ internal sealed class UniCreditTxtParser : IBankStatementParser
             null,
             null,
             null,
+            null,
+            lines);
+    }
+}
+
+/// <summary>
+/// 325 OTP banka XML (legacy ImportIzvod_325). File "yyyy-{18-digit account}-n[-SG].xml"; the account
+/// is taken from the name (Mid(6, 18)). Two layouts: V1 (1.5.-29.7.2021, ex-SOGE attributes
+/// TransakcioniRacunPrivredaIzvod/Zaglavlje + Stavke Opis3/5/6/8/9) and V2 (from 30.7.2021, izvod
+/// elements + stavke/transakcija). Payment code strips "SIF-" (ObradiSifruPlacanjaOTP).
+/// </summary>
+internal sealed class OtpXmlParser : IBankStatementParser
+{
+    public int BankCode => 325;
+    public string Name => "OTP banka (XML V1/V2)";
+    public bool IsSupported => true;
+    public bool MatchesFileName(string fileName) => fileName.IndexOf("325", StringComparison.Ordinal) == 5 && fileName.Length > 28;
+
+    public ParsedStatement Parse(string fileName, byte[] content)
+    {
+        var name = Path.GetFileName(fileName);
+        var account = name.Length >= 23 ? name.Substring(5, 18) : null;
+        var doc = StatementText.LoadXml(content);
+        return doc.Find("TransakcioniRacunPrivredaIzvod") is { } v1 ? ParseV1(v1, account) : ParseV2(doc.Require("izvod"), account);
+    }
+
+    private ParsedStatement ParseV1(XElement root, string? account)
+    {
+        var header = root.Require("Zaglavlje");
+        var lines = root.Children("Stavke").Select((x, i) => BankStatementParsers.Line(i + 1, BankCode,
+            x.Attr("Opis3"),
+            x.Attr("Opis5"),
+            x.Attr("Opis9"),
+            StatementText.ParseCode(x.Attr("Opis6")?.Replace("SIF-", string.Empty)),
+            x.Attr("Opis8"),
+            StatementText.ParseAmount(x.Attr("Duguje")),
+            StatementText.ParseAmount(x.Attr("Potrazuje")))).ToArray();
+
+        return new ParsedStatement(
+            BankCode,
+            account ?? header.Attr("Partija"),
+            StatementText.ParseInt(header.RequireAttr("IzvodID"), "broj izvoda"),
+            StatementText.ParseDate(header.RequireAttr("DatumIzvoda")),
+            StatementText.ParseAmount(header.RequireAttr("PrethodnoStanje")),
+            StatementText.ParseAmount(header.RequireAttr("NovoStanje")),
+            StatementText.ParseAmount(header.Attr("UkupnoZaduzenje")),
+            StatementText.ParseAmount(header.Attr("UkupnoOdobrenje")),
+            Sum(header.Attr("BrojStavkiPotrazuje"), header.Attr("BrojStavkiDuguje")),
+            lines);
+    }
+
+    private ParsedStatement ParseV2(XElement root, string? account)
+    {
+        var lines = (root.Children("stavke").FirstOrDefault()?.Children("transakcija") ?? []).Select((x, i) => BankStatementParsers.Line(i + 1, BankCode,
+            x.Text("komitent"),
+            x.Text("racun"),
+            x.Text("svrhaDoznake"),
+            StatementText.ParseCode(x.Text("sifraPlacanja")?.Replace("SIF-", string.Empty)),
+            x.Text("pozivNaBrojOdobrenje"),
+            StatementText.ParseAmount(x.Text("duguje")),
+            StatementText.ParseAmount(x.Text("potrazuje")))).ToArray();
+
+        return new ParsedStatement(
+            BankCode,
+            account,
+            StatementText.ParseInt(root.Text("brojIzvoda"), "broj izvoda"),
+            StatementText.ParseDate(root.Text("datum")),
+            StatementText.ParseAmount(root.Text("prethodnoStanje")),
+            StatementText.ParseAmount(root.Text("novoStanje")),
+            StatementText.ParseAmount(root.Text("DnevniPrometDugovni")),
+            StatementText.ParseAmount(root.Text("DnevniPrometPotrazni")),
+            Sum(root.Text("BrojNalogaOdobrenja"), root.Text("BrojNalogaZaduzenja")),
+            lines);
+    }
+
+    private static int? Sum(string? a, string? b) =>
+        a is null || b is null ? null : StatementText.ParseInt(a, "broj stavki") + StatementText.ParseInt(b, "broj stavki");
+}
+
+/// <summary>
+/// Asseco Office Banking XML (legacy IsAssecoOfficeBankig + ImportIzvod_AssecoOfficeBanking): any bank
+/// whose e-banking is Asseco, recognized by &lt;rstype&gt;ibank.payment.stmtrs.past&lt;/rstype&gt;.
+/// stmtrslist/stmtrs (or stmtrs), account = first acctid, date = dtasof, balances ledgerbal/availbal,
+/// trnlist@count, lines use payeerefnumber. Legacy bank (for reference cleanup) = first 3 account digits.
+/// </summary>
+internal sealed class AssecoOfficeBankingParser : IBankStatementParser
+{
+    public int BankCode => 9001;
+    public string Name => "Asseco Office Banking (XML)";
+    public bool IsSupported => true;
+    public bool MatchesFileName(string fileName) => false;
+
+    public bool MatchesContent(byte[] content) =>
+        StatementText.DecodeText(content).Contains("<rstype>ibank.payment.stmtrs.past</rstype>", StringComparison.Ordinal);
+
+    public ParsedStatement Parse(string fileName, byte[] content)
+    {
+        var root = StatementText.LoadXml(content).Require("stmtrs");
+        var account = root.Descendants().FirstOrDefault(x => x.Name.LocalName == "acctid" && x.Parent?.Name.LocalName != "payeeaccountinfo")?.Value.Trim();
+        var bank = BankStatementParsers.BankOf(account, BankCode);
+        var list = root.Require("trnlist");
+        var lines = list.Children("stmttrn").Select((x, i) =>
+        {
+            var amount = StatementText.ParseAmount(x.Text("trnamt"));
+            var benefit = x.Text("benefit")?.Trim();
+            return BankStatementParsers.Line(i + 1, bank,
+                x.Find("payeeinfo")?.Text("name"),
+                x.Find("payeeaccountinfo")?.Text("acctid"),
+                x.Text("purpose"),
+                StatementText.ParseCode(x.Text("purposecode")),
+                x.Text("payeerefnumber"),
+                benefit == "debit" ? amount : 0m,
+                benefit == "credit" ? amount : 0m);
+        }).ToArray();
+
+        var count = list.Attr("count");
+        return new ParsedStatement(
+            bank,
+            account,
+            StatementText.ParseInt(root.Text("stmtnumber"), "broj izvoda"),
+            StatementText.ParseDate(root.Text("dtasof")),
+            StatementText.ParseAmount(root.Require("ledgerbal").Text("balamt")),
+            StatementText.ParseAmount(root.Require("availbal").Text("balamt")),
+            null,
+            null,
+            count is null ? null : StatementText.ParseInt(count, "broj stavki"),
+            lines);
+    }
+}
+
+/// <summary>
+/// Poštanska štedionica KS2IZVPLKK XML (legacy IsPostanskaImport + ImportIzvod_PostanskaImport),
+/// recognized by &lt;MATICNI_BANKE&gt;07004893&lt;/MATICNI_BANKE&gt;. KS2IZVPLKK/IZVOD header
+/// (PARTIJA, DATUM_IZVODA, BROJ_IZVODA, stanja, prometi) + STAVKE/STAVKA lines. Legacy's declared
+/// count was the STAVKA count itself, so no count is declared here.
+/// </summary>
+internal sealed class PostanskaKs2Parser : IBankStatementParser
+{
+    public int BankCode => 9002;
+    public string Name => "Poštanska štedionica KS2IZVPLKK";
+    public bool IsSupported => true;
+    public bool MatchesFileName(string fileName) => false;
+
+    public bool MatchesContent(byte[] content) =>
+        StatementText.DecodeText(content).Contains("<MATICNI_BANKE>07004893</MATICNI_BANKE>", StringComparison.Ordinal);
+
+    public ParsedStatement Parse(string fileName, byte[] content)
+    {
+        var root = StatementText.LoadXml(content).Require("IZVOD");
+        var account = root.Text("PARTIJA")?.Trim();
+        var bank = BankStatementParsers.BankOf(account, 200);
+        var lines = (root.Children("STAVKE").FirstOrDefault()?.Children("STAVKA") ?? []).Select((x, i) => BankStatementParsers.Line(i + 1, bank,
+            x.Text("KORISNIK-NALOGODAVAC"),
+            x.Text("RACUN"),
+            x.Text("SVRHA_PLACANJA"),
+            StatementText.ParseCode(x.Text("SIFRA_PLACANJA")),
+            x.Text("POZIVKORISNIK"),
+            StatementText.ParseAmount(x.Text("IZNOS_DUGUJE")),
+            StatementText.ParseAmount(x.Text("IZNOS_POTRAZUJE")))).ToArray();
+
+        return new ParsedStatement(
+            bank,
+            account,
+            StatementText.ParseInt(root.Text("BROJ_IZVODA"), "broj izvoda"),
+            StatementText.ParseDate(root.Text("DATUM_IZVODA")),
+            StatementText.ParseAmount(root.Text("PRETHODNO_STANJE")),
+            StatementText.ParseAmount(root.Text("NOVO_STANJE")),
+            StatementText.ParseAmount(root.Text("DUGOVNI_PROMET")),
+            StatementText.ParseAmount(root.Text("POTRAZNI_PROMET")),
             null,
             lines);
     }

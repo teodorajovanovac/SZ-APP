@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SzApp.Data;
 
@@ -11,9 +12,11 @@ using SzApp.Data;
 namespace SzApp.Data.Migrations
 {
     [DbContext(typeof(SzAppDbContext))]
-    partial class SzAppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260930143550_LegacyReportsAndAuditTrail")]
+    partial class LegacyReportsAndAuditTrail
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -804,13 +807,6 @@ namespace SzApp.Data.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
-                    b.Property<bool>("IsForLawsuit")
-                        .HasColumnType("bit");
-
-                    b.Property<decimal?>("LawyerCost")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
                     b.Property<int>("NoticeBatchId")
                         .HasColumnType("int");
 
@@ -925,9 +921,6 @@ namespace SzApp.Data.Migrations
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<int>("CompanyId")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("CostsJournalEntryId")
                         .HasColumnType("int");
 
                     b.Property<string>("CustomCaptionOnSlip")
@@ -1063,14 +1056,8 @@ namespace SzApp.Data.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("Closing")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<int>("CompanyId")
                         .HasColumnType("int");
-
-                    b.Property<DateOnly?>("DecisionDate")
-                        .HasColumnType("date");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
@@ -1085,14 +1072,6 @@ namespace SzApp.Data.Migrations
                         .IsRequired()
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("rowversion");
-
-                    b.Property<string>("Signature")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<string>("Subject")
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
 
                     b.HasKey("Id");
 
@@ -1196,9 +1175,6 @@ namespace SzApp.Data.Migrations
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("rowversion");
 
-                    b.Property<int?>("SupplierInvoiceId")
-                        .HasColumnType("int");
-
                     b.Property<string>("TemplateTitle")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -1210,8 +1186,6 @@ namespace SzApp.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("PaymentOrderTypeId");
-
-                    b.HasIndex("SupplierInvoiceId");
 
                     b.HasIndex("CompanyId", "IsArchived", "Date");
 
@@ -4980,11 +4954,6 @@ namespace SzApp.Data.Migrations
                         .HasForeignKey("PaymentOrderTypeId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
-
-                    b.HasOne("SzApp.Data.Entities.Billing.SupplierInvoice", null)
-                        .WithMany()
-                        .HasForeignKey("SupplierInvoiceId")
-                        .OnDelete(DeleteBehavior.NoAction);
                 });
 
             modelBuilder.Entity("SzApp.Data.Entities.Billing.SupplierInvoice", b =>

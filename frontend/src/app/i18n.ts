@@ -4,6 +4,7 @@ import { interestNoticeResources } from './i18n.interestNotices'
 import { cardsResources } from './i18n.cards'
 import { invoiceExtrasResources } from './i18n.invoiceExtras'
 import { accountingResources } from './i18n.accounting'
+import { legacyResources } from './i18n.legacy'
 import { loginResources } from './i18n.login'
 import { bankResources } from './i18n.bank'
 import { billing2Resources } from './i18n.billing2'
@@ -1420,6 +1421,7 @@ for (const [lng, bundle] of Object.entries(interestNoticeResources)) i18n.addRes
 for (const [lng, bundle] of Object.entries(cardsResources)) i18n.addResourceBundle(lng, 'translation', bundle, true, false)
 for (const [lng, bundle] of Object.entries(invoiceExtrasResources)) i18n.addResourceBundle(lng, 'translation', bundle, true, false)
 for (const [lng, bundle] of Object.entries(accountingResources)) i18n.addResourceBundle(lng, 'translation', bundle, true, false)
+for (const [lng, bundle] of Object.entries(legacyResources)) i18n.addResourceBundle(lng, 'translation', bundle, true, false)
 for (const [lng, bundle] of Object.entries(loginResources)) i18n.addResourceBundle(lng, 'translation', bundle, true, false)
 for (const [lng, bundle] of Object.entries(bankResources)) i18n.addResourceBundle(lng, 'translation', bundle, true, false)
 for (const [lng, bundle] of Object.entries(billing2Resources)) i18n.addResourceBundle(lng, 'translation', bundle, true, false)

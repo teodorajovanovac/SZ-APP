@@ -1,3 +1,4 @@
+using SzApp.Api.Features.Audit;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authorization;
@@ -41,6 +42,7 @@ builder.Services.AddAccountingWorkflowFeature();
 builder.Services.AddPlatformFeature(builder.Configuration);
 builder.Services.AddReportsFeature(builder.Configuration);
 builder.Services.AddEtlFeature(builder.Configuration);
+builder.Services.AddAuditFeature();
 
 builder.Services
     .AddIdentity<ApplicationUser, IdentityRole<int>>(options =>
@@ -198,6 +200,8 @@ app.MapPlatformEndpoints();
 app.MapReportsEndpoints();
 app.MapEtlEndpoints();
 app.MapExportEndpoints();
+app.MapLegacyFormatExports();
+app.MapAuditEndpoints();
 
 var auth = app.MapGroup("/api/v1/auth").WithTags("Auth");
 

@@ -230,9 +230,162 @@ public sealed class BankStatementParsersTests
         Assert.Equal(289, line.Code);
     }
 
+    // 325 OTP V1 (ImportIzvod_325_V1): SOGE-like attributes, name Opis3, code "SIF-289", reference
+    // strips "PBO-" and the "(97)" model; account from the file name Mid(6, 18).
+    [Fact]
+    public void Otp325V1_ParsesAttributes()
+    {
+        const string xml = """
+            <TransakcioniRacunPrivredaIzvod>
+              <Zaglavlje IzvodID="7" DatumIzvoda="15.06.2021" PrethodnoStanje="100.00" NovoStanje="150.00"
+                UkupnoOdobrenje="80.00" UkupnoZaduzenje="30.00" BrojStavkiPotrazuje="1" BrojStavkiDuguje="1" />
+              <Stavke Opis3="Marko Markovic" Opis5="160000000026950155" Opis6="SIF-289" Opis8="PBO-(97)12-345"
+                Opis9="Odrzavanje" Potrazuje="80.00" Duguje="0.00" />
+              <Stavke Opis3="EPS" Opis5="170-30032591000-11" Opis6="SIF-221" Opis8="" Opis9="Struja" Potrazuje="0.00" Duguje="30.00" />
+            </TransakcioniRacunPrivredaIzvod>
+            """;
+        const string fileName = "2021-325950050028777962-7-SG.xml";
+        var parser = BankStatementParsers.Resolve(fileName, null);
+        Assert.Equal(325, parser.BankCode);
+        var parsed = BankStatementParsers.Parse(fileName, Bytes(xml));
+        Assert.Equal("325950050028777962", parsed.AccountNumber);
+        Assert.Equal(7, parsed.StatementNumber);
+        Assert.Equal(new DateOnly(2021, 6, 15), parsed.Date);
+        Assert.Equal(30m, parsed.DeclaredDebit);
+        Assert.Equal(80m, parsed.DeclaredCredit);
+        Assert.Equal(2, parsed.DeclaredCount);
+        Assert.Equal("Marko Markovic", parsed.Lines[0].PayerName);
+        Assert.Equal("160-269501-55", parsed.Lines[0].PayerAccount);
+        Assert.Equal(289, parsed.Lines[0].Code);
+        Assert.Equal("12345", parsed.Lines[0].PaymentReference);
+        Assert.Equal(80m, parsed.Lines[0].Credit);
+        Assert.Equal(30m, parsed.Lines[1].Debit);
+    }
+
+    // 325 OTP V2 (ImportIzvod_325_V2, from 30.7.2021): izvod elements + stavke/transakcija.
+    [Fact]
+    public void Otp325V2_ParsesElements()
+    {
+        const string xml = """
+            <izvod>
+              <brojIzvoda>120</brojIzvoda>
+              <datum>2021-08-02</datum>
+              <prethodnoStanje>1000,00</prethodnoStanje>
+              <novoStanje>1100,00</novoStanje>
+              <DnevniPrometPotrazni>100,00</DnevniPrometPotrazni>
+              <DnevniPrometDugovni>0,00</DnevniPrometDugovni>
+              <BrojNalogaOdobrenja>1</BrojNalogaOdobrenja>
+              <BrojNalogaZaduzenja>0</BrojNalogaZaduzenja>
+              <stavke>
+                <transakcija>
+                  <komitent>Jovana Jovic</komitent>
+                  <racun>265000000012345678</racun>
+                  <pozivNaBrojOdobrenje>(97) 44-1001</pozivNaBrojOdobrenje>
+                  <potrazuje>100,00</potrazuje>
+                  <duguje>0,00</duguje>
+                  <sifraPlacanja>289</sifraPlacanja>
+                  <svrhaDoznake>Uplata</svrhaDoznake>
+                </transakcija>
+              </stavke>
+            </izvod>
+            """;
+        var parsed = BankStatementParsers.Parse("2021-325950050028777962-120.xml", Bytes(xml));
+        Assert.Equal(120, parsed.StatementNumber);
+        Assert.Equal(new DateOnly(2021, 8, 2), parsed.Date);
+        Assert.Equal(1, parsed.DeclaredCount);
+        var line = Assert.Single(parsed.Lines);
+        Assert.Equal("441001", line.PaymentReference);
+        Assert.Equal("265-123456-78", line.PayerAccount);
+        Assert.Equal(100m, line.Credit);
+    }
+
+    // Asseco Office Banking: no file-name rule, detected by rstype (IsAssecoOfficeBankig).
+    [Fact]
+    public void Asseco_DetectedByContent_UsesPayeeRefNumber()
+    {
+        const string xml = """
+            <stmtrslist>
+              <rstype>ibank.payment.stmtrs.past</rstype>
+              <stmtrs>
+                <acctid>340-11001234-56</acctid>
+                <stmtnumber>45</stmtnumber>
+                <dtasof>2023-03-10</dtasof>
+                <ledgerbal><balamt>200.00</balamt></ledgerbal>
+                <availbal><balamt>150.00</balamt></availbal>
+                <trnlist count="1">
+                  <stmttrn>
+                    <benefit>debit</benefit>
+                    <trnamt>50.00</trnamt>
+                    <purpose>Provizija</purpose>
+                    <purposecode>221</purposecode>
+                    <payeerefnumber>97 11-22</payeerefnumber>
+                    <payeeinfo><name> Banka </name></payeeinfo>
+                    <payeeaccountinfo><acctid>340-0000011-99</acctid></payeeaccountinfo>
+                  </stmttrn>
+                </trnlist>
+              </stmtrs>
+            </stmtrslist>
+            """;
+        var content = Bytes(xml);
+        var parser = BankStatementParsers.Resolve("izvod.xml", null, content);
+        Assert.Equal(9001, parser.BankCode);
+        var parsed = BankStatementParsers.Parse("izvod.xml", content);
+        Assert.Equal(340, parsed.BankCode);
+        Assert.Equal("340-11001234-56", parsed.AccountNumber);
+        Assert.Equal(new DateOnly(2023, 3, 10), parsed.Date);
+        Assert.Equal(200m, parsed.PreviousBalance);
+        var line = Assert.Single(parsed.Lines);
+        Assert.Equal(50m, line.Debit);
+        Assert.Equal("Banka", line.PayerName);
+        Assert.Equal("971122", line.PaymentReference);
+        Assert.Equal("340-11-99", line.PayerAccount);
+    }
+
+    // Poštanska KS2IZVPLKK: detected by MATICNI_BANKE 07004893 (IsPostanskaImport).
+    [Fact]
+    public void PostanskaKs2_DetectedByContent()
+    {
+        const string xml = """
+            <KS2IZVPLKK>
+              <MATICNI_BANKE>07004893</MATICNI_BANKE>
+              <IZVOD>
+                <PARTIJA>200-2345678-10</PARTIJA>
+                <DATUM_IZVODA>18.01.2022</DATUM_IZVODA>
+                <BROJ_IZVODA>3</BROJ_IZVODA>
+                <PRETHODNO_STANJE>0,00</PRETHODNO_STANJE>
+                <NOVO_STANJE>75,00</NOVO_STANJE>
+                <POTRAZNI_PROMET>75,00</POTRAZNI_PROMET>
+                <DUGOVNI_PROMET>0,00</DUGOVNI_PROMET>
+                <STAVKE>
+                  <STAVKA>
+                    <KORISNIK-NALOGODAVAC>Ivan Ivic</KORISNIK-NALOGODAVAC>
+                    <RACUN>160-5555-11</RACUN>
+                    <SVRHA_PLACANJA>Odrzavanje</SVRHA_PLACANJA>
+                    <SIFRA_PLACANJA>189</SIFRA_PLACANJA>
+                    <POZIVKORISNIK>12/34</POZIVKORISNIK>
+                    <IZNOS_POTRAZUJE>75,00</IZNOS_POTRAZUJE>
+                    <IZNOS_DUGUJE></IZNOS_DUGUJE>
+                  </STAVKA>
+                </STAVKE>
+              </IZVOD>
+            </KS2IZVPLKK>
+            """;
+        var content = Bytes(xml);
+        Assert.Equal(9002, BankStatementParsers.Resolve("x.xml", null, content).BankCode);
+        var parsed = BankStatementParsers.Parse("x.xml", content);
+        Assert.Equal(200, parsed.BankCode);
+        Assert.Equal("200-2345678-10", parsed.AccountNumber);
+        Assert.Equal(new DateOnly(2022, 1, 18), parsed.Date);
+        Assert.Equal(75m, parsed.DeclaredCredit);
+        var line = Assert.Single(parsed.Lines);
+        Assert.Equal(75m, line.Credit);
+        Assert.Equal(0m, line.Debit);
+        Assert.Equal("1234", line.PaymentReference);
+        Assert.Equal(189, line.Code);
+    }
+
     [Theory]
     [InlineData(180)]
-    [InlineData(325)]
     public void StubFormats_ReportNotSupported(int bankCode)
     {
         var parser = BankStatementParsers.All.Single(x => x.BankCode == bankCode);
