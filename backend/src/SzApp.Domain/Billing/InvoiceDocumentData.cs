@@ -21,7 +21,9 @@ public sealed record InvoiceDocumentData(
     decimal SubTotal,
     decimal VatAmount,
     decimal Total,
-    bool IsExtraordinary)
+    bool IsExtraordinary,
+    IReadOnlyList<InvoiceDocumentBenefitLine>? BenefitLines = null,
+    IReadOnlyList<InvoiceDocumentGroupMember>? GroupMembers = null)
 {
     /// <summary>Amount actually due (audit 9.1 IPS QR rule): max(PreviousDebt + Total, 0) regular, Total for extraordinary.</summary>
     public decimal AmountDue => IsExtraordinary ? Total : Math.Max(PreviousDebt + Total, 0m);
@@ -32,4 +34,12 @@ public sealed record InvoiceDocumentLine(
     decimal Quantity,
     decimal UnitPrice,
     decimal VatRate,
-    decimal Total);
+    decimal Total,
+    decimal PriceEur = 0m,
+    decimal ExchangeRate = 0m);
+
+/// <summary>Legacy RACUN_012 BENEFIT: a manager line zeroed by the benefit, with its archived original amount (BenefitArchive).</summary>
+public sealed record InvoiceDocumentBenefitLine(string Description, string Note, decimal OriginalAmount);
+
+/// <summary>Legacy Racun_007: one member invoice summed into a group (master) invoice.</summary>
+public sealed record InvoiceDocumentGroupMember(string InvoiceNumber, string CustomerName, string Address, decimal Total);

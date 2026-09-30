@@ -77,9 +77,9 @@ public static class BillingFeatureExtensions
 
         // GAP-02/03/26: PDF + IPS QR rendering and bulk email sending. Read access is enough to
         // view/download (mirrors other read endpoints in this file); only /emails/send mutates.
-        batches.MapPost("/{batchId:int}/pdf", async (int companyId, int batchId, InvoicePdfService pdfService, CancellationToken ct) =>
+        batches.MapPost("/{batchId:int}/pdf", async (int companyId, int batchId, InvoicePdfTemplate? template, bool? doubleSlip, InvoicePdfService pdfService, CancellationToken ct) =>
         {
-            var result = await pdfService.RenderBatchZipAsync(companyId, batchId, ct);
+            var result = await pdfService.RenderBatchZipAsync(companyId, batchId, ct, template ?? InvoicePdfTemplate.Standard, doubleSlip ?? false);
             return result is null ? Results.NotFound() : Results.File(result.Bytes, "application/zip", result.FileName);
         }).AddEndpointFilter<AntiforgeryEndpointFilter>();
         batches.MapPost("/{batchId:int}/emails/preview", (int companyId, int batchId, InvoicePdfService pdfService, CancellationToken ct) =>
@@ -98,9 +98,10 @@ public static class BillingFeatureExtensions
             var invoice = await service.GetInvoiceAsync(companyId, invoiceId, ct);
             return invoice is null ? Results.NotFound() : Results.Ok(invoice);
         });
-        invoices.MapGet("/{invoiceId:int}/pdf", async (int companyId, int invoiceId, InvoicePdfService pdfService, CancellationToken ct) =>
+        // ?template=Standard|WithoutPreviousDebt|Lease|Benefit|Group &doubleSlip=true (legacy report variants, audit 9.1 "Štampa").
+        invoices.MapGet("/{invoiceId:int}/pdf", async (int companyId, int invoiceId, InvoicePdfTemplate? template, bool? doubleSlip, InvoicePdfService pdfService, CancellationToken ct) =>
         {
-            var result = await pdfService.RenderSingleAsync(companyId, invoiceId, ct);
+            var result = await pdfService.RenderSingleAsync(companyId, invoiceId, ct, template ?? InvoicePdfTemplate.Standard, doubleSlip ?? false);
             return result is null ? Results.NotFound() : Results.File(result.Bytes, "application/pdf", result.FileName);
         });
         invoices.MapPost("/{invoiceId:int}/cancel", (int companyId, int invoiceId, CancelInvoiceRequest request, HttpContext context, BillingService service, CancellationToken ct) =>

@@ -24,16 +24,18 @@ public sealed class InvoicePdfService(
 {
     private const string EmailOutboxMessageType = "platform.email.send";
 
-    public async Task<InvoicePdfResult?> RenderSingleAsync(int companyId, int invoiceId, CancellationToken ct)
+    public async Task<InvoicePdfResult?> RenderSingleAsync(int companyId, int invoiceId, CancellationToken ct,
+        InvoicePdfTemplate template = InvoicePdfTemplate.Standard, bool doubleSlip = false)
     {
         var data = await mapper.BuildAsync(companyId, invoiceId, ct);
         if (data is null) return null;
-        var bytes = InvoicePdfRenderer.Render(data);
+        var bytes = InvoicePdfRenderer.Render(data, template, doubleSlip);
         return new InvoicePdfResult(bytes, $"{SanitizeFileNamePart(data.InvoiceNumber)}.pdf");
     }
 
     /// <summary>Zips one PDF per invoice in the batch, path RACUNI/{YYYY}/{MM}/{FolderSZ}/{RBR}.pdf (mirrors legacy layout).</summary>
-    public async Task<InvoicePdfResult?> RenderBatchZipAsync(int companyId, int batchId, CancellationToken ct)
+    public async Task<InvoicePdfResult?> RenderBatchZipAsync(int companyId, int batchId, CancellationToken ct,
+        InvoicePdfTemplate template = InvoicePdfTemplate.Standard, bool doubleSlip = false)
     {
         var batch = await db.Set<SzApp.Data.Entities.Billing.InvoiceBatch>().AsNoTracking()
             .SingleOrDefaultAsync(x => x.CompanyId == companyId && x.Id == batchId, ct);
@@ -50,7 +52,7 @@ public sealed class InvoicePdfService(
             {
                 var data = await mapper.BuildAsync(companyId, invoiceId, ct);
                 if (data is null) continue;
-                var bytes = InvoicePdfRenderer.Render(data);
+                var bytes = InvoicePdfRenderer.Render(data, template, doubleSlip);
                 var entryPath = $"RACUNI/{batch.Year:D4}/{batch.Month:D2}/{folderSz}/{SanitizeFileNamePart(data.InvoiceNumber)}.pdf";
                 var entry = zip.CreateEntry(entryPath, CompressionLevel.Fastest);
                 await using var entryStream = entry.Open();

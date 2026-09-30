@@ -2641,6 +2641,20 @@
               "type": "integer",
               "format": "int32"
             }
+          },
+          {
+            "name": "template",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/InvoicePdfTemplate"
+            }
+          },
+          {
+            "name": "doubleSlip",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -2847,6 +2861,20 @@
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": "integer",
               "format": "int32"
+            }
+          },
+          {
+            "name": "template",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/InvoicePdfTemplate"
+            }
+          },
+          {
+            "name": "doubleSlip",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
             }
           }
         ],
@@ -10204,6 +10232,9 @@
             "default": 0
           }
         }
+      },
+      "InvoicePdfTemplate": {
+        "type": "integer"
       },
       "InvoicePreviewLineResponse": {
         "required": [
