@@ -31,7 +31,8 @@ export function StaffAccessList({ companyId, onSelect }: StaffAccessListProps) {
     () => [
       {
         accessorKey: 'staffEmail',
-        header: 'Korisnik',
+        header: t('fields.user'),
+        enableSorting: true,
         cell: ({ row, getValue }) => (
           <Link
             component="button"
@@ -44,7 +45,7 @@ export function StaffAccessList({ companyId, onSelect }: StaffAccessListProps) {
           </Link>
         ),
       },
-      { accessorKey: 'staffRole', header: 'Uloga', enableSorting: false },
+      { accessorKey: 'staffRole', header: t('fields.role') },
       {
         id: 'actions',
         header: t('ui.actions'),
@@ -65,13 +66,13 @@ export function StaffAccessList({ companyId, onSelect }: StaffAccessListProps) {
   return (
     <Stack spacing={2}>
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'center' }} justifyContent="space-between">
-        <Typography component="h1" variant="h1">Pristup zaposlenih</Typography>
+        <Typography component="h1" variant="h1">{t('staffAccess_.title')}</Typography>
         <Button variant="contained" startIcon={<AddIcon />} onClick={() => setEditing('new')}>
           {t('staffAccess_.new')}
         </Button>
       </Stack>
-      <TextField label="Pretraga po email adresi" value={search} onChange={(event) => setSearch(event.target.value)} size="small" />
-      {result.isError && <Alert severity="error">Pristupi nisu mogli da se učitaju.</Alert>}
+      <TextField label={t('staffAccess_.search')} value={search} onChange={(event) => setSearch(event.target.value)} size="small" />
+      {result.isError && <Alert severity="error">{t('staffAccess_.loadError')}</Alert>}
       <ServerDataTable
         ariaLabel="Pristup zaposlenih"
         rows={result.data?.items ?? []}

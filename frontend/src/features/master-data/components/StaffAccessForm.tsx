@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Alert, Button, MenuItem, Stack, TextField } from '@mui/material'
 import { useState, type FormEvent } from 'react'
 import { getErrorMessage } from '../../../api/problemDetails'
@@ -14,6 +15,7 @@ interface StaffAccessFormProps {
 }
 
 export function StaffAccessForm({ companyId, access, fixedStaffId, onSaved, onCancel }: StaffAccessFormProps) {
+  const { t } = useTranslation()
   const save = useSaveStaffAccess(companyId, access?.id)
   const [staffId, setStaffId] = useState(String(access?.staffId ?? fixedStaffId ?? ''))
   const [staffRole, setStaffRole] = useState<StaffRole>(access?.staffRole ?? 'Review')
@@ -25,18 +27,18 @@ export function StaffAccessForm({ companyId, access, fixedStaffId, onSaved, onCa
 
   return (
     <Stack component="form" spacing={2} onSubmit={submit}>
-      {save.isError && <Alert severity="error">{getErrorMessage(save.error, 'Pristup nije sačuvan.')}</Alert>}
+      {save.isError && <Alert severity="error">{getErrorMessage(save.error, t('staffAccess_.saveError'))}</Alert>}
       {/* ponytail: raw numeric ID here; the /staff pages add grants with a fixed staff member,
           which is the normal path. Autocomplete over GET /api/v1/staff if this form stays in use. */}
-      <TextField size="small" label="ID zaposlenog" type="number" required value={staffId} disabled={!!access || fixedStaffId !== undefined} onChange={(event) => setStaffId(event.target.value)} slotProps={{ htmlInput: { min: 1 } }} />
-      <TextField size="small" select label="Uloga" value={staffRole} onChange={(event) => setStaffRole(event.target.value as StaffRole)}>
-        <MenuItem value="Upravnik">Upravnik</MenuItem>
-        <MenuItem value="Moderator">Moderator</MenuItem>
-        <MenuItem value="Review">Review</MenuItem>
+      <TextField size="small" label={t('fields.staffId')} type="number" required value={staffId} disabled={!!access || fixedStaffId !== undefined} onChange={(event) => setStaffId(event.target.value)} slotProps={{ htmlInput: { min: 1 } }} />
+      <TextField size="small" select label={t('fields.role')} value={staffRole} onChange={(event) => setStaffRole(event.target.value as StaffRole)}>
+        <MenuItem value="Upravnik">{t('roles.Upravnik')}</MenuItem>
+        <MenuItem value="Moderator">{t('roles.Moderator')}</MenuItem>
+        <MenuItem value="Review">{t('roles.Review')}</MenuItem>
       </TextField>
       <Stack direction="row" spacing={1} justifyContent="flex-end">
-        {onCancel && <Button onClick={onCancel}>Odustani</Button>}
-        <Button type="submit" variant="contained" disabled={save.isPending || Number(staffId) <= 0}>Sačuvaj</Button>
+        {onCancel && <Button onClick={onCancel}>{t('common.cancel')}</Button>}
+        <Button type="submit" variant="contained" disabled={save.isPending || Number(staffId) <= 0}>{t('common.save')}</Button>
       </Stack>
     </Stack>
   )

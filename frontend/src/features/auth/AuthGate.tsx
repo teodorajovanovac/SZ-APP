@@ -11,7 +11,7 @@ export function AuthGate() {
 
   if (isLoading) {
     return (
-      <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }} role="status" aria-label="Učitavanje">
+      <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }} role="status" aria-label={t('ui.loading')}>
         <CircularProgress />
       </Box>
     )

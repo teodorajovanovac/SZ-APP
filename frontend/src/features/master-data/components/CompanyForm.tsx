@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Alert, Autocomplete, Button, CircularProgress, Grid, Stack, TextField } from '@mui/material'
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { getErrorMessage } from '../../../api/problemDetails'
@@ -9,6 +10,7 @@ interface CompanyFormProps {
 }
 
 export function CompanyForm({ companyId }: CompanyFormProps) {
+  const { t } = useTranslation()
   const company = useCompanyDetail(companyId)
   const update = useUpdateCompany(companyId)
   const locationCategories = useLocationCategories(companyId)
@@ -33,8 +35,8 @@ export function CompanyForm({ companyId }: CompanyFormProps) {
     }
   }, [company.data])
 
-  if (company.isLoading) return <CircularProgress aria-label="Učitavanje kompanije" />
-  if (company.isError || !company.data) return <Alert severity="error">Kompanija nije mogla da se učita.</Alert>
+  if (company.isLoading) return <CircularProgress aria-label={t('company_.loading')} />
+  if (company.isError || !company.data) return <Alert severity="error">{t('company_.loadError')}</Alert>
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
@@ -57,17 +59,17 @@ export function CompanyForm({ companyId }: CompanyFormProps) {
 
   return (
     <Stack component="form" spacing={2} onSubmit={submit} noValidate>
-      {update.isError && <Alert severity="error">{getErrorMessage(update.error, 'Izmena nije sačuvana. Osvežite podatke ako ih je drugi korisnik menjao.')}</Alert>}
-      {update.isSuccess && <Alert severity="success">Kompanija je sačuvana.</Alert>}
+      {update.isError && <Alert severity="error">{getErrorMessage(update.error, t('company_.saveError'))}</Alert>}
+      {update.isSuccess && <Alert severity="success">{t('company_.saved')}</Alert>}
       <Grid container spacing={2}>
         <Grid size={{ xs: 12, sm: 6 }}>
-          <TextField fullWidth size="small" label="Kratak naziv" required value={shortName} onChange={(event) => setShortName(event.target.value)} slotProps={{ htmlInput: { maxLength: 50 } }} />
+          <TextField fullWidth size="small" label={t('fields.shortName')} required value={shortName} onChange={(event) => setShortName(event.target.value)} slotProps={{ htmlInput: { maxLength: 50 } }} />
         </Grid>
         <Grid size={{ xs: 12, sm: 6 }}>
-          <TextField fullWidth size="small" label="Naziv za štampu" required value={printName} onChange={(event) => setPrintName(event.target.value)} slotProps={{ htmlInput: { maxLength: 50 } }} />
+          <TextField fullWidth size="small" label={t('fields.printName')} required value={printName} onChange={(event) => setPrintName(event.target.value)} slotProps={{ htmlInput: { maxLength: 50 } }} />
         </Grid>
         <Grid size={{ xs: 12, sm: 6 }}>
-          <TextField fullWidth size="small" label="Relativni folder" value={relativeFolderName} onChange={(event) => setRelativeFolderName(event.target.value)} slotProps={{ htmlInput: { maxLength: 255 } }} />
+          <TextField fullWidth size="small" label={t('fields.relativeFolder')} value={relativeFolderName} onChange={(event) => setRelativeFolderName(event.target.value)} slotProps={{ htmlInput: { maxLength: 255 } }} />
         </Grid>
         <Grid size={{ xs: 12, sm: 6 }}>
           <Autocomplete
@@ -78,7 +80,7 @@ export function CompanyForm({ companyId }: CompanyFormProps) {
             isOptionEqualToValue={(option, value) => option.id === value.id}
             value={locationOptions.find((item) => item.id === locationCategoryId) ?? null}
             onChange={(_, option) => setLocationCategoryId(option?.id ?? null)}
-            renderInput={(params) => <TextField {...params} label="Lokacijska kategorija" />}
+            renderInput={(params) => <TextField {...params} label={t('fields.locationCategory')} />}
           />
         </Grid>
         <Grid size={{ xs: 12, sm: 6 }}>
@@ -86,19 +88,19 @@ export function CompanyForm({ companyId }: CompanyFormProps) {
             fullWidth
             size="small"
             type="number"
-            label="Redosled prikaza"
+            label={t('fields.sortOrder')}
             value={sortIndex}
             onChange={(event) => setSortIndex(event.target.value)}
           />
         </Grid>
         <Grid size={{ xs: 12, sm: 6 }}>
-          <TextField fullWidth size="small" label="Spoljni konto (knjigovodstvena agencija)" value={externalAccount} onChange={(event) => setExternalAccount(event.target.value)} slotProps={{ htmlInput: { maxLength: 255 } }} />
+          <TextField fullWidth size="small" label={t('fields.externalAccount')} value={externalAccount} onChange={(event) => setExternalAccount(event.target.value)} slotProps={{ htmlInput: { maxLength: 255 } }} />
         </Grid>
         <Grid size={12}>
-          <TextField fullWidth size="small" multiline minRows={2} label="Napomena" value={note} onChange={(event) => setNote(event.target.value)} slotProps={{ htmlInput: { maxLength: 255 } }} />
+          <TextField fullWidth size="small" multiline minRows={2} label={t('fields.note')} value={note} onChange={(event) => setNote(event.target.value)} slotProps={{ htmlInput: { maxLength: 255 } }} />
         </Grid>
       </Grid>
-      <Button type="submit" variant="contained" disabled={update.isPending || !shortName.trim() || !printName.trim()} sx={{ alignSelf: 'flex-end' }}>Sačuvaj</Button>
+      <Button type="submit" variant="contained" disabled={update.isPending || !shortName.trim() || !printName.trim()} sx={{ alignSelf: 'flex-end' }}>{t('common.save')}</Button>
     </Stack>
   )
 }

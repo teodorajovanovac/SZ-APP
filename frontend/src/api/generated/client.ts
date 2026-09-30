@@ -55,7 +55,7 @@ export class ApiProblemError extends Error {
   readonly problem: ProblemDetails
 
   constructor(problem: ProblemDetails) {
-    super(problem.detail || problem.title || 'Došlo je do greške pri komunikaciji sa serverom.')
+    super(problem.detail || problem.title || `HTTP ${problem.status ?? ''}`.trim())
     this.name = 'ApiProblemError'
     this.problem = problem
   }

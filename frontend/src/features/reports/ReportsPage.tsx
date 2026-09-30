@@ -29,6 +29,7 @@ import { getErrorMessage } from '../../api/problemDetails'
 import { useActiveCompany } from '../companies/useActiveCompany'
 import { useCompanyRole } from '../companies/useCompanyRole'
 import { ConsistencyChecksPanel } from './ConsistencyChecksPanel'
+import { PageHeader } from '../../shared/components/PageHeader'
 import { formatDate } from '../../shared/format/date'
 import { formatNumber } from '../../shared/format/money'
 import {
@@ -67,7 +68,7 @@ export function ReportsPage() {
     try {
       return { value: parseReportParameters(rawParameters) }
     } catch (e) {
-      return { error: e instanceof Error ? e.message : 'Neispravni parametri.' }
+      return { error: e instanceof Error ? e.message : t('validation.invalidParams') }
     }
   }, [rawParameters])
 
@@ -78,12 +79,12 @@ export function ReportsPage() {
 
   return (
     <Stack spacing={3}>
-      <Typography component="h1" variant="h1">Analize i izveštaji</Typography>
+      <PageHeader title={t('reportsUi.title')} />
       <Typography color="text.secondary">{t('reports_.intro')}</Typography>
       {canAdmin ? <ConsistencyChecksPanel companyId={activeCompany.id} isRoot={role === 'Root'} /> : null}
 
-      {definitionsError ? <Alert severity="error">Definicije izveštaja nisu dostupne.</Alert> : null}
-      {runError ? <Alert severity="error">{getErrorMessage(runError, 'Izveštaj nije mogao da se pokrene.')}</Alert> : null}
+      {definitionsError ? <Alert severity="error">{t('reportsUi.definitionsError')}</Alert> : null}
+      {runError ? <Alert severity="error">{getErrorMessage(runError, t('reportsUi.runError'))}</Alert> : null}
 
       <Accordion disableGutters variant="outlined" sx={{ '&::before': { display: 'none' } }}>
         <AccordionSummary expandIcon={<ExpandMoreIcon />} aria-controls="report-parameters" id="report-parameters-header">
@@ -241,7 +242,7 @@ function ReportResult({ table }: { table: ReportTable }) {
     <Paper variant="outlined" component="section">
       <Stack spacing={1} sx={{ p: 2, pb: 1 }}>
         <Typography variant="h6" component="h2">{table.name} ({table.rowCount})</Typography>
-        {table.isTruncated ? <Alert severity="warning">Rezultat je skraćen na serverski limit.</Alert> : null}
+        {table.isTruncated ? <Alert severity="warning">{t('reportsUi.truncated')}</Alert> : null}
       </Stack>
       {table.rows.length === 0 ? (
         <Typography sx={{ p: 4, textAlign: 'center', color: 'text.secondary' }}>{t('reports_.resultEmpty')}</Typography>
