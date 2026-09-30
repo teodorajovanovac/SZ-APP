@@ -329,19 +329,34 @@ public sealed class BillingService(
             if (batch.Status != BillingBatchStatus.Generated)
                 throw new DomainRuleException("billing.batch-not-generated", "Samo generisana serija može biti knjižena.");
 
-            var invoices = await db.Invoices.AsNoTracking()
-                .Where(x => x.CompanyId == companyId && EF.Property<int?>(x, "InvoiceBatchId") == batchId && !x.IsCancelled)
-                .Select(x => new InvoiceHead(x.Id, x.PartnerId, x.PartnerName, x.DueDate, x.InvoiceTotal, EF.Property<string?>(x, "PaymentReference")))
+            // Active invoices plus GAP-12 group members (storno, parent = an active master): their lines are
+            // posted and then moved onto the master in the same journal (legacy GrupniRacunFixKnjizenje).
+            var heads = await db.Invoices.AsNoTracking()
+                .Where(x => x.CompanyId == companyId && EF.Property<int?>(x, "InvoiceBatchId") == batchId)
+                .Select(x => new
+                {
+                    Head = new InvoiceHead(x.Id, x.PartnerId, x.PartnerName, x.DueDate, x.InvoiceTotal, EF.Property<string?>(x, "PaymentReference")),
+                    x.IsCancelled,
+                    ParentId = EF.Property<int?>(x, "InvoiceParentId"),
+                    MasterAccountId = EF.Property<int?>(x, "InvoiceLegacyMasterId")
+                })
                 .ToArrayAsync(ct);
-            if (invoices.Length == 0) throw new DomainRuleException("billing.batch-empty", "Serija nema aktivne račune.");
+            var active = heads.Where(x => !x.IsCancelled).ToDictionary(x => x.Head.Id);
+            if (active.Count == 0) throw new DomainRuleException("billing.batch-empty", "Serija nema aktivne račune.");
+            var members = heads.Where(x => x.IsCancelled && x.ParentId is { } p && active.ContainsKey(p)).ToArray();
+            var groupMasterIds = active.Values.Where(x => x.MasterAccountId != null && x.ParentId == null).Select(x => x.Head.Id).ToHashSet();
+            var invoices = active.Values.Concat(members).Select(x => x.Head).ToArray();
+            var postedInvoiceIds = invoices.Select(x => x.Id).ToArray();
 
             var lineSums = await db.InvoiceLines.AsNoTracking()
-                .Where(x => x.CompanyId == companyId && EF.Property<int?>(x, "InvoiceBatchId") == batchId && !x.Invoice.IsCancelled)
+                .Where(x => x.CompanyId == companyId && EF.Property<int?>(x, "InvoiceBatchId") == batchId && postedInvoiceIds.Contains(x.InvoiceId))
                 .GroupBy(x => new { x.InvoiceId, SupplierInvoiceId = EF.Property<int?>(x, "SupplierInvoiceId") })
                 .Select(g => new { g.Key.InvoiceId, g.Key.SupplierInvoiceId, Amount = g.Sum(x => x.TotalAmount) })
                 .ToArrayAsync(ct);
 
             var customerAccounts = await ResolveCustomerAccountsAsync(companyId, invoices, ct);
+            var interest = await LoadInterestPostingAsync(companyId, batch, heads.Select(x => new InvoiceCarrierRow(x.Head.Id, x.Head.PartnerId, x.IsCancelled, x.ParentId)),
+                active.Values.Select(x => x.Head).ToDictionary(x => x.Id), customerAccounts, ct);
             var sources = new List<InvoicePostingSource>();
             foreach (var invoice in invoices)
             {
@@ -349,9 +364,12 @@ public sealed class BillingService(
                 var own = lineSums.Where(x => x.InvoiceId == invoice.Id).ToArray();
                 sources.AddRange(own.Select(x => new InvoicePostingSource(
                     invoice.Id, account.Id, account.Account, invoice.DueDate, invoice.PaymentReference, x.SupplierInvoiceId, x.Amount)));
-                // Invoice-level amounts that aren't on a line (benefit reduction, interest,
+                // A group master's debt is its members' lines moved onto it, not a residual.
+                if (groupMasterIds.Contains(invoice.Id) || !active.ContainsKey(invoice.Id)) continue;
+                // Invoice-level amounts that aren't on a line or in the interest run (benefit reduction,
                 // rounding) still belong to the customer's debt: posted without a supplier invoice.
-                var residual = FinanceRounding.Money(invoice.InvoiceTotal - own.Sum(x => x.Amount));
+                var residual = FinanceRounding.Money(invoice.InvoiceTotal - own.Sum(x => x.Amount)
+                    - interest.Where(x => x.InvoiceId == invoice.Id).Sum(x => x.Amount));
                 if (residual != 0m)
                 {
                     sources.Add(new InvoicePostingSource(
@@ -359,10 +377,17 @@ public sealed class BillingService(
                 }
             }
 
-            var supplierIds = sources.Where(x => x.SupplierInvoiceId is not null).Select(x => x.SupplierInvoiceId!.Value).Distinct().ToArray();
+            var groupTargets = members.ToDictionary(x => x.Head.Id, x =>
+            {
+                var master = active[x.ParentId!.Value].Head;
+                var account = customerAccounts[master.Id];
+                return new GroupInvoiceTarget(master.Id, account.Id, account.Account, master.DueDate, master.PaymentReference);
+            });
+            var supplierIds = sources.Select(x => x.SupplierInvoiceId).Concat(interest.Select(x => x.SupplierInvoiceId))
+                .Where(x => x is not null).Select(x => x!.Value).Distinct().ToArray();
             var suppliers = await LoadSupplierPostingInfoAsync(companyId, supplierIds, ct);
             var documentRef = DocumentPostingRules.InvoiceDocumentRef(batch.PeriodYYMM);
-            var lines = DocumentPostingRules.BuildInvoiceBatch(batch.TransactionDate, documentRef, sources, suppliers);
+            var lines = DocumentPostingRules.BuildInvoiceBatch(batch.TransactionDate, documentRef, sources, suppliers, interest, groupTargets);
             var result = await ledger.PostAsync(new LedgerPostingRequest(
                 companyId, "InvoiceBatch", batchId, batch.TransactionDate, $"SZ RACUNI {documentRef}", "RSD", idempotencyKey, lines), ct);
 
@@ -541,6 +566,45 @@ public sealed class BillingService(
         return result;
     }
 
+    /// <summary>
+    /// R7/R8 + 9.2 "kamata": the batch's PrenesiZK rows, attributed to invoices like ApplyInterestAsync (members -> master;
+    /// partners without an active invoice are not posted, like legacy's ZK INNER JOIN Racun), posted as 2040 on the interest
+    /// sub-account (SubAccount.InterestSubAccountId, e.g. 11301 -> 11309) and linked to the company's type-9 supplier invoice for
+    /// that sub-account -- this period's, else the '0000' template (PeriodYYMM 0) -- when one exists (then 4350/5590 as well).
+    /// </summary>
+    private async Task<IReadOnlyList<InterestPostingSource>> LoadInterestPostingAsync(int companyId, InvoiceBatch batch,
+        IEnumerable<InvoiceCarrierRow> rows, IReadOnlyDictionary<int, InvoiceHead> activeHeads,
+        IReadOnlyDictionary<int, (int Id, string Account)> accounts, CancellationToken ct)
+    {
+        var transfer = await InvoiceGenerationService.LoadInterestTransferAsync(db, companyId, batch.Id, ct);
+        if (transfer.Count == 0) return [];
+        var carriers = InvoiceGenerationEngine.InvoiceCarriers(rows);
+        var baseSubs = transfer.Select(x => x.Total.SubAccountId).Distinct().ToArray();
+        var interestSub = await db.Set<SubAccount>().AsNoTracking()
+            .Where(x => baseSubs.Contains(x.Id) && x.InterestSubAccountId != null && x.InterestSubAccountId != "-1")
+            .ToDictionaryAsync(x => x.Id, x => x.InterestSubAccountId!, ct);
+        string? SubFor(string baseSub) => interestSub.GetValueOrDefault(baseSub) ?? (baseSub.Length == 0 ? null : baseSub);
+        var subs = baseSubs.Select(SubFor).Where(x => x is not null).Distinct().ToArray();
+        var templates = await (
+                from s in db.Set<SupplierInvoice>().AsNoTracking()
+                join t in db.ShortLists.AsNoTracking() on s.DocumentTypeId equals t.Id
+                where s.CompanyId == companyId && t.TableName == "SupplierDocumentType" && t.IndexValue == SupplierDocumentTypes.Interest
+                    && (s.PeriodYYMM == batch.PeriodYYMM || s.PeriodYYMM == 0) && subs.Contains(s.SubAccountId)
+                select new { s.Id, s.SubAccountId, s.PeriodYYMM })
+            .ToArrayAsync(ct);
+        var supplierFor = templates.GroupBy(x => x.SubAccountId!)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.PeriodYYMM).ThenBy(x => x.Id).First().Id);
+
+        return transfer.Where(x => carriers.ContainsKey(x.PartnerId)).Select(x =>
+        {
+            var head = activeHeads[carriers[x.PartnerId]];
+            var account = accounts[head.Id];
+            var sub = SubFor(x.Total.SubAccountId);
+            int? supplierId = sub is not null && supplierFor.TryGetValue(sub, out var id) ? id : null;
+            return new InterestPostingSource(head.Id, account.Id, account.Account, head.DueDate, head.PaymentReference, sub, supplierId, x.Total.Interest);
+        }).ToArray();
+    }
+
     private async Task<Dictionary<int, SupplierPostingInfo>> LoadSupplierPostingInfoAsync(int companyId, IReadOnlyCollection<int> ids, CancellationToken ct)
     {
         if (ids.Count == 0) return [];
@@ -716,6 +780,8 @@ public sealed class BillingService(
             batch.InterestPeriodStart = request.PeriodStart;
             batch.InterestPeriodEnd = request.PeriodEnd;
             await db.SaveChangesAsync(ct);
+            // R7/R8: an already generated batch gets the new KamataIznos on its invoices right away.
+            await InvoiceGenerationService.ApplyInterestAsync(db, companyId, batch.Id, ct);
 
             var totals = InterestCalculator.Totals(rows);
             return new InterestRunResponse(batch.Id, request.PeriodStart, request.PeriodEnd, rows.Count,

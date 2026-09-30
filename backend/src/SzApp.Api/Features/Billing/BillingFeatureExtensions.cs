@@ -55,12 +55,15 @@ public static class BillingFeatureExtensions
         batches.MapPost("/", (int companyId, CreateInvoiceBatchRequest request, ClaimsPrincipal principal, BillingService service, CancellationToken ct) =>
                 service.CreateInvoiceBatchAsync(companyId, StaffId(principal), request, ct))
             .RequireAuthorization(SecurityConstants.CompanyWritePolicy).AddEndpointFilter<AntiforgeryEndpointFilter>();
-        // Item 8 wizard: server-computed invoices (R0..R3). Single-company scope (route companyId).
-        batches.MapPost("/preview", (int companyId, GenerateInvoicesV2Request request, InvoiceGenerationService service, CancellationToken ct) =>
-                service.PreviewAsync(companyId, request.PeriodYYMM, request.ExtraordinaryMarker, request.ExchangeRateNbs, ct))
+        // Item 8 wizard: server-computed invoices (R0..R3). Scope = route company, a location category or all
+        // companies the caller may write to (request.Scope); one batch per company.
+        batches.MapPost("/preview", async (int companyId, GenerateInvoicesV2Request request, ClaimsPrincipal principal, InvoiceGenerationService service, CancellationToken ct) =>
+                await service.PreviewScopeAsync(await service.ResolveScopeAsync(principal, companyId, request.Scope, request.LocationCategoryId, ct), request, ct))
             .RequireAuthorization(SecurityConstants.CompanyWritePolicy).AddEndpointFilter<AntiforgeryEndpointFilter>();
-        batches.MapPost("/generate", (int companyId, GenerateInvoicesV2Request request, ClaimsPrincipal principal, InvoiceGenerationService service, CancellationToken ct) =>
-                service.GenerateAsync(companyId, StaffId(principal), request, ct))
+        batches.MapPost("/generate", async (int companyId, GenerateInvoicesV2Request request, ClaimsPrincipal principal, InvoiceGenerationService service,
+                BillingService billing, CancellationToken ct) =>
+                await service.GenerateScopeAsync(await service.ResolveScopeAsync(principal, companyId, request.Scope, request.LocationCategoryId, ct),
+                    StaffId(principal), request, billing, ct))
             .RequireAuthorization(SecurityConstants.CompanyWritePolicy)
             .AddEndpointFilter<AntiforgeryEndpointFilter>().AddEndpointFilter<IdempotencyKeyEndpointFilter>();
         batches.MapPost("/{batchId:int}/preview", (int companyId, int batchId, InvoiceGenerationRequest request, BillingService service, CancellationToken ct) =>
