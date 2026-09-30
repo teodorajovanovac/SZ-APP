@@ -82,7 +82,8 @@ export function useSavePartner(companyId: number, partnerId?: number) {
       partnerId
         ? masterDataApi.partners.update(companyId, partnerId, value)
         : masterDataApi.partners.create(companyId, value),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['master-data', companyId, 'partners'] }),
+    // A partner can be created in / moved to another company, so refresh every company's partner cache.
+    onSuccess: () => queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === 'master-data' && query.queryKey[2] === 'partners' }),
   })
 }
 

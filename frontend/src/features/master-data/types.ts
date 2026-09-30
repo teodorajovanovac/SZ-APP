@@ -86,6 +86,8 @@ export interface SavePartner {
   isSefUser: boolean
   isCrfUser: boolean
   skipAutoCheckSef: boolean
+  /** Target company; for an existing partner a different value moves it. */
+  companyId?: number
 }
 
 export interface PartnerAddress {

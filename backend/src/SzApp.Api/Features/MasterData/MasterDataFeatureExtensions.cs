@@ -371,6 +371,27 @@ public static class MasterDataFeatureExtensions
         {
             return Results.NotFound();
         }
+        if (request.CompanyId is { } targetCompanyId && targetCompanyId != companyId)
+        {
+            if (!await permission.CanWriteAsync(principal, targetCompanyId, cancellationToken))
+            {
+                return Results.Forbid();
+            }
+            if (!await dbContext.Companies.AnyAsync(item => item.Id == targetCompanyId, cancellationToken))
+            {
+                return Results.NotFound();
+            }
+            // Ledger/billing rows are company-scoped; moving a partner that already has any
+            // would leave them pointing at a partner of another company.
+            if (await dbContext.Set<PartnerAccount>().AnyAsync(item => item.PartnerId == partnerId, cancellationToken) ||
+                await dbContext.Set<BankAccount>().AnyAsync(item => item.PartnerId == partnerId, cancellationToken) ||
+                await dbContext.Invoices.AnyAsync(item => item.PartnerId == partnerId, cancellationToken) ||
+                await dbContext.Set<Contract>().AnyAsync(item => item.OwnerPartnerId == partnerId || item.InvoicePartnerId == partnerId || item.TenantPartnerId == partnerId, cancellationToken))
+            {
+                return Results.Conflict(new { message = "Partner se ne može prebaciti u drugu kompaniju dok ima konta, račune, ugovore ili fakture." });
+            }
+            partner.CompanyId = targetCompanyId;
+        }
         Apply(partner, request);
         await dbContext.SaveChangesAsync(cancellationToken);
         return Results.Ok(ToResponse(partner));

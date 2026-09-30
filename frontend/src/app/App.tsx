@@ -21,6 +21,7 @@ import { SettingsPage } from '../features/administration/SettingsPage'
 import { ShortListsPage } from '../features/administration/ShortListsPage'
 import { BuildingEntranceDetailPage } from '../features/master-data/pages/BuildingEntranceDetailPage'
 import { PartnerDetailPage } from '../features/master-data/pages/PartnerDetailPage'
+import { PartnerEditPage } from '../features/master-data/pages/PartnerEditPage'
 import { UnitDetailPage } from '../features/master-data/pages/UnitDetailPage'
 import { ContractsPage } from '../features/contracts/ContractsPage'
 import { BillingWorkspace } from '../features/billing/BillingWorkspace'
@@ -64,6 +65,8 @@ function AuthenticatedRoutes() {
               <Route path="administration" element={<AdministrationRoute />} />
             </Route>
             <Route path="partners" element={<PartnersPage />} />
+            <Route path="partners/new" element={<PartnerEditPage />} />
+            <Route path="partners/:companyId/:partnerId/edit" element={<PartnerEditPage />} />
             <Route path="addresses" element={<AddressesPage />} />
             <Route element={<RoleGuard allowedRoles={['Root', 'Upravnik']} />}>
               <Route path="staff" element={<StaffListPage />} />

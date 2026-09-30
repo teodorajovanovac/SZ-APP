@@ -4,11 +4,11 @@ import EditIcon from '@mui/icons-material/Edit'
 import { Alert, Button, IconButton, Link, Stack, TextField, Tooltip, Typography } from '@mui/material'
 import type { ColumnDef, PaginationState, SortingState } from '@tanstack/react-table'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 import { FormDialog } from '../../../shared/components/FormDialog'
 import { ServerDataTable } from '../../../shared/components/ServerDataTable'
 import { usePartners } from '../useMasterData'
 import { PartnerDetail } from './PartnerDetail'
-import { PartnerForm } from './PartnerForm'
 import type { Partner } from '../types'
 
 interface PartnerListProps {
@@ -21,7 +21,7 @@ export function PartnerList({ companyId, onSelect }: PartnerListProps) {
   const [search, setSearch] = useState('')
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 25 })
   const [sorting, setSorting] = useState<SortingState>([{ id: 'shortName', desc: false }])
-  const [editing, setEditing] = useState<Partner | 'new'>()
+  const navigate = useNavigate()
   const [viewing, setViewing] = useState<Partner>()
   const sort = sorting[0]
   const partners = usePartners(companyId, {
@@ -63,21 +63,21 @@ export function PartnerList({ companyId, onSelect }: PartnerListProps) {
         meta: { align: 'right' },
         cell: ({ row }) => (
           <Tooltip title={t('ui.edit')}>
-            <IconButton size="small" aria-label={t('ui.edit')} onClick={() => setEditing(row.original)}>
+            <IconButton size="small" aria-label={t('ui.edit')} onClick={() => navigate(`/partners/${row.original.companyId}/${row.original.id}/edit`)}>
               <EditIcon fontSize="small" />
             </IconButton>
           </Tooltip>
         ),
       },
     ],
-    [onSelect, t],
+    [navigate, onSelect, t],
   )
 
   return (
     <Stack spacing={2}>
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'center' }} justifyContent="space-between">
         <Typography component="h1" variant="h1">Partneri</Typography>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setEditing('new')}>
+        <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate('/partners/new')}>
           {t('partners_.new')}
         </Button>
       </Stack>
@@ -105,29 +105,12 @@ export function PartnerList({ companyId, onSelect }: PartnerListProps) {
         getRowId={(row) => String(row.id)}
       />
 
-      <FormDialog
-        open={Boolean(editing)}
-        title={editing === 'new' ? t('partners_.newTitle') : t('partners_.editTitle')}
-        onClose={() => setEditing(undefined)}
-        maxWidth="md"
-      >
-        {editing ? (
-          <PartnerForm
-            companyId={companyId}
-            partner={editing === 'new' ? undefined : editing}
-            onSaved={() => setEditing(undefined)}
-            onCancel={() => setEditing(undefined)}
-          />
-        ) : null}
-      </FormDialog>
-
       <FormDialog open={Boolean(viewing)} title={t('partners_.detailTitle')} onClose={() => setViewing(undefined)}>
         {viewing ? (
           <PartnerDetail
             partner={viewing}
             onEdit={() => {
-              setEditing(viewing)
-              setViewing(undefined)
+              navigate(`/partners/${viewing.companyId}/${viewing.id}/edit`)
             }}
           />
         ) : null}

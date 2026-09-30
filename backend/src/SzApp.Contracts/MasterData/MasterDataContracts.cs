@@ -84,7 +84,8 @@ public sealed record SavePartnerRequest(
     string? Note,
     bool IsSefUser = false,
     bool IsCrfUser = false,
-    bool SkipAutoCheckSef = false);
+    bool SkipAutoCheckSef = false,
+    int? CompanyId = null);
 
 public sealed record PartnerAddressResponse(
     int Id,

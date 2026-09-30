@@ -8,17 +8,18 @@ import { getErrorMessage } from '../../../api/problemDetails'
 import { useActiveCompany } from '../../companies/useActiveCompany'
 import { useSavePartner } from '../useMasterData'
 import { useShortList } from '../useShortList'
+import { isValidJmbg, isValidMb, isValidPib } from '../../../shared/validation/serbianIds'
 import { PartnerAddressesSection } from './PartnerAddressesSection'
 import type { Partner, SavePartner } from '../types'
 
 const partnerSchema = z.object({
   shortName: z.string().trim().min(1, 'Kratak naziv je obavezan.').max(100),
   name: z.string().trim().min(1, 'Pun naziv je obavezan.').max(255),
-  registrationNumber: z.string().trim().max(10).optional(),
-  taxNumber: z.string().trim().max(10).optional(),
+  registrationNumber: z.string().trim().max(10).refine((v) => !v || isValidMb(v), 'Matični broj nije ispravan (8 cifara sa kontrolnom cifrom).').optional(),
+  taxNumber: z.string().trim().max(10).refine((v) => !v || isValidPib(v), 'PIB nije ispravan (9 cifara sa kontrolnom cifrom).').optional(),
   jbkjs: z.string().trim().max(10).optional(),
   idCardNumber: z.string().trim().max(20).optional(),
-  jmbg: z.string().trim().max(15).optional(),
+  jmbg: z.string().trim().max(15).refine((v) => !v || isValidJmbg(v), 'JMBG nije ispravan (13 cifara sa kontrolnom cifrom).').optional(),
   language: z.string().trim().min(1).max(10),
   note: z.string().optional(),
   partnerTypeId: z.number().nullable(),
@@ -41,7 +42,9 @@ export function PartnerForm({ companyId, partner, onSaved, onCancel }: PartnerFo
   // The company list is already limited to what the signed-in staff member may access.
   const { companies } = useActiveCompany()
   const [selectedCompanyId, setSelectedCompanyId] = useState(partner?.companyId ?? companyId)
-  const save = useSavePartner(selectedCompanyId, partner?.id)
+  // An existing partner is saved through its current company's route; a move is expressed by
+  // sending the newly selected companyId in the body. A new partner is created under the selection.
+  const save = useSavePartner(partner?.companyId ?? selectedCompanyId, partner?.id)
   const partnerTypes = useShortList(selectedCompanyId, 'PartnerType')
   const {
     register,
@@ -75,6 +78,7 @@ export function PartnerForm({ companyId, partner, onSaved, onCancel }: PartnerFo
     // untouched field is omitted from the request and the backend leaves it alone.
     const request: SavePartner = {
       ...value,
+      companyId: selectedCompanyId,
       idCardNumber: dirtyFields.idCardNumber ? value.idCardNumber : undefined,
       jmbg: dirtyFields.jmbg ? value.jmbg : undefined,
     }
@@ -119,8 +123,6 @@ export function PartnerForm({ companyId, partner, onSaved, onCancel }: PartnerFo
             label="Kompanija"
             value={selectedCompanyId}
             onChange={(event) => setSelectedCompanyId(Number(event.target.value))}
-            // A saved partner belongs to its company; only a new partner can pick one.
-            disabled={Boolean(partner)}
           >
             {companies.map((company) => <MenuItem key={company.id} value={company.id}>{company.name}</MenuItem>)}
           </TextField>
@@ -178,7 +180,7 @@ export function PartnerForm({ companyId, partner, onSaved, onCancel }: PartnerFo
         <Section>Adrese</Section>
         <Grid size={12}>
           {partner
-            ? <PartnerAddressesSection companyId={selectedCompanyId} partnerId={partner.id} />
+            ? <PartnerAddressesSection companyId={partner.companyId} partnerId={partner.id} />
             : <Typography color="text.secondary" variant="body2">Adrese se unose nakon što se partner prvi put sačuva.</Typography>}
         </Grid>
 
