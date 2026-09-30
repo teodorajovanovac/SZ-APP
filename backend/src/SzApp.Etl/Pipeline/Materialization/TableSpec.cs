@@ -60,7 +60,7 @@ public static class TableSpecs
             Key: KeyMode.Natural, Ignore: ["DefaultSupplierPartnerAccountId"]),
         new("CalculationType", typeof(CalculationType), [new("UnitOfMeasureId", "ShortList", "UnitOfMeasure")], Key: KeyMode.Explicit),
         new("InterestRate", typeof(InterestRate), []),
-        new("Address", typeof(Address), []),
+        new("Address", typeof(Address), [], Aliases: new Dictionary<string, string> { ["StreetAddress"] = "Address" }),
         new("Partner", typeof(Partner),
             [new("CompanyId", "Company"), new("PartnerTypeId", "ShortList", "PartnerType")]),
         new("Company", typeof(Company),

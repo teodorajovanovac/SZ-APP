@@ -1,13 +1,12 @@
-import { Card, CardContent, Link, Tab, Table, TableBody, TableCell, TableHead, TableRow, Tabs } from '@mui/material'
+import { Card, CardContent, Link, Tab, Tabs } from '@mui/material'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link as RouterLink, useParams } from 'react-router-dom'
 import { ApiProblemError } from '../../../api/generated/client'
-import { EmptyState } from '../../../shared/components/EmptyState'
-import { formatDate } from '../../../shared/format/date'
 import { useShortList } from '../useShortList'
-import { useBuildingEntranceDetail, useContractHistory, useUnitDetail } from '../useMasterData'
+import { useBuildingEntranceDetail, useUnitDetail } from '../useMasterData'
 import { DetailField, DetailGrid, DetailPageLayout } from './DetailPageLayout'
+import { ContractChangeSection } from './ContractChangeSection'
 
 export function UnitDetailPage() {
   const { t } = useTranslation()
@@ -23,7 +22,6 @@ export function UnitDetailPage() {
   // UX-24: names instead of raw ids.
   const entrance = useBuildingEntranceDetail(cid, data?.buildingEntranceId ?? 0)
   const unitTypes = useShortList(data?.unitTypeId ? cid : 0, 'UnitType')
-  const contracts = useContractHistory(tab === 1 ? cid : 0, validParams ? unitIdNum : 0)
   const isNotFound = !validParams || (detail.error instanceof ApiProblemError && isNotFoundStatus(detail.error.problem.status))
   const entranceName = entrance.data ? [entrance.data.buildingName, entrance.data.entranceName].filter(Boolean).join(' · ') : null
   const unitType = unitTypes.data?.find((item) => item.id === data?.unitTypeId)?.caption
@@ -63,29 +61,8 @@ export function UnitDetailPage() {
                 <DetailField label="K5" value={data.k5} />
                 <DetailField label={t('fields.note')} value={data.note} />
               </DetailGrid>
-            ) : (contracts.data?.length ?? 0) === 0 && !contracts.isLoading ? (
-              <EmptyState message={t('units_.contractsEmpty')} />
             ) : (
-              <Table aria-label={t('ui.tabs.contracts')}>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>{t('fields.accountNumber')}</TableCell>
-                    <TableCell>{t('fields.contractDate')}</TableCell>
-                    <TableCell>{t('fields.contractEnd')}</TableCell>
-                    <TableCell>{t('fields.status')}</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {contracts.data?.map((contract) => (
-                    <TableRow key={contract.id} hover>
-                      <TableCell sx={{ fontVariantNumeric: 'tabular-nums' }}>{contract.accountNumber ?? '—'}</TableCell>
-                      <TableCell>{formatDate(contract.contractDate)}</TableCell>
-                      <TableCell>{contract.contractEndDate ? formatDate(contract.contractEndDate) : '—'}</TableCell>
-                      <TableCell>{contract.isActive ? t('contracts_.statusActive') : t('contracts_.statusInactive')}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <ContractChangeSection companyId={cid} unitId={unitIdNum} />
             )}
           </CardContent>
         </Card>

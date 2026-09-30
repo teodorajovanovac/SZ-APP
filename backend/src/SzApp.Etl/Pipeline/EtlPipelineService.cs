@@ -8,6 +8,7 @@ using SzApp.Data.Entities.EtlExtended;
 using SzApp.Domain;
 using SzApp.Etl.Csv;
 using SzApp.Etl.Parsing;
+using SzApp.Etl.Pipeline.Materialization;
 
 namespace SzApp.Etl.Pipeline;
 
@@ -177,6 +178,12 @@ public sealed class EtlPipelineService(
                 .Where(x => x.SourceTable == context.SourceTable)
                 .Select(x => x.SourceKey)
                 .ToHashSetAsync(cancellationToken);
+            if (TableSpecs.Find(context.SourceTable) is { } spec)
+            {
+                await MaterializeAsync(run, context, spec, rows, quarantinedKeys, cancellationToken);
+                return;
+            }
+
             var materializable = MasterDataMaterializer.IsSupported(context.SourceTable);
 
             foreach (var row in rows.Where(x => !quarantinedKeys.Contains(x.SourceKey ?? string.Empty)))
@@ -241,6 +248,14 @@ public sealed class EtlPipelineService(
         }
         catch (Exception exception)
         {
+            // TableMaterializer clears the change tracker; drop half-written rows and re-attach the run.
+            if (dbContext.Entry(run).State == EntityState.Detached)
+            {
+                dbContext.ChangeTracker.Clear();
+                dbContext.Attach(run);
+                dbContext.Attach(context);
+            }
+
             run.Status = EtlRunStatus.Failed;
             run.Error = exception.Message;
             context.Stage = EtlPipelineStage.Failed;
@@ -248,6 +263,47 @@ public sealed class EtlPipelineService(
             await dbContext.SaveChangesAsync(cancellationToken);
             throw;
         }
+    }
+
+    // ETL-05/08/09: tables with a TableSpec get the real delta materializer (insert/update/unchanged,
+    // chunked, key map with RowHash) and, for financial tables, the balance reconciliation.
+    private async Task MaterializeAsync(
+        EtlRun run, EtlRunContext context, TableSpec spec, RawStagingRow[] rows, HashSet<string> quarantinedKeys, CancellationToken ct)
+    {
+        var staged = rows
+            .Select(x => (Row: x, Values: JsonSerializer.Deserialize<Dictionary<string, string>>(x.ValuesJson) ?? []))
+            .Select(x => new StagedRow(
+                x.Values.GetValueOrDefault(spec.KeyColumn) ?? x.Row.SourceKey ?? x.Row.SourceRowNumber.ToString(CultureInfo.InvariantCulture),
+                x.Row.RowHash, x.Row.SourceRowNumber,
+                new Dictionary<string, string>(x.Values, StringComparer.OrdinalIgnoreCase)))
+            .Where(x => !quarantinedKeys.Contains(x.SourceKey))
+            .ToArray();
+
+        var result = await new TableMaterializer(new ImportContext(dbContext), spec, run.Id, context.CompanyId, timeProvider).RunAsync(staged, ct);
+        run = await dbContext.EtlRuns.SingleAsync(x => x.Id == run.Id, ct);
+        context = await dbContext.Set<EtlRunContext>().SingleAsync(x => x.EtlRunId == run.Id, ct);
+        await ResolveRelationshipsAsync(context.CompanyId, run.Id, ct);
+
+        context.Stage = EtlPipelineStage.Reconciling;
+        var now = timeProvider.GetUtcNow();
+        AddReconciliation(run.Id, ReconciliationMetric.RowCount, context.SourceTable, staged.Length,
+            result.Inserted + result.Updated + result.Unchanged, now);
+        if (ImportReconciler.FinancialTables.Contains(context.SourceTable))
+        {
+            var companies = result.CompanyIds.Count > 0 ? result.CompanyIds : [context.CompanyId];
+            dbContext.AddRange(await ImportReconciler.ReconcileAsync(dbContext, run.Id, companies, null, now, ct));
+        }
+
+        run.ImportedRowCount = result.Inserted + result.Updated;
+        run.QuarantinedRowCount = await dbContext.QuarantineRecords.CountAsync(x => x.EtlRunId == run.Id, ct);
+        run.Status = EtlRunStatus.Completed;
+        run.CompletedAt = now;
+        run.Error = result.DeletedInSource.Count > 0
+            ? $"Obrisano u izvoru (nije brisano ovde): {result.DeletedInSource.Count}"
+            : null;
+        context.Stage = EtlPipelineStage.Completed;
+        context.UpdatedAt = now;
+        await dbContext.SaveChangesAsync(ct);
     }
 
     private async Task EnsureDependenciesAsync(EtlRunContext context, CancellationToken cancellationToken)
