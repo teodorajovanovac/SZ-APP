@@ -2,6 +2,7 @@
 // strings that used to be hardcoded in master-data / reports / imports. Registered with
 // addResourceBundle (deep merge), like i18n.invoicePdf.ts, so i18n.ts stays lean.
 import i18n from './i18n'
+import '../shared/validation'
 
 const bundles = {
   'sr-Latn': {
@@ -48,7 +49,7 @@ const bundles = {
       interestRange: 'Početak perioda kamate mora biti pre kraja.',
       endAfterStart: 'Kraj mora biti posle početka.',
       jsonObject: 'Parametri moraju biti JSON objekat.',
-      invalidParams: 'Neispravni parametri.',
+      invalidParams: 'Neispravni parametri.', tooSmall: 'Najmanje {{min}}.', tooBig: 'Najviše {{max}} znakova.', email: 'Neispravna email adresa.', format: 'Neispravan format.',
     },
     fields: {
       shortName: 'Kratak naziv', fullName: 'Pun naziv', registrationNumber: 'Matični broj', taxNumber: 'PIB', jbkjs: 'JBKJS',
@@ -133,7 +134,7 @@ const bundles = {
       interestRange: 'Почетак периода камате мора бити пре краја.',
       endAfterStart: 'Крај мора бити после почетка.',
       jsonObject: 'Параметри морају бити JSON објекат.',
-      invalidParams: 'Неисправни параметри.',
+      invalidParams: 'Неисправни параметри.', tooSmall: 'Најмање {{min}}.', tooBig: 'Највише {{max}} знакова.', email: 'Неисправна имејл адреса.', format: 'Неисправан формат.',
     },
     fields: {
       shortName: 'Кратак назив', fullName: 'Пун назив', registrationNumber: 'Матични број', taxNumber: 'ПИБ', jbkjs: 'ЈБКЈС',
@@ -218,7 +219,7 @@ const bundles = {
       interestRange: 'Interest period start must be before its end.',
       endAfterStart: 'End must be after start.',
       jsonObject: 'Parameters must be a JSON object.',
-      invalidParams: 'Invalid parameters.',
+      invalidParams: 'Invalid parameters.', tooSmall: 'At least {{min}}.', tooBig: 'At most {{max}} characters.', email: 'Invalid email address.', format: 'Invalid format.',
     },
     fields: {
       shortName: 'Short name', fullName: 'Full name', registrationNumber: 'Registration no.', taxNumber: 'Tax ID', jbkjs: 'JBKJS',

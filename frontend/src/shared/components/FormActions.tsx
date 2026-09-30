@@ -12,8 +12,8 @@ interface FormActionsProps {
 
 /** True when the form was submitted with the "Sačuvaj i novi" button (or Ctrl+Enter). */
 // eslint-disable-next-line react-refresh/only-export-components
-export function isSaveNewSubmit(event?: { nativeEvent?: Event } | Event): boolean {
-  const native = event && 'nativeEvent' in event ? event.nativeEvent : event
+export function isSaveNewSubmit(event?: { nativeEvent?: unknown }): boolean {
+  const native = event?.nativeEvent
   const submitter = (native as SubmitEvent | undefined)?.submitter
   return Boolean(submitter?.hasAttribute('data-save-new'))
 }

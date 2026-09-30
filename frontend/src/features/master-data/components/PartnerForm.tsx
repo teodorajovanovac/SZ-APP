@@ -1,21 +1,24 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Alert, Button, Divider, Grid, Stack, TextField, Typography } from '@mui/material'
+import { Alert, Divider, Grid, Stack, TextField, Typography } from '@mui/material'
+import type { BaseSyntheticEvent } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
 import { getErrorMessage } from '../../../api/problemDetails'
+import { FormActions, isSaveNewSubmit } from '../../../shared/components/FormActions'
 import { useSavePartner } from '../useMasterData'
 import type { Partner, SavePartner } from '../types'
 
+// zod messages are i18n keys (translated at render) so the schema can stay at module scope.
 const partnerSchema = z.object({
-  shortName: z.string().trim().min(1, 'Kratak naziv je obavezan.').max(100),
-  name: z.string().trim().min(1, 'Pun naziv je obavezan.').max(255),
+  shortName: z.string().trim().min(1, 'validation.shortNameRequired').max(100),
+  name: z.string().trim().min(1, 'validation.fullNameRequired').max(255),
   registrationNumber: z.string().trim().max(10).optional(),
   taxNumber: z.string().trim().max(10).optional(),
   jbkjs: z.string().trim().max(10).optional(),
   idCardNumber: z.string().trim().max(20).optional(),
   jmbg: z.string().trim().max(15).optional(),
-  language: z.string().trim().min(1).max(10),
+  language: z.string().trim().min(1, 'validation.required').max(10),
   note: z.string().optional(),
 })
 
@@ -25,10 +28,12 @@ interface PartnerFormProps {
   companyId: number
   partner?: Partner
   onSaved?: (partner: Partner) => void
+  /** Offers "Sačuvaj i novi"; called instead of onSaved when that button (Ctrl+Enter) was used. */
+  onSavedNew?: (partner: Partner) => void
   onCancel?: () => void
 }
 
-export function PartnerForm({ companyId, partner, onSaved, onCancel }: PartnerFormProps) {
+export function PartnerForm({ companyId, partner, onSaved, onSavedNew, onCancel }: PartnerFormProps) {
   const { t } = useTranslation()
   const save = useSavePartner(companyId, partner?.id)
   const {
@@ -49,8 +54,10 @@ export function PartnerForm({ companyId, partner, onSaved, onCancel }: PartnerFo
       note: partner?.note ?? '',
     },
   })
+  const message = (error?: { message?: string }) => (error?.message ? t(error.message) : undefined)
 
-  const submit = (value: PartnerFormValue) => {
+  const submit = (value: PartnerFormValue, event?: BaseSyntheticEvent) => {
+    const andNew = Boolean(onSavedNew) && isSaveNewSubmit(event)
     // idCardNumber/jmbg come back from the API masked (e.g. "***1234"), so this form can
     // never preload the real value — it always starts blank. Sending that blank back as ''
     // would make the backend erase the stored value on every unrelated edit. Only send
@@ -62,66 +69,63 @@ export function PartnerForm({ companyId, partner, onSaved, onCancel }: PartnerFo
       jmbg: dirtyFields.jmbg ? value.jmbg : undefined,
       partnerTypeId: partner?.partnerTypeId ?? null,
     }
-    save.mutate(request, { onSuccess: onSaved })
+    save.mutate(request, { onSuccess: andNew ? onSavedNew : onSaved })
   }
 
   return (
     <Stack component="form" spacing={2} onSubmit={handleSubmit(submit)} noValidate>
-      {save.isError && <Alert severity="error">{getErrorMessage(save.error, 'Partner nije sačuvan. Proverite podatke i pokušajte ponovo.')}</Alert>}
+      {save.isError && <Alert severity="error">{getErrorMessage(save.error, t('partners_.saveError'))}</Alert>}
       <Grid container spacing={2} columnSpacing={3}>
-        <Section>Identifikacija</Section>
+        <Section>{t('sections.identification')}</Section>
         <Grid size={{ xs: 12, sm: 6 }}>
-          <TextField fullWidth size="small" label="Kratak naziv" required {...register('shortName')} error={!!errors.shortName} helperText={errors.shortName?.message} />
+          <TextField fullWidth size="small" label={t('fields.shortName')} required {...register('shortName')} error={!!errors.shortName} helperText={message(errors.shortName)} />
         </Grid>
         <Grid size={{ xs: 12, sm: 6 }}>
-          <TextField fullWidth size="small" label="Pun naziv" required {...register('name')} error={!!errors.name} helperText={errors.name?.message} />
+          <TextField fullWidth size="small" label={t('fields.fullName')} required {...register('name')} error={!!errors.name} helperText={message(errors.name)} />
         </Grid>
         <Grid size={{ xs: 12, sm: 4 }}>
-          <TextField fullWidth size="small" label="Matični broj" {...register('registrationNumber')} error={!!errors.registrationNumber} helperText={errors.registrationNumber?.message} />
+          <TextField fullWidth size="small" label={t('fields.registrationNumber')} {...register('registrationNumber')} error={!!errors.registrationNumber} helperText={message(errors.registrationNumber)} />
         </Grid>
         <Grid size={{ xs: 12, sm: 4 }}>
-          <TextField fullWidth size="small" label="PIB" {...register('taxNumber')} error={!!errors.taxNumber} helperText={errors.taxNumber?.message} />
+          <TextField fullWidth size="small" label={t('fields.taxNumber')} {...register('taxNumber')} error={!!errors.taxNumber} helperText={message(errors.taxNumber)} />
         </Grid>
         <Grid size={{ xs: 12, sm: 4 }}>
-          <TextField fullWidth size="small" label="JBKJS" {...register('jbkjs')} error={!!errors.jbkjs} helperText={errors.jbkjs?.message} />
+          <TextField fullWidth size="small" label={t('fields.jbkjs')} {...register('jbkjs')} error={!!errors.jbkjs} helperText={message(errors.jbkjs)} />
         </Grid>
 
-        <Section>Lični podaci</Section>
+        <Section>{t('sections.personal')}</Section>
         <Grid size={{ xs: 12, sm: 4 }}>
           <TextField
             fullWidth
             size="small"
-            label="Broj lične karte"
+            label={t('fields.idCardNumber')}
             placeholder={partner?.maskedIdCardNumber ?? undefined}
             {...register('idCardNumber')}
             error={!!errors.idCardNumber}
-            helperText={errors.idCardNumber?.message ?? (partner?.maskedIdCardNumber ? t('partners_.maskedFieldHint', { value: partner.maskedIdCardNumber }) : undefined)}
+            helperText={message(errors.idCardNumber) ?? (partner?.maskedIdCardNumber ? t('partners_.maskedFieldHint', { value: partner.maskedIdCardNumber }) : undefined)}
           />
         </Grid>
         <Grid size={{ xs: 12, sm: 4 }}>
           <TextField
             fullWidth
             size="small"
-            label="JMBG"
+            label={t('fields.jmbg')}
             placeholder={partner?.maskedJmbg ?? undefined}
             {...register('jmbg')}
             error={!!errors.jmbg}
-            helperText={errors.jmbg?.message ?? (partner?.maskedJmbg ? t('partners_.maskedFieldHint', { value: partner.maskedJmbg }) : undefined)}
+            helperText={message(errors.jmbg) ?? (partner?.maskedJmbg ? t('partners_.maskedFieldHint', { value: partner.maskedJmbg }) : undefined)}
           />
         </Grid>
         <Grid size={{ xs: 12, sm: 4 }}>
-          <TextField fullWidth size="small" label="Jezik" required {...register('language')} error={!!errors.language} helperText={errors.language?.message} />
+          <TextField fullWidth size="small" label={t('fields.language')} required {...register('language')} error={!!errors.language} helperText={message(errors.language)} />
         </Grid>
 
-        <Section>Napomena</Section>
+        <Section>{t('sections.note')}</Section>
         <Grid size={12}>
-          <TextField fullWidth size="small" label="Napomena" multiline minRows={3} {...register('note')} />
+          <TextField fullWidth size="small" label={t('fields.note')} multiline minRows={3} {...register('note')} />
         </Grid>
       </Grid>
-      <Stack direction="row" spacing={1} justifyContent="flex-end">
-        {onCancel && <Button onClick={onCancel}>Odustani</Button>}
-        <Button type="submit" variant="contained" disabled={save.isPending}>Sačuvaj</Button>
-      </Stack>
+      <FormActions onCancel={onCancel} pending={save.isPending} saveNew={Boolean(onSavedNew)} />
     </Stack>
   )
 }
@@ -134,4 +138,3 @@ function Section({ children }: { children: string }) {
     </Grid>
   )
 }
-
