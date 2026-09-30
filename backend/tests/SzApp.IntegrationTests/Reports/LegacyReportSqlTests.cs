@@ -34,6 +34,15 @@ public sealed class LegacyReportSqlTests
             catch (SqlException exception) { failures.Add($"{section.QueryName}: {exception.Message}"); }
         }
 
+        foreach (var export in SzApp.Api.Features.Export.LegacyFormatExports.All)
+        {
+            await using var command = new SqlCommand("sp_describe_first_result_set", connection) { CommandType = System.Data.CommandType.StoredProcedure };
+            command.Parameters.AddWithValue("@tsql", export.Sql);
+            command.Parameters.AddWithValue("@params", "@ids nvarchar(max), @yymm int");
+            try { await using var reader = await command.ExecuteReaderAsync(); }
+            catch (SqlException exception) { failures.Add($"{export.Name}: {exception.Message}"); }
+        }
+
         Assert.Empty(failures);
     }
 }

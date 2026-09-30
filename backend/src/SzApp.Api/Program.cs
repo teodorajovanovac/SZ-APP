@@ -195,6 +195,7 @@ app.MapPlatformEndpoints();
 app.MapReportsEndpoints();
 app.MapEtlEndpoints();
 app.MapExportEndpoints();
+app.MapLegacyFormatExports();
 
 var auth = app.MapGroup("/api/v1/auth").WithTags("Auth");
 
