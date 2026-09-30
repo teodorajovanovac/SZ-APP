@@ -9,6 +9,7 @@ import type {
   SaveCompany,
   SavePartner,
   SavePartnerAccount,
+  SavePartnerAddress,
   SaveStaffAccess,
   SaveUnit,
 } from './types'
@@ -90,6 +91,35 @@ export function useDeletePartner(companyId: number) {
   return useMutation({
     mutationFn: (partnerId: number) => masterDataApi.partners.remove(companyId, partnerId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['master-data', companyId, 'partners'] }),
+  })
+}
+
+const partnerAddressesKey = (companyId: number, partnerId: number) => ['master-data', companyId, 'partner-addresses', partnerId] as const
+
+export function usePartnerAddresses(companyId: number, partnerId: number) {
+  return useQuery({
+    queryKey: partnerAddressesKey(companyId, partnerId),
+    queryFn: () => masterDataApi.partners.addresses.list(companyId, partnerId),
+    enabled: companyId > 0 && partnerId > 0,
+  })
+}
+
+export function useSavePartnerAddress(companyId: number, partnerId: number, id?: number) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (value: SavePartnerAddress) =>
+      id
+        ? masterDataApi.partners.addresses.update(companyId, partnerId, id, value)
+        : masterDataApi.partners.addresses.create(companyId, partnerId, value),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: partnerAddressesKey(companyId, partnerId) }),
+  })
+}
+
+export function useDeletePartnerAddress(companyId: number, partnerId: number) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => masterDataApi.partners.addresses.remove(companyId, partnerId, id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: partnerAddressesKey(companyId, partnerId) }),
   })
 }
 

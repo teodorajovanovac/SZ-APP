@@ -82,6 +82,9 @@ public static class MasterDataMaterializer
             RegistrationNumber = Get(v, "RegistrationNumber"),
             TaxNumber = Get(v, "TaxNumber"),
             Jbkjs = Get(v, "Jbkjs"),
+            IsSefUser = GetFlag(v, "IsSefUser"),
+            IsCrfUser = GetFlag(v, "IsCrfUser"),
+            SkipAutoCheckSef = GetFlag(v, "SkipAutoCheckSef"),
             IdCardNumber = Get(v, "IdCardNumber"),
             Jmbg = Get(v, "Jmbg"),
             PartnerTypeId = null, // ShortList lookup — not materialized yet
@@ -191,6 +194,10 @@ public static class MasterDataMaterializer
 
     private static string? Get(IReadOnlyDictionary<string, string> values, string key) =>
         values.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value) ? value.Trim() : null;
+
+    // Missing/blank legacy Yes/No columns mean "not set", which the new non-null flag stores as false.
+    private static bool GetFlag(IReadOnlyDictionary<string, string> values, string key) =>
+        Get(values, key) is { } raw && SerbianLegacyValueParser.ParseAccessBoolean(raw);
 
     private static int? ParseNullableInt(string? raw) =>
         raw is null ? null : int.Parse(raw, CultureInfo.InvariantCulture);
