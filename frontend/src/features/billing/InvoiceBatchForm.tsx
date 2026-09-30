@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Alert, Button, Divider, Grid, Stack, Typography } from '@mui/material'
+import { Alert, Button, Divider, Grid, MenuItem, Stack, TextField, Typography } from '@mui/material'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
@@ -68,6 +68,8 @@ export function InvoiceBatchForm({ companyId, onCreated }: { companyId: number; 
   const runInterest = useRunInterest(companyId)
   const queryClient = useQueryClient()
   const [generation, setGeneration] = useState<GenerateInvoicesRequest | null>(null)
+  const [scope, setScope] = useState<'single' | 'location' | 'all'>('single')
+  const [locationCategoryId, setLocationCategoryId] = useState('')
   const { control, handleSubmit, reset, formState, setValue } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -85,17 +87,24 @@ export function InvoiceBatchForm({ companyId, onCreated }: { companyId: number; 
       const presets = await queryClient.fetchQuery(interestPresetsQuery(companyId, { periodYYMM: value.periodYYMM, previousValueDate, balanceAsOfDate, dueDate: value.dueDate }))
       period = resolveInterestPeriod({ interestPreset, interestStart, interestEnd }, presets.presets, presets.defaultPreset)
     }
-    const created = await create.mutateAsync({
-      ...batch, month, year, extraordinaryInvoiceMarker: null,
-      balanceAsOfDate: balanceAsOfDate || null, previousValueDate: previousValueDate || null,
-      isInterestCalculated: interestEnabled, paymentPurpose: null,
-    })
-    if (interestEnabled) {
-      await runInterest.mutateAsync({ invoiceBatchId: created.id, periodStart: period.start, periodEnd: period.end })
+    // Multi-company scope: the server creates one batch per company and runs interest after generation.
+    const multi = scope !== 'single'
+    if (!multi) {
+      const created = await create.mutateAsync({
+        ...batch, month, year, extraordinaryInvoiceMarker: null,
+        balanceAsOfDate: balanceAsOfDate || null, previousValueDate: previousValueDate || null,
+        isInterestCalculated: interestEnabled, paymentPurpose: null,
+      })
+      if (interestEnabled) {
+        await runInterest.mutateAsync({ invoiceBatchId: created.id, periodStart: period.start, periodEnd: period.end })
+      }
     }
     setGeneration({
       periodYYMM: value.periodYYMM, extraordinaryMarker: null, place: value.place, issueDate: value.issueDate, dueDate: value.dueDate,
       serviceDateFrom: value.serviceDateFrom, serviceDateTo: value.serviceDateTo, transactionDate: value.transactionDate, exchangeRateNbs: value.exchangeRateNbs,
+      scope, locationCategoryId: scope === 'location' && locationCategoryId ? Number(locationCategoryId) : null,
+      interestPeriodStart: multi && interestEnabled ? period.start : null,
+      interestPeriodEnd: multi && interestEnabled ? period.end : null,
     })
     reset()
     onCreated?.()
@@ -121,6 +130,19 @@ export function InvoiceBatchForm({ companyId, onCreated }: { companyId: number; 
         <Grid size={{ xs: 12, sm: 4 }}>
           <ControlledTextField control={control} name="place" label={t('billing_.form.place')} required />
         </Grid>
+
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <TextField select fullWidth size="small" label={t('invx_.scope')} value={scope} onChange={(e) => setScope(e.target.value as typeof scope)}>
+            <MenuItem value="single">{t('invx_.scopeSingle')}</MenuItem>
+            <MenuItem value="location">{t('invx_.scopeLocation')}</MenuItem>
+            <MenuItem value="all">{t('invx_.scopeAll')}</MenuItem>
+          </TextField>
+        </Grid>
+        {scope === 'location' ? (
+          <Grid size={{ xs: 12, sm: 4 }}>
+            <TextField fullWidth size="small" type="number" required label={t('invx_.locationId')} value={locationCategoryId} onChange={(e) => setLocationCategoryId(e.target.value)} />
+          </Grid>
+        ) : null}
 
         <SectionHeading>{t('billingUi.sectionDates')}</SectionHeading>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>

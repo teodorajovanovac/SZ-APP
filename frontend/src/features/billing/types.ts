@@ -70,9 +70,30 @@ export interface GenerateInvoicesRequest {
   serviceDateTo: string
   transactionDate: string
   exchangeRateNbs: number
+  scope?: 'single' | 'location' | 'all'
+  locationCategoryId?: number | null
+  interestPeriodStart?: string | null
+  interestPeriodEnd?: string | null
+}
+
+export interface InvoiceScopePreview {
+  buildings: InvoiceBatchPreview[]
+  customerCount: number
+  netTotal: number
+  vatTotal: number
+  interestTotal: number
+  total: number
+}
+
+export interface GenerateInvoicesScopeResult {
+  companies: Array<{ companyId: number; companyName: string; invoiceBatchId: number | null; alreadyGenerated: boolean; invoiceCount: number; interestTotal: number | null; error: string | null }>
 }
 
 export interface InvoiceBatchPreview {
+  companyName: string
+  previousTotal: number | null
+  changePercent: number | null
+  error: string | null
   companyId: number
   periodYYMM: number
   customerCount: number
