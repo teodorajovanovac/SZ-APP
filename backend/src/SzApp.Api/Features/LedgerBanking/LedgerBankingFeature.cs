@@ -94,7 +94,7 @@ public static class LedgerBankingFeature
                 .Skip((safePage - 1) * safePageSize).Take(safePageSize)
                 .Select(x => new JournalEntrySummaryResponse(
                     x.Id, x.PostingDate, x.Description, x.Currency, x.Balance, x.IsPosted,
-                    x.PostedAt, x.ReversalOfId, Convert.ToBase64String(x.RowVersion)))
+                    x.PostedAt, x.ReversalOfId, Convert.ToBase64String(x.RowVersion), x.JournalEntryTypeId))
                 .ToArrayAsync(cancellationToken);
             return Results.Ok(new PageResponse<JournalEntrySummaryResponse>(items, safePage, safePageSize, total));
         });
@@ -109,7 +109,7 @@ public static class LedgerBankingFeature
                 .Where(x => x.Id == id && x.CompanyId == companyId)
                 .Select(x => new JournalEntrySummaryResponse(
                     x.Id, x.PostingDate, x.Description, x.Currency, x.Balance, x.IsPosted,
-                    x.PostedAt, x.ReversalOfId, Convert.ToBase64String(x.RowVersion)))
+                    x.PostedAt, x.ReversalOfId, Convert.ToBase64String(x.RowVersion), x.JournalEntryTypeId))
                 .SingleOrDefaultAsync(cancellationToken);
             if (header is null) return Results.NotFound();
 
@@ -120,7 +120,8 @@ public static class LedgerBankingFeature
                 .OrderBy(x => x.Priority)
                 .Select(x => new LedgerEntryResponse(
                     x.Id, x.Account, x.PostingDate, x.DueDate, x.DebitAmount, x.CreditAmount, x.DocumentRef,
-                    EF.Property<string?>(x, "SubAccountId"), EF.Property<int?>(x, "PartnerAccountId"), x.Note))
+                    EF.Property<string?>(x, "SubAccountId"), EF.Property<int?>(x, "PartnerAccountId"), x.Note,
+                    x.Parameters, x.Description))
                 .ToArrayAsync(cancellationToken);
             return Results.Ok(new JournalEntryResponse(header, lines));
         });

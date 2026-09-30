@@ -14,6 +14,8 @@ import { canPostJournal, canPostStatement, formatMoney } from './ledgerBankingFo
 import type { BankStatementSummary, JournalEntrySummary, PostingPeriodLock } from './types'
 import { BankStatementUpload } from './BankStatementUpload'
 import { BankStatementMatchingDialog } from './BankStatementMatchingDialog'
+import { JournalTools } from '../journals/JournalTools'
+import { ManualJournalDialog } from '../journals/ManualJournalDialog'
 
 const statementStatusColor: Record<BankStatementSummary['status'], 'default' | 'warning' | 'info' | 'success'> = {
   Imported: 'default',
@@ -68,6 +70,7 @@ function JournalPanel({ companyId, canPost }: { companyId: number; canPost: bool
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 25 })
   const [sorting, setSorting] = useState<SortingState>([])
   const [pendingAction, setPendingAction] = useState<{ journal: JournalEntrySummary; reverse: boolean } | null>(null)
+  const [editDraftId, setEditDraftId] = useState<number | null>(null)
   const queryKey = ['ledger-journals', companyId, pagination]
   const journals = useQuery({
     queryKey,
@@ -125,6 +128,8 @@ function JournalPanel({ companyId, canPost }: { companyId: number; canPost: bool
         cell: ({ row }) => {
           if (!canPost) return null
           return canPostJournal(row.original) ? (
+            <>
+            <Button size="small" sx={{ mr: 1 }} onClick={() => setEditDraftId(row.original.id)}>{t('acct_.editDraft')}</Button>
             <Button
               size="small"
               variant="contained"
@@ -133,6 +138,7 @@ function JournalPanel({ companyId, canPost }: { companyId: number; canPost: bool
             >
               {t('ledgerBanking.post')}
             </Button>
+            </>
           ) : (
             <Button
               size="small"
@@ -153,6 +159,8 @@ function JournalPanel({ companyId, canPost }: { companyId: number; canPost: bool
   return (
     <Stack spacing={2}>
       <Typography variant="body2" color="text.secondary">{t('ledgerBanking.journalsHint')}</Typography>
+      <JournalTools companyId={companyId} canWrite={canPost} canPost={canPost} />
+      <ManualJournalDialog companyId={companyId} open={editDraftId !== null} draftId={editDraftId ?? undefined} canPost={canPost} onClose={() => setEditDraftId(null)} />
       {journals.isError ? <Alert severity="error">{t('ledgerBanking.loadFailed')}</Alert> : null}
       <MutationError error={mutation.error} />
       <ServerDataTable

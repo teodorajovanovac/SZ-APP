@@ -10,7 +10,10 @@ public sealed record LedgerLineRequest(
     string? DocumentRef,
     string? SubAccountId,
     int? PartnerAccountId,
-    string? Note);
+    string? Note,
+    // GAP-13 manual journal: GK.PARAMETRI (poziv na broj) and the line description.
+    string? PaymentReference = null,
+    string? Description = null);
 
 public sealed record CreateJournalEntryRequest(
     DateOnly PostingDate,
@@ -29,7 +32,8 @@ public sealed record JournalEntrySummaryResponse(
     bool IsPosted,
     DateTimeOffset? PostedAt,
     int? ReversalOfId,
-    string RowVersion);
+    string RowVersion,
+    int? JournalEntryTypeId);
 
 public sealed record JournalEntryResponse(
     JournalEntrySummaryResponse Header,
@@ -45,7 +49,9 @@ public sealed record LedgerEntryResponse(
     string? DocumentRef,
     string? SubAccountId,
     int? PartnerAccountId,
-    string? Note);
+    string? Note,
+    string? PaymentReference,
+    string? Description);
 
 public sealed record ConcurrencyCommandRequest(string RowVersion);
 

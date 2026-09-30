@@ -24,6 +24,7 @@ import { ServerDataTable } from '../../shared/components/ServerDataTable'
 import { usePartnerAccounts } from '../master-data/useMasterData'
 import { useShortList } from '../master-data/useShortList'
 import { SupplierInvoiceForm } from './SupplierInvoiceForm'
+import { SupplierWorkflowActions } from './SupplierWorkflowActions'
 import { useSupplierInvoicePosting, useSupplierInvoices, type SupplierInvoice } from './supplierApi'
 
 // Legacy TipDokumenta codes that are posted on their own (type 1 goes with the invoice batch).
@@ -147,9 +148,12 @@ export function SupplierInvoiceList({ companyId, canPost = false }: { companyId:
     <Stack spacing={2}>
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'center' }} justifyContent="space-between">
         <Typography component="h1" variant="h1">{t('suppliers_.title')}</Typography>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreating(true)}>
-          {t('suppliersUi.new')}
-        </Button>
+        <Stack direction="row" spacing={1}>
+          {canPost ? <SupplierWorkflowActions companyId={companyId} periodYYMM={periodYYMM} /> : null}
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreating(true)}>
+            {t('suppliersUi.new')}
+          </Button>
+        </Stack>
       </Stack>
 
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} flexWrap="wrap" useFlexGap>
