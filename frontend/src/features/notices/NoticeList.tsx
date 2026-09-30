@@ -13,6 +13,7 @@ import { MoneyField } from '../../shared/components/MoneyField'
 import { ServerDataTable } from '../../shared/components/ServerDataTable'
 import { useShortList } from '../master-data/useShortList'
 import { NoticeCostsPanel } from './NoticeCostsPanel'
+import { NoticeDocumentsToolbar, NoticeRowDocuments } from './NoticeDocumentsToolbar'
 import { useCreateNoticeBatch, useGenerateNotices, useNoticeCommand, useNoticeTemplates, useNotices } from './noticeApi'
 import type { CreateNoticeBatch, Notice } from './noticeApi'
 
@@ -54,6 +55,11 @@ export function NoticeList({ companyId, canWrite }: { companyId: number; canWrit
         ),
       },
       {
+        id: 'documents',
+        header: t('noticeDocs_.lawsuit'),
+        cell: ({ row }) => <NoticeRowDocuments companyId={companyId} notice={row.original} canWrite={canWrite} />,
+      },
+      {
         id: 'actions',
         header: t('notices_.columns.action'),
         cell: ({ row }) => (
@@ -82,7 +88,7 @@ export function NoticeList({ companyId, canWrite }: { companyId: number; canWrit
         ),
       },
     ],
-    [canWrite, command, t],
+    [canWrite, command, companyId, t],
   )
 
   return (
@@ -102,6 +108,8 @@ export function NoticeList({ companyId, canWrite }: { companyId: number; canWrit
         </Stack>
       </Box>
       {showCosts ? <NoticeCostsPanel companyId={companyId} /> : null}
+      {/* Server enforces CompanyPost for cost posting; hidden only for read-only users here. */}
+      <NoticeDocumentsToolbar companyId={companyId} canWrite={canWrite} canPost={canWrite} />
       <FormDialog open={showNewBatch} title={t('notices_.newBatch')} onClose={() => setShowNewBatch(false)}>
         {showNewBatch ? <NewNoticeBatchForm companyId={companyId} onDone={() => setShowNewBatch(false)} /> : null}
       </FormDialog>

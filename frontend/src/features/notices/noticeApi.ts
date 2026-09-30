@@ -1,6 +1,60 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiRequest } from '../../api/generated/client'
 import type { BillingPage } from '../billing/types'
+import { downloadFile } from '../billing/billingApi'
+
+// --- Notice documents / cost posting / lawsuit (GAP-09, GAP-20) ---
+export interface NoticeBatchListItem {
+  id: number
+  title: string
+  date: string
+  noticeCount: number
+  totalCosts: number
+  costsJournalEntryId: number | null
+}
+export interface NoticeEmailPreview { totalNotices: number; withEmail: number; missingEmail: number; missingCustomerNames: string[] }
+export interface NoticeEmailSendResult { enqueued: number; skipped: number }
+export type NoticeBatchAction = 'emails/preview' | 'emails/send' | 'costs/post' | 'costs/cancel'
+
+const base = (companyId: number) => `/api/v1/companies/${companyId}`
+
+export function useNoticeBatches(companyId: number) {
+  return useQuery({
+    queryKey: ['companies', companyId, 'notice-batches'],
+    queryFn: () => apiRequest<NoticeBatchListItem[]>(`${base(companyId)}/notice-batches`),
+  })
+}
+
+export function useNoticeBatchAction(companyId: number) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ batchId, action }: { batchId: number; action: NoticeBatchAction }) =>
+      apiRequest<unknown>(`${base(companyId)}/notice-batches/${batchId}/${action}`, {
+        method: 'POST',
+        headers: action === 'emails/preview' ? undefined : { 'Idempotency-Key': crypto.randomUUID() },
+      }),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ['companies', companyId, 'notice-batches'] })
+      void client.invalidateQueries({ queryKey: ['companies', companyId, 'notices'] })
+    },
+  })
+}
+
+export function useSetNoticeLawsuit(companyId: number) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ noticeId, isForLawsuit, lawyerCost }: { noticeId: number; isForLawsuit: boolean; lawyerCost: number | null }) =>
+      apiRequest<unknown>(`${base(companyId)}/notices/${noticeId}/lawsuit`, { method: 'PUT', body: JSON.stringify({ isForLawsuit, lawyerCost }) }),
+    onSuccess: () => client.invalidateQueries({ queryKey: ['companies', companyId, 'notices'] }),
+  })
+}
+
+export const downloadNoticePdf = (companyId: number, noticeId: number) =>
+  downloadFile(`${base(companyId)}/notices/${noticeId}/pdf`, 'GET', `opomena-${noticeId}.pdf`)
+export const downloadNoticeZip = (companyId: number, batchId: number) =>
+  downloadFile(`${base(companyId)}/notice-batches/${batchId}/pdf`, 'POST', `opomene-${batchId}.zip`)
+export const downloadLawsuitCsv = (companyId: number, batchId?: number) =>
+  downloadFile(`${base(companyId)}/notices/lawsuit/export${batchId ? `?batchId=${batchId}` : ''}`, 'GET', 'za-utuzenje.csv')
 
 export interface Notice {
   id: number
@@ -14,6 +68,8 @@ export interface Notice {
   deliveryStatus: 'Draft' | 'Rendered' | 'Queued' | 'Sent' | 'Failed'
   renderedDocumentPath: string | null
   rowVersion: string
+  isForLawsuit: boolean
+  lawyerCost: number | null
 }
 
 // apiRequest attaches the antiforgery header automatically for unsafe methods.
