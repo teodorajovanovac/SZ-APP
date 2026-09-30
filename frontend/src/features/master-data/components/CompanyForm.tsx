@@ -1,7 +1,8 @@
 import { Alert, Autocomplete, Button, CircularProgress, Grid, Stack, TextField } from '@mui/material'
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { getErrorMessage } from '../../../api/problemDetails'
 import { useCompanyDetail, useLocationCategories, useUpdateCompany } from '../useMasterData'
+import { flattenLocationCategories } from '../locationCategoryPaths'
 
 interface CompanyFormProps {
   companyId: number
@@ -11,6 +12,7 @@ export function CompanyForm({ companyId }: CompanyFormProps) {
   const company = useCompanyDetail(companyId)
   const update = useUpdateCompany(companyId)
   const locationCategories = useLocationCategories(companyId)
+  const locationOptions = useMemo(() => flattenLocationCategories(locationCategories.data ?? []), [locationCategories.data])
   const [shortName, setShortName] = useState('')
   const [printName, setPrintName] = useState('')
   const [relativeFolderName, setRelativeFolderName] = useState('')
@@ -70,11 +72,11 @@ export function CompanyForm({ companyId }: CompanyFormProps) {
         <Grid size={{ xs: 12, sm: 6 }}>
           <Autocomplete
             size="small"
-            options={locationCategories.data ?? []}
+            options={locationOptions}
             loading={locationCategories.isLoading}
-            getOptionLabel={(option) => option.name}
+            getOptionLabel={(option) => option.label}
             isOptionEqualToValue={(option, value) => option.id === value.id}
-            value={locationCategories.data?.find((item) => item.id === locationCategoryId) ?? null}
+            value={locationOptions.find((item) => item.id === locationCategoryId) ?? null}
             onChange={(_, option) => setLocationCategoryId(option?.id ?? null)}
             renderInput={(params) => <TextField {...params} label="Lokacijska kategorija" />}
           />

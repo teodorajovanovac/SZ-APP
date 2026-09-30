@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useMemo, useState, type FormEvent } from 'react'
 import { Alert, Autocomplete, Button, Grid, Stack, TextField } from '@mui/material'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
@@ -7,6 +7,7 @@ import { authQueryKey } from '../auth/authContext'
 import { masterDataApi } from '../master-data/masterDataApi'
 import { useLocationCategories } from '../master-data/useMasterData'
 import { useActiveCompany } from './useActiveCompany'
+import { flattenLocationCategories } from '../master-data/locationCategoryPaths'
 
 // ponytail: PartnerId is typed as a number -- there is no global-partner (CompanyId == null) lookup
 // endpoint yet; swap for an Autocomplete once one exists.
@@ -15,6 +16,7 @@ export function CompanyCreateForm({ onSaved }: { onSaved: () => void }) {
   const queryClient = useQueryClient()
   const { activeCompany } = useActiveCompany()
   const locations = useLocationCategories(activeCompany.id)
+  const locationOptions = useMemo(() => flattenLocationCategories(locations.data ?? []), [locations.data])
   const [id, setId] = useState('')
   const [partnerId, setPartnerId] = useState('')
   const [shortName, setShortName] = useState('')
@@ -68,10 +70,10 @@ export function CompanyCreateForm({ onSaved }: { onSaved: () => void }) {
         <Grid size={{ xs: 12, sm: 6 }}>
           <Autocomplete
             size="small"
-            options={locations.data ?? []}
-            getOptionLabel={(option) => option.name}
+            options={locationOptions}
+            getOptionLabel={(option) => option.label}
             isOptionEqualToValue={(option, value) => option.id === value.id}
-            value={locations.data?.find((item) => item.id === locationCategoryId) ?? null}
+            value={locationOptions.find((item) => item.id === locationCategoryId) ?? null}
             onChange={(_, option) => setLocationCategoryId(option?.id ?? null)}
             renderInput={(params) => <TextField {...params} label={t('companiesAdmin_.location')} />}
           />

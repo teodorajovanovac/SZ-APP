@@ -50,38 +50,11 @@ import type { CompanyScope } from '../features/companies/companyScope'
 import { useActiveCompany } from '../features/companies/useActiveCompany'
 import { useCompanyScope } from '../features/companies/useCompanyScope'
 import { useLocationCategories } from '../features/master-data/useMasterData'
-import type { LocationCategory } from '../features/master-data/types'
+import { flattenLocationCategories, type LocationCategoryOption } from '../features/master-data/locationCategoryPaths'
 import { buildMenuGroups, iconForName, useMenu } from './useMenu'
 
 const drawerWidth = 264
 
-interface LocationCategoryOption {
-  id: number
-  label: string
-}
-
-// Flattens the parentId-linked category tree into a searchable list of full paths
-// (e.g. "BW", "BW / Plot 24"), depth-first so children follow their parent — the
-// backend already orders siblings by SortIndex/Name, we just preserve that order.
-function flattenLocationCategories(categories: LocationCategory[]): LocationCategoryOption[] {
-  const byParent = new Map<number | null, LocationCategory[]>()
-  for (const category of categories) {
-    const siblings = byParent.get(category.parentId) ?? []
-    siblings.push(category)
-    byParent.set(category.parentId, siblings)
-  }
-  const options: LocationCategoryOption[] = []
-  const visit = (parentId: number | null, prefix: string, ancestors: Set<number>) => {
-    for (const node of byParent.get(parentId) ?? []) {
-      if (ancestors.has(node.id)) continue // defensive: ignore a cyclic parentId
-      const label = prefix ? `${prefix} / ${node.name}` : node.name
-      options.push({ id: node.id, label })
-      visit(node.id, label, new Set(ancestors).add(node.id))
-    }
-  }
-  visit(null, '', new Set())
-  return options
-}
 export function AppShell() {
   const theme = useTheme()
   const isDesktop = useMediaQuery(theme.breakpoints.up('lg'))
