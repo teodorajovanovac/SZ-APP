@@ -171,7 +171,14 @@ public sealed class NoticeTemplate : ICompanyOwned
     public int Id { get; set; }
     public int CompanyId { get; set; }
     public string Name { get; set; } = string.Empty;
+    /// <summary>Intro text before the document table (legacy rptField03, placeholders allowed).</summary>
     public string Body { get; set; } = string.Empty;
+    // 9.5 OpomeneSabloni: subject line (rptField02), closing text after the table (rptField04),
+    // signature/date block (rptField05/07), and the SZ assembly decision date for [DatumUgovora].
+    public string? Subject { get; set; }
+    public string? Closing { get; set; }
+    public string? Signature { get; set; }
+    public DateOnly? DecisionDate { get; set; }
     public bool IsActive { get; set; } = true;
     public byte[] RowVersion { get; set; } = [];
 }
@@ -195,6 +202,8 @@ public sealed class NoticeBatch : ICompanyOwned
     public decimal? AditionalCostsLowerAmount { get; set; }
     public decimal? AditionalCostsLowerLimit { get; set; }
     public decimal? AditionalCostsUpperAmount { get; set; }
+    // Journal of the optional notice-cost posting (2040 D / 4900 P); null = not posted or stornoed.
+    public int? CostsJournalEntryId { get; set; }
     public string? GenerationFingerprint { get; set; }
     public byte[] RowVersion { get; set; } = [];
     public ICollection<Notice> Notices { get; } = new List<Notice>();
@@ -232,6 +241,10 @@ public sealed class Notice : ICompanyOwned
     public NoticeDeliveryStatus DeliveryStatus { get; set; }
     public string? RenderedDocumentPath { get; set; }
     public DateTimeOffset? SentAt { get; set; }
+    // GAP-20: legacy basket type 11 ("Kupac-Za-Utuzenje") + optional lawyer cost (legacy ad-hoc 4.500).
+    // Informational only -- not part of Total and never posted.
+    public bool IsForLawsuit { get; set; }
+    public decimal? LawyerCost { get; set; }
     public byte[] RowVersion { get; set; } = [];
     public NoticeBatch NoticeBatch { get; set; } = null!;
     public ICollection<NoticeLine> Lines { get; } = new List<NoticeLine>();

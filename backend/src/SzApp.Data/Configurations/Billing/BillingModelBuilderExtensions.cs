@@ -242,6 +242,8 @@ public static class BillingModelBuilderExtensions
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Id).UseIdentityColumn();
             entity.Property(x => x.Name).HasMaxLength(100);
+            entity.Property(x => x.Subject).HasMaxLength(255);
+            entity.Property(x => x.Signature).HasMaxLength(1000);
             entity.Property(x => x.RowVersion).IsRowVersion();
             entity.HasIndex(x => new { x.CompanyId, x.Name }).IsUnique();
             entity.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.NoAction);
@@ -301,6 +303,7 @@ public static class BillingModelBuilderExtensions
             entity.Property(x => x.Total).HasPrecision(18, 2);
             entity.Property(x => x.DeliveryStatus).HasConversion<int>();
             entity.Property(x => x.RenderedDocumentPath).HasMaxLength(500);
+            entity.Property(x => x.LawyerCost).HasPrecision(18, 2);
             entity.Property(x => x.RowVersion).IsRowVersion();
             entity.HasIndex(x => new { x.CompanyId, x.NoticeBatchId, x.PartnerAccountId }).IsUnique();
             entity.HasOne(x => x.NoticeBatch).WithMany(x => x.Notices).HasForeignKey(x => x.NoticeBatchId).OnDelete(DeleteBehavior.Cascade);

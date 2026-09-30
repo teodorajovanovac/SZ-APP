@@ -880,15 +880,21 @@ public sealed class BillingService(
 
     public async Task<IReadOnlyList<NoticeTemplateResponse>> ListNoticeTemplatesAsync(int companyId, CancellationToken ct) =>
         await db.Set<NoticeTemplate>().AsNoTracking().Where(x => x.CompanyId == companyId)
-            .OrderBy(x => x.Name).Select(x => new NoticeTemplateResponse(x.Id, x.Name, x.Body, x.IsActive, Convert.ToBase64String(x.RowVersion)))
+            .OrderBy(x => x.Name).Select(x => new NoticeTemplateResponse(x.Id, x.Name, x.Body, x.IsActive, Convert.ToBase64String(x.RowVersion),
+                x.Subject, x.Closing, x.Signature, x.DecisionDate))
             .ToArrayAsync(ct);
 
     public async Task<NoticeTemplateResponse> CreateNoticeTemplateAsync(int companyId, CreateNoticeTemplateRequest request, CancellationToken ct)
     {
-        var entity = new NoticeTemplate { CompanyId = companyId, Name = Required(request.Name, 100, "Naziv šablona"), Body = Required(request.Body, int.MaxValue, "Sadržaj šablona") };
+        var entity = new NoticeTemplate
+        {
+            CompanyId = companyId, Name = Required(request.Name, 100, "Naziv šablona"), Body = Required(request.Body, int.MaxValue, "Sadržaj šablona"),
+            Subject = Trim(request.Subject, 255), Closing = Trim(request.Closing, int.MaxValue), Signature = Trim(request.Signature, 1000), DecisionDate = request.DecisionDate
+        };
         db.Add(entity);
         await db.SaveChangesAsync(ct);
-        return new(entity.Id, entity.Name, entity.Body, entity.IsActive, Convert.ToBase64String(entity.RowVersion));
+        return new(entity.Id, entity.Name, entity.Body, entity.IsActive, Convert.ToBase64String(entity.RowVersion),
+            entity.Subject, entity.Closing, entity.Signature, entity.DecisionDate);
     }
 
     public async Task<NoticeBatchResponse> CreateNoticeBatchAsync(int companyId, CreateNoticeBatchRequest request, CancellationToken ct)
@@ -949,6 +955,9 @@ public sealed class BillingService(
         {
             if (!request.Confirm)
                 throw new DomainRuleException("notice.regenerate-confirm-required", "Opomene za ovu seriju već postoje. Potvrdite ponovno generisanje.");
+            // Posted notice costs reference these notices (DocumentRef) -- storno them first.
+            if (batch.CostsJournalEntryId is not null)
+                throw new DomainRuleException("notice.costs-posted", "Troškovi opomena ove serije su proknjiženi. Stornirajte ih pre ponovnog generisanja.");
             db.RemoveRange(batch.Notices.SelectMany(x => x.Lines));
             db.RemoveRange(batch.Notices);
             batch.Notices.Clear();
@@ -1189,7 +1198,8 @@ public sealed class BillingService(
 
     private static NoticeResponse ToNoticeResponse(Notice x) =>
         new(x.Id, x.NoticeBatchId, x.PartnerAccountId, x.UnpaidInvoiceCount, x.Debt, x.AdditionalCosts, x.Total,
-            x.PaymentReference, x.DeliveryStatus.ToString(), x.RenderedDocumentPath, Convert.ToBase64String(x.RowVersion));
+            x.PaymentReference, x.DeliveryStatus.ToString(), x.RenderedDocumentPath, Convert.ToBase64String(x.RowVersion),
+            x.IsForLawsuit, x.LawyerCost);
 
     private static PaymentOrderResponse ToPaymentOrderResponse(PaymentOrder x) =>
         new(x.Id, x.TemplateTitle, x.PayerName, x.RecipientName, x.PaymentPurpose, x.Amount, x.Currency,

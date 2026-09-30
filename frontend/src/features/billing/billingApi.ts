@@ -138,7 +138,7 @@ export interface InvoiceEmailSendResult { enqueued: number; skipped: number }
 
 // File downloads need the raw Response (Blob), so they fetch their own CSRF token
 // like reportsApi's download() does.
-async function downloadFile(path: string, method: 'GET' | 'POST', fileName: string) {
+export async function downloadFile(path: string, method: 'GET' | 'POST', fileName: string) {
   const headers: Record<string, string> = {}
   if (method === 'POST') {
     const token = await apiRequest<{ token: string; headerName: string }>('/api/v1/auth/antiforgery')

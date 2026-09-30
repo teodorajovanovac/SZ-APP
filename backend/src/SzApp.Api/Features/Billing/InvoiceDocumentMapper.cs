@@ -45,7 +45,7 @@ public sealed class InvoiceDocumentMapper(SzAppDbContext db)
             : string.Empty;
 
         var lines = invoice.Lines.OrderBy(x => x.SortIndex)
-            .Select(x => new InvoiceDocumentLine(x.Name, x.Quantity, x.PricePcs, x.VatRate, x.TotalAmount))
+            .Select(x => new InvoiceDocumentLine(x.Name, x.Quantity, x.PricePcs, x.VatRate, x.TotalAmount, x.PriceEur, x.ExchangeRateNbs))
             .ToArray();
         // GAP-12 group master (legacy Racun_007) has no lines of its own: it prints its members' lines, prefixed by member.
         var members = await db.Invoices.AsNoTracking().Include(x => x.Lines)
@@ -58,6 +58,20 @@ public sealed class InvoiceDocumentMapper(SzAppDbContext db)
                     .Select(x => new InvoiceDocumentLine($"{m.PartnerName}: {x.Name}", x.Quantity, x.PricePcs, x.VatRate, x.TotalAmount)))
                 .ToArray();
         }
+
+        // RACUN_012 BENEFIT: the zeroed manager lines with their archived original amounts.
+        var lineNames = invoice.Lines.ToDictionary(x => x.Id, x => x.Name);
+        var benefitLines = (await db.Set<BenefitArchive>().AsNoTracking()
+                .Where(x => x.CompanyId == companyId && x.InvoiceId == invoiceId).OrderBy(x => x.Id)
+                .Select(x => new { x.InvoiceLineId, x.Note, x.OriginalAmount }).ToArrayAsync(ct))
+            .Select(x => new InvoiceDocumentBenefitLine(lineNames.GetValueOrDefault(x.InvoiceLineId, string.Empty), x.Note, x.OriginalAmount))
+            .ToArray();
+        // Racun_007: members point at their master through InvoiceParentId (legacy SPC).
+        var groupMembers = await db.Invoices.AsNoTracking()
+            .Where(x => x.CompanyId == companyId && EF.Property<int?>(x, "InvoiceParentId") == invoiceId)
+            .OrderBy(x => x.SequenceNumber)
+            .Select(x => new InvoiceDocumentGroupMember(x.SequenceNumber, x.PartnerName, x.Address, x.InvoiceTotal))
+            .ToArrayAsync(ct);
 
         return new InvoiceDocumentData(
             InvoiceNumber: invoice.SequenceNumber,
@@ -77,6 +91,8 @@ public sealed class InvoiceDocumentMapper(SzAppDbContext db)
             // InvoiceTotal = Total + InterestAmount (audit 9.1 R7 "Ukupno = UkupnoRacun + KamataIznos") --
             // this is the figure the IPS QR amount rule (max(PreviousDebt + Total, 0)) is defined against.
             Total: invoice.InvoiceTotal,
-            IsExtraordinary: isExtraordinary);
+            IsExtraordinary: isExtraordinary,
+            BenefitLines: benefitLines,
+            GroupMembers: groupMembers);
     }
 }

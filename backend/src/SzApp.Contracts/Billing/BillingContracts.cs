@@ -234,8 +234,10 @@ public sealed record InterestStatementResponse(
     string? SubAccountId,
     int InvoiceBatchId);
 
-public sealed record NoticeTemplateResponse(int Id, string Name, string Body, bool IsActive, string RowVersion);
-public sealed record CreateNoticeTemplateRequest(string Name, string Body);
+public sealed record NoticeTemplateResponse(int Id, string Name, string Body, bool IsActive, string RowVersion,
+    string? Subject = null, string? Closing = null, string? Signature = null, DateOnly? DecisionDate = null);
+public sealed record CreateNoticeTemplateRequest(string Name, string Body,
+    string? Subject = null, string? Closing = null, string? Signature = null, DateOnly? DecisionDate = null);
 public sealed record NoticeBatchResponse(
     int Id,
     string Title,
@@ -296,7 +298,19 @@ public sealed record NoticeResponse(
     string PaymentReference,
     string DeliveryStatus,
     string? RenderedDocumentPath,
-    string RowVersion);
+    string RowVersion,
+    bool IsForLawsuit = false,
+    decimal? LawyerCost = null);
+
+/// <summary>GAP-20: mark/unmark a notice's partner for lawsuit (legacy basket type 11), optional lawyer cost.</summary>
+public sealed record SetNoticeLawsuitRequest(bool IsForLawsuit, decimal? LawyerCost);
+
+/// <summary>Notice batch as listed for the documents toolbar. CostsJournalEntryId set = notice costs currently posted.</summary>
+public sealed record NoticeBatchListItem(int Id, string Title, DateOnly Date, int NoticeCount, decimal TotalCosts, int? CostsJournalEntryId);
+
+public sealed record NoticeEmailPreviewResult(int TotalNotices, int WithEmail, int MissingEmail, IReadOnlyList<string> MissingCustomerNames);
+public sealed record NoticeEmailSendResult(int Enqueued, int Skipped);
+public sealed record NoticeCostPostingResult(int BatchId, int? CostsJournalEntryId, int JournalEntryId, decimal TotalCosts);
 
 public sealed record PaymentOrderResponse(
     int Id,

@@ -17,9 +17,12 @@ public static class BillingFeatureExtensions
         services.AddScoped<InvoiceDocumentMapper>();
         services.AddScoped<InvoicePdfService>();
         services.AddScoped<InvoiceGenerationService>();
+        services.AddHttpContextAccessor();
+        services.AddScoped<NoticeDocumentService>();
+        services.AddScoped<NoticeActionsService>();
+        services.AddScoped<INoticeWorkflowGateway>(sp => sp.GetRequiredService<NoticeDocumentService>());
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddScoped<ILedgerPostingGateway, UnavailableLedgerPostingGateway>();
-        services.TryAddScoped<INoticeWorkflowGateway, UnavailableNoticeWorkflowGateway>();
         return services;
     }
 
@@ -80,9 +83,9 @@ public static class BillingFeatureExtensions
 
         // GAP-02/03/26: PDF + IPS QR rendering and bulk email sending. Read access is enough to
         // view/download (mirrors other read endpoints in this file); only /emails/send mutates.
-        batches.MapPost("/{batchId:int}/pdf", async (int companyId, int batchId, InvoicePdfService pdfService, CancellationToken ct) =>
+        batches.MapPost("/{batchId:int}/pdf", async (int companyId, int batchId, InvoicePdfTemplate? template, bool? doubleSlip, InvoicePdfService pdfService, CancellationToken ct) =>
         {
-            var result = await pdfService.RenderBatchZipAsync(companyId, batchId, ct);
+            var result = await pdfService.RenderBatchZipAsync(companyId, batchId, ct, template ?? InvoicePdfTemplate.Standard, doubleSlip ?? false);
             return result is null ? Results.NotFound() : Results.File(result.Bytes, "application/zip", result.FileName);
         }).AddEndpointFilter<AntiforgeryEndpointFilter>();
         batches.MapPost("/{batchId:int}/emails/preview", (int companyId, int batchId, InvoicePdfService pdfService, CancellationToken ct) =>
@@ -101,9 +104,10 @@ public static class BillingFeatureExtensions
             var invoice = await service.GetInvoiceAsync(companyId, invoiceId, ct);
             return invoice is null ? Results.NotFound() : Results.Ok(invoice);
         });
-        invoices.MapGet("/{invoiceId:int}/pdf", async (int companyId, int invoiceId, InvoicePdfService pdfService, CancellationToken ct) =>
+        // ?template=Standard|WithoutPreviousDebt|Lease|Benefit|Group &doubleSlip=true (legacy report variants, audit 9.1 "Štampa").
+        invoices.MapGet("/{invoiceId:int}/pdf", async (int companyId, int invoiceId, InvoicePdfTemplate? template, bool? doubleSlip, InvoicePdfService pdfService, CancellationToken ct) =>
         {
-            var result = await pdfService.RenderSingleAsync(companyId, invoiceId, ct);
+            var result = await pdfService.RenderSingleAsync(companyId, invoiceId, ct, template ?? InvoicePdfTemplate.Standard, doubleSlip ?? false);
             return result is null ? Results.NotFound() : Results.File(result.Bytes, "application/pdf", result.FileName);
         });
         invoices.MapPost("/{invoiceId:int}/cancel", (int companyId, int invoiceId, CancelInvoiceRequest request, HttpContext context, BillingService service, CancellationToken ct) =>
@@ -144,6 +148,18 @@ public static class BillingFeatureExtensions
                 service.SendNoticeAsync(companyId, noticeId, ct))
             .RequireAuthorization(SecurityConstants.CompanyWritePolicy).AddEndpointFilter<AntiforgeryEndpointFilter>();
 
+        // GAP-09 documents: single notice PDF (read access, like invoice PDFs) and GAP-20 lawsuit marking/export.
+        notices.MapGet("/{noticeId:int}/pdf", async (int companyId, int noticeId, bool? doubleSlip, NoticeDocumentService documents, CancellationToken ct) =>
+        {
+            var result = await documents.RenderSingleAsync(companyId, noticeId, doubleSlip ?? false, ct);
+            return result is null ? Results.NotFound() : Results.File(result.Bytes, "application/pdf", result.FileName);
+        });
+        notices.MapPut("/{noticeId:int}/lawsuit", (int companyId, int noticeId, SetNoticeLawsuitRequest request, NoticeActionsService actions, CancellationToken ct) =>
+                actions.SetLawsuitAsync(companyId, noticeId, request, ct))
+            .RequireAuthorization(SecurityConstants.CompanyWritePolicy).AddEndpointFilter<AntiforgeryEndpointFilter>();
+        notices.MapGet("/lawsuit/export", async (int companyId, int? batchId, NoticeActionsService actions, CancellationToken ct) =>
+            Results.File(await actions.ExportLawsuitCsvAsync(companyId, batchId, ct), "text/csv", "za-utuzenje.csv"));
+
         var noticeTemplates = root.MapGroup("/notice-templates").WithTags("Billing - Notice templates");
         noticeTemplates.MapGet("/", (int companyId, BillingService service, CancellationToken ct) =>
             service.ListNoticeTemplatesAsync(companyId, ct));
@@ -169,6 +185,28 @@ public static class BillingFeatureExtensions
             .RequireAuthorization(SecurityConstants.CompanyAdminPolicy).AddEndpointFilter<AntiforgeryEndpointFilter>();
 
         var noticeBatches = root.MapGroup("/notice-batches").WithTags("Billing - Notice batches");
+        noticeBatches.MapGet("/", (int companyId, NoticeActionsService actions, CancellationToken ct) => actions.ListBatchesAsync(companyId, ct));
+        noticeBatches.MapPost("/{batchId:int}/pdf", async (int companyId, int batchId, bool? doubleSlip, NoticeDocumentService documents, CancellationToken ct) =>
+        {
+            var result = await documents.RenderBatchZipAsync(companyId, batchId, doubleSlip ?? false, ct);
+            return result is null ? Results.NotFound() : Results.File(result.Bytes, "application/zip", result.FileName);
+        }).AddEndpointFilter<AntiforgeryEndpointFilter>();
+        noticeBatches.MapPost("/{batchId:int}/emails/preview", (int companyId, int batchId, NoticeDocumentService documents, CancellationToken ct) =>
+                documents.PreviewBatchEmailsAsync(companyId, batchId, ct))
+            .AddEndpointFilter<AntiforgeryEndpointFilter>();
+        noticeBatches.MapPost("/{batchId:int}/emails/send", (int companyId, int batchId, ClaimsPrincipal principal, NoticeDocumentService documents, CancellationToken ct) =>
+                documents.SendBatchEmailsAsync(companyId, batchId, StaffId(principal), ct))
+            .RequireAuthorization(SecurityConstants.CompanyWritePolicy)
+            .AddEndpointFilter<AntiforgeryEndpointFilter>().AddEndpointFilter<IdempotencyKeyEndpointFilter>();
+        // Optional notice-cost posting (P11 open question: default is NOT posted; explicit action, CompanyPost right).
+        noticeBatches.MapPost("/{batchId:int}/costs/post", (int companyId, int batchId, ClaimsPrincipal principal, NoticeActionsService actions, CancellationToken ct) =>
+                actions.PostCostsAsync(companyId, batchId, StaffId(principal), ct))
+            .RequireAuthorization(SecurityConstants.CompanyPostPolicy)
+            .AddEndpointFilter<AntiforgeryEndpointFilter>().AddEndpointFilter<IdempotencyKeyEndpointFilter>();
+        noticeBatches.MapPost("/{batchId:int}/costs/cancel", (int companyId, int batchId, ClaimsPrincipal principal, NoticeActionsService actions, CancellationToken ct) =>
+                actions.CancelCostsAsync(companyId, batchId, StaffId(principal), ct))
+            .RequireAuthorization(SecurityConstants.CompanyPostPolicy)
+            .AddEndpointFilter<AntiforgeryEndpointFilter>().AddEndpointFilter<IdempotencyKeyEndpointFilter>();
         noticeBatches.MapPost("/", (int companyId, CreateNoticeBatchRequest request, BillingService service, CancellationToken ct) =>
                 service.CreateNoticeBatchAsync(companyId, request, ct))
             .RequireAuthorization(SecurityConstants.CompanyWritePolicy).AddEndpointFilter<AntiforgeryEndpointFilter>();
@@ -199,14 +237,5 @@ public static class BillingFeatureExtensions
     {
         public Task<LedgerPostingResult> PostAsync(LedgerPostingRequest request, CancellationToken cancellationToken) =>
             throw new DomainRuleException("billing.ledger-unavailable", "Servis glavne knjige nije povezan.");
-    }
-
-    private sealed class UnavailableNoticeWorkflowGateway : INoticeWorkflowGateway
-    {
-        public Task<string> RenderAsync(int companyId, int noticeId, CancellationToken cancellationToken) =>
-            throw new DomainRuleException("notice.renderer-unavailable", "Servis za dokumente nije povezan.");
-
-        public Task SendAsync(int companyId, int noticeId, string renderedDocumentPath, CancellationToken cancellationToken) =>
-            throw new DomainRuleException("notice.sender-unavailable", "Servis za slanje nije povezan.");
     }
 }
